@@ -1,0 +1,4 @@
+ibrand
+*.a
+*.o
+*.so

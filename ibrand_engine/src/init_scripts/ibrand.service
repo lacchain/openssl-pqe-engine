@@ -1,0 +1,15 @@
+[Unit]
+Description=CQC IronBridge IBRand TRNG driver
+BindsTo=dev-ibrand.device
+After=dev-ibrand.device
+
+[Service]
+Type=forking
+WorkingDirectory=/tmp
+ExecStart=/usr/local/sbin/ibrand --dev-random --daemon --pidfile /var/run/ibrand.pid
+User=root
+Group=root
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

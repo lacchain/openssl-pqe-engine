@@ -1,0 +1,4 @@
+# This is the internal configuration file for the IronBridge ibrand RNG.
+
+IBRandDatafilePath=/var/lib/ibrand/ibrand_data.bin
+IBRandInitialised=0
