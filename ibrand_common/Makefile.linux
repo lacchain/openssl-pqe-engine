@@ -1,0 +1,63 @@
+
+PREFIX = $(DESTDIR)/usr/local
+COMMON_DIR = .
+
+CFLAGS = -g -Wall -Wextra -Werror -std=c99 -O3 -fPIC \
+ -I $(COMMON_DIR) \
+ -DLINUX
+
+.PHONY: all
+all: MARKER my_utilslib.a my_utilslib.so
+	@echo --- $@ Done
+
+MARKER:
+	@echo ================================================================================
+
+my_utilslib.h : my_base64.h my_config.h my_filelock.h my_json.h my_logging.h my_utils.h
+
+%.o: %.c my_utilslib.h
+	$(CC) -c -o $@ $< $(CFLAGS)
+	@echo --- $@ Done
+
+my_utils.o: my_utils.c my_utilslib.h
+	$(CC) $(CFLAGS) -o $@ -c my_utils.c
+	@echo --- $@ Done
+
+# Static library
+my_utilslib.a: my_base64.o my_config.o my_filelock.o my_json.o my_logging.o my_utils.o
+	ar rcs my_utilslib.a my_base64.o my_config.o my_filelock.o my_json.o my_logging.o my_utils.o
+	ranlib my_utilslib.a
+
+# Shared/Dynamic library
+my_utilslib.so: my_base64.o my_config.o my_filelock.o my_json.o my_logging.o my_utils.o my_utilslib.version
+	$(CC) $(CFLAGS) -fvisibility=hidden -o my_utilslib.so my_base64.o my_config.o my_filelock.o my_json.o my_logging.o my_utils.o -Wl,--version-script=my_utilslib.version -lm -shared
+	@echo --- $@ Done
+
+libs: my_utilslib.a
+
+clean:
+	-$(RM) *.o *.a *.gch *.so my_utilslib_example
+	@echo --- $@ Done
+
+# We use "install" to do the following...
+#	install -d <DEST_PATH>                      # mkdir <DEST_PATH>, including and parents as required.
+#	install -m <ATTRS> <FILES> <DEST_PATH>      # copy <FILES> to <DEST_PATH>, and do a chmod <ATTRS> on each.
+#	ldconfig <LIB_PATH>                         # Configure Dynamic Linker Run Time Bindings
+
+install-lib: MARKER my_utilslib.so
+	@install -d                    $(PREFIX)/include
+	install -m 0644 my_utilslib.h     $(PREFIX)/include
+	@install -d                    $(PREFIX)/lib
+	install -m 0644 my_utilslib.so    $(PREFIX)/lib
+	@ldconfig                      $(PREFIX)/lib
+	@echo --- $@ Done
+
+uninstall:
+	-$(RM) /usr/local/lib/my_utilslib.so
+	-$(RM) /usr/local/include/my_utilslib.h
+	@echo --- $@ Done
+
+show-installed:
+	-find /var | grep -i my_utils
+	-find /usr | grep -i my_utils
+	@echo --- $@ Done

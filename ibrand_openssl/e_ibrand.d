@@ -1,1 +1,1 @@
-e_ibrand.o: e_ibrand.c ../ibrand_engine/src/libibrand.h
+e_ibrand.o: e_ibrand.c ../ibrand_lib/software/libibrand.h

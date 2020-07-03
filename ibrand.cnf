@@ -1,4 +1,31 @@
-# This is the internal configuration file for the IronBridge ibrand RNG.
+JSON:{
+  "GeneralSettings":
+  {
+    "LOGGING_VERBOSITY":"3"
+  },
+  "AuthSettings":
+  {
+    "AUTHTYPE":"SIMPLE",
+    "AUTHURL":"ironbridgeapi.com/api/login",
+    "AUTHUSER":"Fred",
+    "AUTHPSWD":"Pa55w0rd",
+    "AUTHRETRYDELAY":"15"
+  },
+  "CommsSettings":
+  {
+    "BASEURL":"ironbridgeapi.com/api",
+    "BYTESPERREQUEST":"256",
+    "RETRIEVALRETRYDELAY":"3"
+  },
+  "StorageSettings":
+  {
+    "STORAGETYPE":"FILE",
+    "STORAGEDATAFORMAT":"RAW",
+    "STORAGEFILENAME":"/var/lib/ibrand/ibrand_data.bin",
+    "STORAGELOCKFILEPATH":"/tmp",
+    "STORAGEHIGHWATERMARK":"102400",
+    "STORAGELOWWATERMARK":"10240",
+    "IDLEDELAY":"10"
+  }
+}
 
-IBRandDatafilePath=/var/lib/ibrand/ibrand_data.bin
-IBRandInitialised=0

@@ -1,0 +1,88 @@
+GIT_VERSION := $(shell git --no-pager describe --tags --always)
+GIT_COMMIT  := $(shell git rev-parse --verify HEAD)
+GIT_DATE    := $(firstword $(shell git --no-pager show --date=iso-strict --format="%ad" --name-only))
+
+PREFIX = $(DESTDIR)/usr/local
+COMMON_DIR = ../../ibrand_common
+
+CFLAGS = -g -Wall -Wextra -Werror -std=c99 -O3 -fPIC \
+ -I Keccak \
+ -I /usr/include/libftdi1 \
+ -I $(COMMON_DIR) \
+ -DGIT_VERSION=\"$(GIT_VERSION)\"\
+ -DGIT_COMMIT=\"$(GIT_COMMIT)\"\
+ -DGIT_DATE=\"$(GIT_DATE)\"\
+ -DLINUX
+
+FTDI = $(shell $(CC) -o /dev/null -x c /dev/null -shared -lftdi 2>/dev/null && echo -lftdi || echo -lftdi1)
+
+.PHONY: all
+all: MARKER libibrand.so
+	@echo --- $@ IBRAND_LIB Done
+
+MARKER:
+	@echo ================================================================================
+
+%.o: %.c ibrand.h libibrand.h
+	$(CC) -c -o $@ $< $(CFLAGS)
+	@echo --- $@ Done
+
+KeccakF-1600-reference.o: Keccak/KeccakF-1600-reference.c Keccak/KeccakF-1600-interface.h Keccak/brg_endian.h
+	$(CC) -c -o $@ $< $(CFLAGS)
+	@echo --- $@ Done
+
+# Prerequisites: 
+#     apt-get install libcurl4-openssl-dev
+
+# static lib compiled into ibrand binary
+libibrand.o: libibrand.c libibrand.h libibrand_private.h healthcheck.c
+	$(CC) $(CFLAGS) -c libibrand.c
+	@echo --- $@ Done
+
+$(COMMON_DIR)/my_utilslib.a:
+	make -s $(COMMON_DIR) -f Makefile.linux
+	@echo --- $@ Done
+
+# shared lib
+libibrand.so: libibrand.o healthcheck.o KeccakF-1600-reference.o writeentropy.o $(COMMON_DIR)/my_utilslib.a
+	$(CC) $(CFLAGS) -fvisibility=hidden -o libibrand.so libibrand.o healthcheck.o KeccakF-1600-reference.o writeentropy.o $(COMMON_DIR)/my_utilslib.a -Wl,--version-script=libibrand.version $(FTDI) -lm -lcurl -shared 
+	@echo --- $@ Done
+
+clean:
+	-$(RM) ibrand *.o *.a *.gch *.so libibrand_example
+	@echo --- $@ Done
+
+# We use "install" to do the following...
+#	install -d <DEST_PATH>                      # mkdir <DEST_PATH>, including and parents as required.
+#	install -m <ATTRS> <FILES> <DEST_PATH>      # copy <FILES> to <DEST_PATH>, and do a chmod <ATTRS> on each.
+#	ldconfig <LIB_PATH>                         # Configure Dynamic Linker Run Time Bindings
+
+install: install-lib
+	@echo --- $@ Done
+
+install-lib: MARKER libibrand.so
+	@install -d                                   $(PREFIX)/include
+	install -m 0644 libibrand.h        $(PREFIX)/include
+	@install -d                                   $(PREFIX)/lib
+	install -m 0644 libibrand.so       $(PREFIX)/lib
+	@ldconfig                                     $(PREFIX)/lib
+	@install -d                                   $(PREFIX)/ssl
+	@#install -m 0644 ../../ibrand.cnf             $(PREFIX)/ssl
+	@echo --- Needs: export IBRAND_CONF="$(PREFIX)/ssl/ibrand.cnf"
+	@install -d                                   /var/lib/ibrand
+	@#install -m 0644 ../../ibrand_data.bin        /var/lib/ibrand
+	@echo --- $@ Done
+
+uninstall:
+	-$(RM) /usr/local/lib/libibrand.so
+	-$(RM) /usr/local/include/libibrand.h
+	-$(RM) /var/lib/ibrand/ibrand_data.bin
+	-rmdir /var/lib/ibrand
+	@echo --- Needs: export IBRAND_CONF=""
+	@echo --- $@ Done
+
+show-installed:
+	-find /var | grep -i ibrand
+	-find /usr | grep -i ibrand
+	@#printenv IBRAND_CONF
+	@echo --- $@ Done

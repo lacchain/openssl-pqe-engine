@@ -1,5 +1,5 @@
 // Copyright 2018 Thomás Inskip. All rights reserved.
-// https://github.com/tinskip/ibrand-openssl-engine
+// https://github.com/tinskip/infnoise-openssl-engine
 //
 // Implementation of OpenSSL RAND engine which uses the infnoise TRNG to
 // generate true random numbers: https://github.com/waywardgeek/infnoise
@@ -130,7 +130,7 @@ static int IBRandEngineStateInit(IBRandEngineState *engine_state)
   engine_state->status = initIBRand(&engine_state->trng_context, (char *)kIBRandSerial, kKeccak, kDebug);
   if (!engine_state->status)
   {
-    fprintf(stderr, "initIBRand initialization error: %s\n", engine_state->trng_context.message ? engine_state->trng_context.message : "unknown");
+    fprintf(stderr, "ERROR: initIBRand initialization error: %s\n", engine_state->trng_context.message ? engine_state->trng_context.message : "unknown");
   }
 
   return engine_state->status;
@@ -154,14 +154,14 @@ static int Bytes(unsigned char *buf, int num)
       size_t rand_bytes = readData(&engine_state.trng_context, rand_buffer, !kKeccak, kIBRandMultiplier);
       if (engine_state.trng_context.errorFlag)
       {
-        fprintf(stderr, "IBRand error: %s\n", engine_state.trng_context.message ? engine_state.trng_context.message : "unknown");
+        fprintf(stderr, "ERROR: %s\n", engine_state.trng_context.message ? engine_state.trng_context.message : "unknown");
         engine_state.status = kEngineFail;
         break;
       }
       size_t bytes_written = RingBufferWrite(&engine_state.ring_buffer, rand_bytes, rand_buffer);
       if (bytes_written != rand_bytes)
       {
-        fprintf(stderr, "Invalid ibrand engine buffer state!\n");
+        fprintf(stderr, "ERROR: Invalid ibrand engine buffer state\n");
         engine_state.status = kEngineFail;
         break;
       }
@@ -190,7 +190,7 @@ int ibrand_bind(ENGINE *engine, const char *id)
       ENGINE_set_name(engine, kEngineName) != kEngineOk ||
       ENGINE_set_RAND(engine, &rand_method) != kEngineOk)
   {
-    fprintf(stderr, "ibrand_engine: Binding failed.\n");
+    fprintf(stderr, "ERROR: ibrand_lib: Binding failed\n");
     return 0;
   }
 
@@ -199,7 +199,7 @@ int ibrand_bind(ENGINE *engine, const char *id)
     exit(-1);
   }
 
-  fprintf(stderr, "IBRand engine loaded.\n");
+  //fprintf(stderr, "INFO: IBRand engine loaded.\n");
   return kEngineOk;
 }
 

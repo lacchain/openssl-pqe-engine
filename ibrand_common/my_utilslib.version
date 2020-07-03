@@ -1,0 +1,5 @@
+my_utilslib {
+  global: *;  # explicitly list symbols to be exported
+  local:  *;  # hide everything else
+};
+

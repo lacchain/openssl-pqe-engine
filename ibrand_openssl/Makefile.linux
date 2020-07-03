@@ -1,0 +1,88 @@
+GIT_VERSION := $(shell git --no-pager describe --tags --always)
+GIT_COMMIT  := $(shell git rev-parse --verify HEAD)
+GIT_DATE    := $(firstword $(shell git --no-pager show --date=iso-strict --format="%ad" --name-only))
+
+PREFIX = $(DESTDIR)/usr/local
+COMMON_DIR = ../ibrand_common
+
+CC = gcc
+CFLAGS = -g -Wall -Wextra -Werror -fPIC -O2 -L/usr/local/lib/ \
+ -I ../ibrand_lib/software \
+ -I $(COMMON_DIR) \
+ -DGIT_VERSION=\"$(GIT_VERSION)\"\
+ -DGIT_COMMIT=\"$(GIT_COMMIT)\"\
+ -DGIT_DATE=\"$(GIT_DATE)\"\
+ -DLINUX
+
+LDFLAGS = -shared -lcrypto -librand -L/usr/local/lib/
+RM = rm -f
+
+CFLAGS += -I/usr/local/include/ -librand
+
+SRCS = e_ibrand.c
+OBJS = $(SRCS:.c=.o)
+
+.PHONY: all
+all: MARKER ibrand_openssl.so
+	@echo --- $@ IBRAND_OPENSSL Done
+
+MARKER:
+	@echo ================================================================================
+
+ibrand_openssl.so: $(OBJS)
+	$(CC) -o $@ $^ ${LDFLAGS}
+	@echo --- $@ Done
+
+$(SRCS:.c=.d):%.d:%.c
+	$(CC) $(CFLAGS) -MM $< >$@
+	@echo --- $@ Done
+
+$(COMMON_DIR)/my_utilslib.a:
+	make -s $(COMMON_DIR) -f Makefile.linux
+	@echo --- $@ Done
+
+include $(SRCS:.c=.d)
+
+.PHONY: clean
+clean:
+	-${RM} ibrand_openssl.so ${OBJS} $(SRCS:.c=.d)
+	@echo --- $@ Done
+
+# We use "install" to do the following...
+#	install -d <DEST_PATH>                      # mkdir <DEST_PATH>, including and parents as required.
+#	install -m <ATTRS> <FILES> <DEST_PATH>      # copy <FILES> to <DEST_PATH>, and do a chmod <ATTRS> on each.
+#	ldconfig <LIB_PATH>                         # Configure Dynamic Linker Run Time Bindings
+
+# openssl version -e
+# ENGINESDIR: "/usr/local/lib/engines-3"
+# openssl version -d
+# OPENSSLDIR: "/usr/local/ssl"
+
+install-lib: MARKER  ibrand_openssl.so
+	@install -d                             $(PREFIX)/lib/engines-3/
+	install -m 0644 ibrand_openssl.so       $(PREFIX)/lib/engines-3/
+	@install -d                             $(PREFIX)/lib/x86_64-linux-gnu/engines-1.1/
+	install -m 0644 ibrand_openssl.so       $(PREFIX)/lib/x86_64-linux-gnu/engines-1.1/
+	@ldconfig                               $(PREFIX)/lib
+	@ldconfig                               $(PREFIX)/lib/engines-3/
+	@ldconfig                               $(PREFIX)/lib/x86_64-linux-gnu/engines-1.1/
+	@install -d                             $(PREFIX)/ssl
+	install -m 0644 ./ibrand_openssl.cnf    $(PREFIX)/ssl
+	@echo --- Needs: export OPENSSL_CONF="$(PREFIX)/ssl/ibrand_openssl.cnf"
+	@echo --- $@ Done
+
+install: install-lib
+	@echo --- $@ Done
+
+uninstall:
+	-$(RM) /usr/local/lib/engines-3/ibrand_openssl.so
+	-$(RM) /usr/local/lib/x86_64-linux-gnu/engines-1.1/ibrand_openssl.so
+	-$(RM) /usr/local/ssl/ibrand_openssl.cnf
+	@echo --- Needs: export OPENSSL_CONF=""
+	@echo --- $@ Done
+
+show-installed:
+	-find /var | grep -i ibrand
+	-find /usr | grep -i ibrand
+	@#printenv OPENSSL_CONF
+	@echo --- $@ Done

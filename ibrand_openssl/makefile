@@ -1,5 +1,5 @@
 CC = @gcc
-CFLAGS = -fPIC -Wall -Wextra -O2 -L/usr/local/lib/ -I ../ibrand_engine/src
+CFLAGS = -fPIC -Wall -Wextra -O2 -L/usr/local/lib/ -I ../ibrand_lib/software
 LDFLAGS = -shared -lcrypto -librand -L/usr/local/lib/
 RM = rm -f
 
