@@ -12,6 +12,9 @@ then
 	sudo make -f Makefile.linux install-lib
 	popd
 	echo --- Build Service
+	pushd PQCrypto-LWEKE/
+	make
+	popd
 	pushd ibrand_service/
 	sudo make
 	popd
@@ -46,9 +49,9 @@ then
 elif [[ $1 = "showall" ]]
 then
 	echo --- Files:
-	sudo find /var       -printf "%c %p\n" | grep -i ibrand
-	sudo find /usr/local -printf "%c %p\n" | grep -i ibrand
-	sudo find /tmp       -printf "%c %p\n" | grep -i ibrand
+	sudo find /var       -printf "%c %p\n" | grep -i "ibrand\|ibapi\|ib_\|iron"
+	sudo find /usr/local -printf "%c %p\n" | grep -i "ibrand\|ibapi\|ib_\|iron"
+	sudo find /tmp       -printf "%c %p\n" | grep -i "ibrand\|ibapi\|ib_\|iron"
 	echo --- Environment Variable OPENSSL_CONF:
 	printenv OPENSSL_CONF 
 	echo --- Environment Variable IBRAND_CONF:

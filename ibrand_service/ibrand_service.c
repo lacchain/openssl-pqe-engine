@@ -1,14 +1,21 @@
-
-//-----------------------------------------------------------------------
-// File: ibrand_service.c
-// Copyright (c) 2019 Cambridge Quantum Computing Limited. All rights reserved.
-//-----------------------------------------------------------------------
-
+///////////////////////////////////////////////////////////////////////////////
+// IronBridge RNG Provider Service
+// Copyright 2020 Cambridge Quantum Computing Ltd. All Rights Reserved.
+//
+// Licensed under the Apache License 2.0 (the "License").  You may not use
+// this file except in compliance with the License.  You can obtain a copy
+// in the file LICENSE in the source distribution or at
+// https://www.openssl.org/source/license.html
+//
 // Based on the service template provided by Devin Watson:
 // http://www.netzmafia.de/skripten/unix/linux-daemon-howto.html
+//
+///////////////////////////////////////////////////////////////////////////////
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 #include <malloc.h>
 #include <fcntl.h>
@@ -19,7 +26,22 @@
 #include <sys/stat.h>
 
 #include <curl/curl.h>
+#include <openssl/aes.h>
+
+#include "../PQCrypto-LWEKE/src/api_frodo640.h"
+
+#define SYSTEM_NAME    "FrodoKEM-640"
+#define crypto_kem_keypair            crypto_kem_keypair_Frodo640
+#define crypto_kem_enc                crypto_kem_enc_Frodo640
+#define crypto_kem_dec                crypto_kem_dec_Frodo640
+
+// int crypto_kem_keypair_Frodo640 (unsigned char *pk, unsigned char *sk);
+// int crypto_kem_enc_Frodo640     (unsigned char *ct, unsigned char *ss, const unsigned char *pk);
+// int crypto_kem_dec_Frodo640     (unsigned char *ss, const unsigned char *ct, const unsigned char *sk);
+
+
 #include "my_utilslib.h"
+#include "IB_SymmetricEncryption.h"
 
 
 #if LIBCURL_VERSION_NUM < 0x070c03
@@ -44,7 +66,7 @@
 
 //#define FORCE_ALL_LOGGING_ON
 
-#ifdef FORCE_ALL_LOGGING_ON
+#ifdef FORCE_ALL_LOGGING_ON_____EXCEPT_THIS
 #define FILELOCK_LOGLEVEL 0x02  // 0x01 is stdout, 0x02 is syslog
 #else
 #define FILELOCK_LOGLEVEL 0x00  // 0x01 is stdout, 0x02 is syslog
@@ -58,16 +80,19 @@ typedef struct tagLSTRING
 
 typedef struct tagIB_INSTANCEDATA
 {
+    // Configuration
+    unsigned char  fVerbose;                        // bit 0=general, bit1=config bit2=auth, bit3=data, bit4=curl:
+    // Auth
     char          szAuthType[16];                   // "SIMPLE";
     char          szAuthUrl[128];                   // "https://ironbridgeapi.com/login";
     char          szUsername[32];
     char          szPassword[32];
     int           authRetryDelay;
-
+    // Connection
     char          szBaseUrl[128];                   // "https://ironbridgeapi.com/api"; // http://192.168.9.128:6502/v1/ironbridge/api
     int           bytesPerRequest;                  // Tested with 16 & 256
     int           retrievalRetryDelay;
-
+    // Storage
     char          szStorageType[16];                // "FILE";
     char          szStorageDataFormat[16];          // RAW, BASE64, HEX
     char          szStorageFilename[_MAX_PATH];     // "/var/lib/ibrand/ibrand_data.bin";
@@ -75,9 +100,12 @@ typedef struct tagIB_INSTANCEDATA
     long          storageHighWaterMark;             // 1038336; // 1MB
     long          storageLowWaterMark;              // 102400; // 100KB
     int           idleDelay;
+    // SRNG Config
+    unsigned char useSecureRng;
+    char          ourKemSecretKeyFilename[128];
+    char          theirSigningPublicKeyFilename[128];
 
-    unsigned char  fVerbose;                        // bit 0=general, bit1=config bit2=auth, bit3=data, bit4=curl:
-
+    // State
     char          szConfigFilename[_MAX_PATH];      //  "/usr/local/ssl/ibrand.cnf"
     int           fCurlInitialised;
     int           fAuthenticated;
@@ -88,35 +116,102 @@ typedef struct tagIB_INSTANCEDATA
     tLSTRING      ResultantData;
     long          code;
     long          response_code;
+    // SRNG State
+
+    tLSTRING      ourKemSecretKey;
+    tLSTRING      theirSigningPublicKey;
+    tLSTRING      encapsulatedSessionKey;
+    tLSTRING      symmetricSessionKey;
+
 } tIB_INSTANCEDATA;
 
+/////////////////////////////////////
+// Forward declarations
+/////////////////////////////////////
+static int DecapsulateAndStoreSessionKey(tIB_INSTANCEDATA *pIBRand);
+
 //-----------------------------------------------------------------------
-// AppendNewDataToLstring
+// ReceiveDataHandler_login
 // This is our CURLOPT_WRITEFUNCTION
 // and userp is our CURLOPT_WRITEDATA (&pIBRand->Token)
 //-----------------------------------------------------------------------
-size_t AppendNewDataToLstring(char *buffer, size_t size, size_t nmemb, void *userp)
+size_t ReceiveDataHandler_login(char *buffer, size_t size, size_t nmemb, void *userp)
 {
     char *     pNewData;
     size_t     cbNewData;
-    tLSTRING * pLString;
-    char *     pAllData;
-    char *     pExistingData;
-    size_t     cbExistingData;
+    tIB_INSTANCEDATA *pIBRand;
 
     pNewData  = buffer;
     cbNewData = (size * nmemb);
 
-    // Cast our userp back to its original (tLSTRING *) type
-    pLString = (tLSTRING *)userp;
-    if (!pLString)
+    // Cast our userp back to its original (tIB_INSTANCEDATA *) type
+    pIBRand = (tIB_INSTANCEDATA *)userp;
+    if (!pIBRand)
     {
-        app_tracef("ERROR: AppendNewDataToLstring() UserData is NULL");
-        return 0;
+        app_tracef("ERROR: ReceiveDataHandler_login() UserData is NULL");
+        return 0; // Zero bytes processed
     }
 
-    pExistingData  = pLString->pData;
-    cbExistingData = pLString->cbData;
+    if (TEST_BIT(pIBRand->fVerbose,DBGBIT_DATA))
+        app_tracef("INFO: %s Login: %u bytes received", pIBRand->useSecureRng?"SRNG":"RNG", cbNewData);
+
+    // Free up the old buffer, if there is one
+    if (pIBRand->Token.pData && pIBRand->Token.cbData)
+    {
+        memset(pIBRand->Token.pData, 0, pIBRand->Token.cbData);
+        free(pIBRand->Token.pData);
+        pIBRand->Token.pData = NULL;
+        pIBRand->Token.cbData = 0;
+    }
+
+    // Allocate a new buffer
+    pIBRand->Token.pData = (char *)malloc(cbNewData);
+    if (pIBRand->Token.pData == NULL)
+    {
+        app_tracef("ERROR: ReceiveDataHandler_login() malloc failure");
+        return 0; // Zero bytes processed
+    }
+
+    // Copy in the new data
+    memcpy(pIBRand->Token.pData, pNewData, cbNewData);
+    pIBRand->Token.cbData = cbNewData;
+
+    //app_tracef("INFO: ReceiveDataHandler_login() Saved %lu bytes", pIBRand->Token.cbData);
+
+    // Job done
+    return cbNewData;  // Number of bytes processed
+}
+
+//-----------------------------------------------------------------------
+// ReceiveDataHandler_rng
+// This is our CURLOPT_WRITEFUNCTION
+// and userp is our CURLOPT_WRITEDATA (&pIBRand->Token)
+//-----------------------------------------------------------------------
+size_t ReceiveDataHandler_rng(char *buffer, size_t size, size_t nmemb, void *userp)
+{
+    char *     pNewData;
+    size_t     cbNewData;
+    char *     pAllData;
+    char *     pExistingData;
+    size_t     cbExistingData;
+    tIB_INSTANCEDATA *pIBRand;
+
+    pNewData  = buffer;
+    cbNewData = (size * nmemb);
+
+    // Cast our userp back to its original (tIB_INSTANCEDATA *) type
+    pIBRand = (tIB_INSTANCEDATA *)userp;
+    if (!pIBRand)
+    {
+        app_tracef("ERROR: ReceiveDataHandler_rng() UserData is NULL");
+        return 0; // Zero bytes processed
+    }
+
+    if (TEST_BIT(pIBRand->fVerbose,DBGBIT_DATA))
+        app_tracef("INFO: %s request: %u bytes received", pIBRand->useSecureRng?"SRNG":"RNG", cbNewData);
+
+    pExistingData  = pIBRand->ResultantData.pData;
+    cbExistingData = pIBRand->ResultantData.cbData;
     // If pLString already contains some data (i.e. cbExistingData > 0)
     // then we'll...
     //    a) alloc enough room for both
@@ -127,8 +222,8 @@ size_t AppendNewDataToLstring(char *buffer, size_t size, size_t nmemb, void *use
     pAllData = (char *)malloc(cbExistingData + cbNewData);
     if (pAllData == NULL)
     {
-        app_tracef("ERROR: AppendNewDataToLstring() malloc failure");
-        return 0;
+        app_tracef("ERROR: ReceiveDataHandler_rng() malloc failure");
+        return 0; // Zero bytes processed
     }
 
     // Copy in the existing data, if there is
@@ -136,14 +231,18 @@ size_t AppendNewDataToLstring(char *buffer, size_t size, size_t nmemb, void *use
     {
         memcpy(pAllData, pExistingData, cbExistingData);
     }
+
+    if (TEST_BIT(pIBRand->fVerbose,DBGBIT_DATA))
+        app_tracef("INFO: Appending %u bytes", cbNewData);
+
     // Copy in the new data
     memcpy(pAllData+cbExistingData, pNewData, cbNewData);
 
     // Point our userp at the new buffer
-    pLString->pData = pAllData;
-    pLString->cbData = cbExistingData + cbNewData;
+    pIBRand->ResultantData.pData = pAllData;
+    pIBRand->ResultantData.cbData = cbExistingData + cbNewData;
 
-    // Free up the old buffer
+    // Free up the old buffer, if there is one
     if (cbExistingData && pExistingData)
     {
         free(pExistingData);
@@ -151,28 +250,167 @@ size_t AppendNewDataToLstring(char *buffer, size_t size, size_t nmemb, void *use
         cbExistingData = 0;
     }
 
-    //app_tracef("INFO: AppendNewDataToLstring() Saved %lu bytes", pLString->cbData);
+    //app_tracef("INFO: ReceiveDataHandler_rng() Saved %lu bytes", pIBRand->ResultantData.cbData);
 
     // Job done
-    return cbNewData;
+    return cbNewData; // Number of bytes processed
 }
+
+
+//-----------------------------------------------------------------------
+// ReceiveDataHandler_SessionKey
+// This is our CURLOPT_WRITEFUNCTION
+// and userp is our encapsulatedSessionKey
+//-----------------------------------------------------------------------
+size_t ReceiveDataHandler_SessionKey(char *buffer, size_t size, size_t nmemb, void *userp)
+{
+    char *     pInboundKemData;
+    size_t     cbInboundKemData;
+    tIB_INSTANCEDATA *pIBRand;
+
+    pInboundKemData = buffer;
+    cbInboundKemData = (size * nmemb);
+
+    // Cast our userp back to its original (tIB_INSTANCEDATA *) type
+    pIBRand = (tIB_INSTANCEDATA *)userp;
+    if (!pIBRand)
+    {
+        app_tracef("ERROR: ReceiveDataHandler_login() UserData is NULL");
+        return 0; // Zero bytes processed
+    }
+
+    if (TEST_BIT(pIBRand->fVerbose,DBGBIT_DATA))
+        app_tracef("INFO: %s sessionKey: %u bytes received", pIBRand->useSecureRng?"SRNG":"RNG", cbInboundKemData);
+
+    // Free up the old buffer, if there is one
+    if (pIBRand->encapsulatedSessionKey.pData)
+    {
+        memset(pIBRand->encapsulatedSessionKey.pData, 0, pIBRand->encapsulatedSessionKey.cbData);
+        free(pIBRand->encapsulatedSessionKey.pData);
+        pIBRand->encapsulatedSessionKey.pData = NULL;
+        pIBRand->encapsulatedSessionKey.cbData = 0;
+    }
+
+    // Allocate a new buffer
+    pIBRand->encapsulatedSessionKey.pData = (char *)malloc(cbInboundKemData);
+    if (pIBRand->encapsulatedSessionKey.pData == NULL)
+    {
+        app_tracef("ERROR: Failed to allocate storage for inbound KEM data");
+        return 0; // Zero bytes processed
+    }
+    memcpy(pIBRand->encapsulatedSessionKey.pData, pInboundKemData, cbInboundKemData);
+    // We will set the size once we know it has completed
+    pIBRand->encapsulatedSessionKey.cbData = cbInboundKemData;
+
+    // Destroy any existing session key, forcing the new one to be decapsulated and used as and when needed.
+    if (pIBRand->symmetricSessionKey.pData)
+    {
+        memset(pIBRand->symmetricSessionKey.pData, 0, pIBRand->symmetricSessionKey.cbData);
+        free(pIBRand->symmetricSessionKey.pData);
+        pIBRand->symmetricSessionKey.pData = NULL;
+        pIBRand->symmetricSessionKey.cbData = 0;
+    }
+
+    app_tracef("INFO: KEM data stored successfully (%lu bytes)", pIBRand->encapsulatedSessionKey.cbData);
+
+    // Job done
+    return cbInboundKemData; // Number of bytes processed
+}
+
+
+//-----------------------------------------------------------------------
+// DecapsulateAndStoreSessionKey
+//-----------------------------------------------------------------------
+static int DecapsulateAndStoreSessionKey(tIB_INSTANCEDATA *pIBRand)
+{
+    // If there is already a session key stored, then clear and free it.
+    if (pIBRand->symmetricSessionKey.pData)
+    {
+        memset(pIBRand->symmetricSessionKey.pData, 0, pIBRand->symmetricSessionKey.cbData);
+        free(pIBRand->symmetricSessionKey.pData);
+        pIBRand->symmetricSessionKey.pData = NULL;
+        pIBRand->symmetricSessionKey.cbData = 0;
+    }
+
+    // Check that we have the secret Key needed for the KEM decapsulation
+    if (!pIBRand->ourKemSecretKey.pData || pIBRand->ourKemSecretKey.cbData != CRYPTO_SECRETKEYBYTES)
+    {
+        app_tracef("ERROR: Size of secret key is not as expected");
+        return 2201;
+    }
+    // Check that we have the encapsulated key
+    if (!pIBRand->encapsulatedSessionKey.pData || pIBRand->encapsulatedSessionKey.cbData == 0)
+    {
+        app_tracef("ERROR: Encapsulated session key not found");
+        return 2202;
+    }
+
+    unsigned char *p = (unsigned char *)pIBRand->encapsulatedSessionKey.pData;
+    size_t n = pIBRand->encapsulatedSessionKey.cbData;
+    //dumpToFile("/home/jgilmore/dev/dump_SessionKey_A_quoted_base64_encapsulated_key.txt", p, n);
+
+    //app_trace_hexall("DEBUG: base64 encoded encapsulatedSessionKey:", pIBRand->encapsulatedSessionKey.pData, pIBRand->encapsulatedSessionKey.cbData);
+    if (p[0] == '"') {p++; n--;}
+    if (p[n-1] == '"') {n--;}
+    //app_trace_hexall("DEBUG: p:", p, n);
+    //dumpToFile("/home/jgilmore/dev/dump_SessionKey_B_base64_encapsulated_key.txt", p, n);
+
+    // base64_decode the encapsulate key
+    size_t decodeSize = 0;
+    unsigned char *rawEncapsulatedKey = base64_decode((char *)p, n, (size_t *)&(decodeSize));
+    if (!rawEncapsulatedKey)
+    {
+       app_tracef("WARNING: Failed to decode Base64 EncapsulatedKey");
+       return 2299;
+    }
+    //dumpToFile("/home/jgilmore/dev/dump_SessionKey_C_encapsulated_key.txt", rawEncapsulatedKey, decodeSize);
+
+    if (decodeSize != CRYPTO_CIPHERTEXTBYTES)
+    {
+        app_tracef("ERROR: Size of decoded encapsulated key (%u) is not as expected (%u)", decodeSize, CRYPTO_CIPHERTEXTBYTES);
+        //app_trace_hexall("DEBUG: encapsulatedSessionKey:", (char *)rawEncapsulatedKey, decodeSize);
+        return 2203;
+    }
+
+    // Allocate a new buffer
+    pIBRand->symmetricSessionKey.pData = (char *)malloc(CRYPTO_BYTES);
+    if (pIBRand->symmetricSessionKey.pData == NULL)
+    {
+        app_tracef("ERROR: Failed to allocate storage for new session key");
+        return 2204;
+    }
+    // Initialise with something recognisable, so that we can ensure that it has worked
+    memset(pIBRand->symmetricSessionKey.pData, 0xAA, CRYPTO_BYTES);
+
+    // Do the KEM decapsulation
+    crypto_kem_dec((unsigned char *)pIBRand->symmetricSessionKey.pData, (unsigned char *)rawEncapsulatedKey, (unsigned char *)pIBRand->ourKemSecretKey.pData);
+
+    // We will set the size once we know it has completed
+    pIBRand->symmetricSessionKey.cbData = CRYPTO_BYTES;
+
+    //dumpToFile("/home/jgilmore/dev/dump_SessionKey_D_raw.txt", (unsigned char *)pIBRand->symmetricSessionKey.pData, pIBRand->symmetricSessionKey.cbData);
+    app_tracef("INFO: Session key stored successfully (%lu bytes)", pIBRand->symmetricSessionKey.cbData);
+
+    // Job done
+    return 0;
+}
+
 
 //-----------------------------------------------------------------------
 // authenticateUser
 //-----------------------------------------------------------------------
 int authenticateUser(tIB_INSTANCEDATA *pIBRand)
 {
-    //app_tracef("{1}");
     if (!pIBRand)
     {
         app_tracef("ERROR: authenticateUser: Parameter error - instance data is null");
-        return 2200;
+        return 2210;
     }
 
     if (strlen(pIBRand->szAuthUrl) == 0)
     {
         app_tracef("ERROR: authenticateUser: Parameter error - AuthUrl is empty");
-        return 2201;
+        return 2211;
     }
 
     if (TEST_BIT(pIBRand->fVerbose,DBGBIT_AUTH))
@@ -211,8 +449,8 @@ int authenticateUser(tIB_INSTANCEDATA *pIBRand)
     sprintf(bodyData, "{\"Username\":\"%s\",\"Password\":\"%s\"}", pIBRand->szUsername, pIBRand->szPassword );
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_POSTFIELDS, bodyData);
 
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEFUNCTION, AppendNewDataToLstring);
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEDATA, &pIBRand->Token);
+    curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEFUNCTION, ReceiveDataHandler_login);
+    curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEDATA, pIBRand);
 
     if (TEST_BIT(pIBRand->fVerbose,DBGBIT_AUTH))
     {
@@ -225,39 +463,34 @@ int authenticateUser(tIB_INSTANCEDATA *pIBRand)
     if (curlResultCodeA != CURLE_OK)
     {
       app_tracef("ERROR: authenticateUser failed: rc=%d (%s)", curlResultCodeA, curl_easy_strerror(curlResultCodeA));
-      return 2202;
+      return 2212;
     }
 
-    //app_tracef("{4}");
-    pIBRand->code = 999;
+    pIBRand->code = 0;
     CURLcode curlResultCodeB;
     curlResultCodeB = curl_easy_getinfo(pIBRand->hCurl, CURLINFO_HTTP_CONNECTCODE, &pIBRand->code);
     if (!curlResultCodeB && pIBRand->code)
     {
         app_tracef("ERROR: authenticateUser: ResultCode=%03ld (%s)", pIBRand->code, curl_easy_strerror(pIBRand->code));
-        return 2203;
+        return 2220;
     }
 
-    pIBRand->response_code = 999;
+    pIBRand->response_code = 0;
     CURLcode  curlResultCodeC;
     curlResultCodeC = curl_easy_getinfo(pIBRand->hCurl, CURLINFO_RESPONSE_CODE, &pIBRand->response_code);
     if (!curlResultCodeC && (pIBRand->response_code != 200))
     {
-        //app_tracef("{5e}");
         app_tracef("ERROR: authenticateUser: HTTP Responcse Code=%ld", pIBRand->response_code);
-        return 2204;
+        return 2221;
     }
 
-    //app_tracef("{6}");
     if (TEST_BIT(pIBRand->fVerbose,DBGBIT_AUTH))
     {
         app_tracef("INFO: authenticateUser() Token = [%s]"            , pIBRand->Token.pData);
     }
 
     curl_slist_free_all(headers); /* free custom header list */
-
     app_tracef("INFO: Authentication successful: (\"%s\", \"%s\")", pIBRand->szAuthUrl, pIBRand->szUsername);
-
     return 0;
 }
 
@@ -268,14 +501,25 @@ int getRandomBytes(tIB_INSTANCEDATA *pIBRand)
 {
     CURLcode curlResultCode;
     char * pUrl;
+    char * szEndpoint;
+    #define MAXUINT_DIGITS 20 // 0x7FFF FFFF FFFF FFFF = 9,223,372,036,854,775,807 ==> 19 digits for signed, 20 for unsigned.
 
-    pUrl = (char *)malloc(strlen(pIBRand->szBaseUrl)+5+18); // i.e. strlen("/rng/") + strlen(itoa(numberOfBytes))
+    if (pIBRand->useSecureRng)
+    {
+        szEndpoint = "srng";
+    }
+    else
+    {
+        szEndpoint = "rng";
+    }
+
+    pUrl = (char *)malloc(strlen(pIBRand->szBaseUrl)+strlen(szEndpoint)+2+MAXUINT_DIGITS); // i.e. strlen("/rng/NNNNNNN")
     if (!pUrl)
     {
         app_tracef("ERROR: Out of memory allocating for URL");
-        return 2601;
+        return 22230;
     }
-    sprintf(pUrl,"%s/rng/%u", pIBRand->szBaseUrl, pIBRand->bytesPerRequest);
+    sprintf(pUrl,"%s/%s/%u", pIBRand->szBaseUrl, szEndpoint, pIBRand->bytesPerRequest);
 
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPGET, TRUE );
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pUrl);
@@ -288,13 +532,91 @@ int getRandomBytes(tIB_INSTANCEDATA *pIBRand)
     if (!pAuthHeader)
     {
         app_tracef("ERROR: Out of memory allocating for AuthHeader");
-        return 2602;
+        return 2231;
     }
     sprintf(pAuthHeader, "authorization: Bearer %s", pIBRand->pRealToken);
 
     if (TEST_BIT(pIBRand->fVerbose,DBGBIT_AUTH))
     {
-        app_tracef("INFO: RNG AuthHeader = \"%s\"", pAuthHeader);
+        app_tracef("INFO: %s AuthHeader = \"%s\"", pIBRand->useSecureRng?"SRNG":"RNG", pAuthHeader);
+    }
+
+    headers = curl_slist_append ( headers, pAuthHeader );
+
+    // e.g.
+    //   "name": "accept",
+    //   "value": "application/json, text/plain, */*"
+    //   "name": "authorization",
+    //   "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6InVzZXIxIiwibmJmIjoxNTczODM5ODU0LCJleHAiOjE1NzM5MjYyNTQsImlhdCI6MTU3MzgzOTg1NCwiaXNzIjoiaHR0cHM6Ly9pcm9uYnJpZGdlYXBpLmNvbSIsImF1ZCI6IkFueSJ9.sTD67YPrCdj1RWOqa8R3Pc3j7DA88mF8x0oD2ZMbmQ0"
+    //   "name": "content-type",
+    //   "value": "application/json"
+
+    curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEFUNCTION, ReceiveDataHandler_rng);
+    curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEDATA, pIBRand);
+    curl_easy_setopt(pIBRand->hCurl, CURLOPT_FAILONERROR, true);
+
+    // Do it
+    curlResultCode = curl_easy_perform(pIBRand->hCurl);
+    long httpResponseCode = 0;
+    curl_easy_getinfo (pIBRand->hCurl, CURLINFO_RESPONSE_CODE, &httpResponseCode);
+    if (TEST_BIT(pIBRand->fVerbose,DBGBIT_DATA))
+    {
+        app_tracef("INFO: %s response code = %ld", pIBRand->useSecureRng?"SRNG":"RNG", httpResponseCode);
+    }
+
+    if (curlResultCode != CURLE_OK)
+    {
+        app_tracef("ERROR: %s perform failed: [%s]", pIBRand->useSecureRng?"SRNG":"RNG", curl_easy_strerror(curlResultCode));
+        return 2232;
+    }
+
+    //if (TEST_BIT(pIBRand->fVerbose,DBGBIT_DATA))
+    //{
+    //    app_tracef("INFO: %s ResultantData = [%*.*s]", pIBRand->useSecureRng?"SRNG":"RNG", pIBRand->ResultantData.cbData, pIBRand->ResultantData.cbData, pIBRand->ResultantData.pData);
+    //}
+
+    curl_slist_free_all(headers); /* free custom header list */
+    free(pAuthHeader);
+    free(pUrl);
+    return 0;
+}
+
+//-----------------------------------------------------------------------
+// getSecureRNGSessionKey
+//-----------------------------------------------------------------------
+int getSecureRNGSessionKey(tIB_INSTANCEDATA *pIBRand)
+{
+    CURLcode curlResultCode;
+    char * pUrl;
+    char *szEndpoint = "sharedsecret";
+
+    pUrl = (char *)malloc(strlen(pIBRand->szBaseUrl)+1+strlen(szEndpoint)+1);
+    if (!pUrl)
+    {
+        app_tracef("ERROR: Out of memory allocating for URL");
+        return 2240;
+    }
+    sprintf(pUrl,"%s/%s", pIBRand->szBaseUrl, szEndpoint);
+
+    curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPGET, TRUE );
+    curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pUrl);
+
+    /* Pass our list of custom made headers */
+    struct curl_slist *headers = NULL;
+    headers = curl_slist_append ( headers, "Content-Type: application/json" );
+    headers = curl_slist_append ( headers, "Accept: application/json, text/plain, */*" );
+    char *pAuthHeader = (char *)malloc(strlen(pIBRand->pRealToken)+30u); // i.e. + strlen("Authorization: Bearer ")
+    if (!pAuthHeader)
+    {
+        app_tracef("ERROR: Out of memory allocating for AuthHeader");
+        return 2241;
+    }
+    sprintf(pAuthHeader, "authorization: Bearer %s", pIBRand->pRealToken);
+
+    if (TEST_BIT(pIBRand->fVerbose,DBGBIT_AUTH))
+    {
+        app_tracef("INFO: %s AuthHeader = \"%s\"", pIBRand->useSecureRng?"SRNG":"RNG", pAuthHeader);
     }
 
     headers = curl_slist_append ( headers, pAuthHeader );
@@ -309,20 +631,20 @@ int getRandomBytes(tIB_INSTANCEDATA *pIBRand)
 
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPHEADER, headers);
 
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEFUNCTION, AppendNewDataToLstring);
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEDATA, &pIBRand->ResultantData);
+    curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEFUNCTION, ReceiveDataHandler_SessionKey);
+    curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEDATA, pIBRand);
 
     /* Do it */
     curlResultCode = curl_easy_perform(pIBRand->hCurl);
     if (curlResultCode != CURLE_OK)
     {
-        app_tracef("ERROR: RNG perform failed: [%s]", curl_easy_strerror(curlResultCode));
-        return 2603;
+        app_tracef("ERROR: %s perform failed: [%s]", pIBRand->useSecureRng?"SRNG":"RNG", curl_easy_strerror(curlResultCode));
+        return 2242;
     }
 
     //if (TEST_BIT(pIBRand->fVerbose,DBGBIT_DATA))
     //{
-    //    app_tracef("INFO: RNG ResultantData = [%*.*s]", pIBRand->ResultantData.cbData, pIBRand->ResultantData.cbData, pIBRand->ResultantData.pData);
+    //    app_tracef("INFO: %s ResultantData = [%*.*s]", pIBRand->useSecureRng?"SRNG":"RNG", pIBRand->ResultantData.cbData, pIBRand->ResultantData.cbData, pIBRand->ResultantData.pData);
     //}
 
     curl_slist_free_all(headers); /* free custom header list */
@@ -330,6 +652,7 @@ int getRandomBytes(tIB_INSTANCEDATA *pIBRand)
     free(pUrl);
     return 0;
 }
+
 
 //-----------------------------------------------------------------------
 // storeRandomBytes
@@ -339,20 +662,23 @@ void storeRandomBytes(tIB_INSTANCEDATA *pIBRand)
     if (pIBRand->ResultantData.pData == NULL || pIBRand->ResultantData.cbData == 0)
     {
         // Nothing to do
+        if (TEST_BIT(pIBRand->fVerbose,DBGBIT_DATA))
+        {
+            app_tracef("INFO: Nothing to do. [pData=%p, cbData=%u]", pIBRand->ResultantData.pData, pIBRand->ResultantData.cbData);
+        }
         return;
     }
 
-    // Format the output data
-    if (strcmp(pIBRand->szStorageDataFormat,"RAW")==0)
+    if (pIBRand->useSecureRng)
     {
-        // Curl_base64_decode() - Given a base64 string at src, decode it and return
-        // an allocated memory in the *outptr. Returns the length of the decoded data.
-        //*pcbData = Curl_base64_decode(p, (unsigned char **)ppData)
-        // *ppData will, and must, be freed by the caller
-
-        //app_tracef("INFO: RNG ResultantData[%u] = [%*.*s]", pIBRand->ResultantData.cbData, pIBRand->ResultantData.cbData, pIBRand->ResultantData.cbData, pIBRand->ResultantData.pData);
+        // The data is currently Base64 encoded encrypted data
+        ///////////////////////////////////
+        // DeBase64 the data...
+        ///////////////////////////////////
         char * pOriginalData  = pIBRand->ResultantData.pData;
         size_t cbOriginalData = pIBRand->ResultantData.cbData;
+
+        //dumpToFile("/home/jgilmore/dev/dump_SRNG_A_quoted_base64_encrypted_data.txt", (unsigned char *)pIBRand->ResultantData.pData, pIBRand->ResultantData.cbData);
 
         char * pDecodeData = pOriginalData;
         size_t cbDecodeData = cbOriginalData;
@@ -366,59 +692,201 @@ void storeRandomBytes(tIB_INSTANCEDATA *pIBRand)
             pDecodeData = pOriginalData;
             cbDecodeData = cbOriginalData;
         }
-
-        pIBRand->ResultantData.pData = (char *)base64_decode(pDecodeData, cbDecodeData, (size_t *)&(pIBRand->ResultantData.cbData));
-        if (!pIBRand->ResultantData.pData)
+        //dumpToFile("/home/jgilmore/dev/dump_SRNG_B_base64_encrypted_data.txt", (unsigned char *)pDecodeData, cbDecodeData);
+        size_t cbEncryptedData = 0;
+        unsigned char *pEncryptedData = base64_decode(pDecodeData, cbDecodeData, &cbEncryptedData);
+        if (!pEncryptedData)
         {
            app_tracef("WARNING: Failed to decode Base64 data. Discarding %u bytes.", pIBRand->ResultantData.cbData);
            return;
         }
-        free(pOriginalData);
-        if (TEST_BIT(pIBRand->fVerbose,DBGBIT_DATA))
+        free(pIBRand->ResultantData.pData);
+        pIBRand->ResultantData.pData = NULL;
+        pIBRand->ResultantData.cbData = 0;
+
+        //dumpToFile("/home/jgilmore/dev/dump_SRNG_C_encrypted_data.txt", pEncryptedData, cbEncryptedData);
+        ///////////////////////////////////
+        // Decrypt the data...
+        ///////////////////////////////////
+        if (pIBRand->symmetricSessionKey.pData==NULL)
         {
-            app_tracef("INFO: RNG ResultantData[%u]", pIBRand->ResultantData.cbData);
-            //app_tracef("INFO: RNG ResultantData[%u] = [%*.*s]", pIBRand->ResultantData.cbData, pIBRand->ResultantData.cbData, pIBRand->ResultantData.cbData, pIBRand->ResultantData.pData);
+            if (pIBRand->encapsulatedSessionKey.pData==NULL)
+            {
+                // No keys found
+                app_tracef("ERROR: No session key available to decryption SRNG response");
+                return; // todo cleanup
+            }
+            if (TEST_BIT(pIBRand->fVerbose,DBGBIT_AUTH))
+                app_tracef("INFO: Decapsulating session key");
+            int rc = DecapsulateAndStoreSessionKey(pIBRand);
+            if (rc != 0)
+            {
+                app_tracef("ERROR: KEM decapsulation failed with rc=%d", rc);
+                return; // todo cleanup
+            }
+        }
+#define USE_PBKDF2
+#ifdef USE_PBKDF2
+        unsigned char *pDecryptedData = NULL;
+        size_t         cbDecryptedData = 0;
+        int rc;
+
+        rc = AESDecryptBytes(pEncryptedData, cbEncryptedData, (uint8_t *)pIBRand->symmetricSessionKey.pData, pIBRand->symmetricSessionKey.cbData, 32, &pDecryptedData, &cbDecryptedData);
+        if (rc)
+        {
+            printf("AESDecryptBytes failed with rc=%d\n", rc);
+        }
+        pIBRand->ResultantData.pData = (char *)pDecryptedData;
+        pIBRand->ResultantData.cbData = cbDecryptedData;
+#else
+        // Initialisation vector
+        unsigned char iv[AES_BLOCK_SIZE];
+        AES_KEY dec_key;
+
+        // AES-128 bit CBC Decryption
+        memset(iv, 0x00, AES_BLOCK_SIZE); // don't forget to set iv vector again, else you can't decrypt data properly
+
+        // Rfc2898DeriveBytes
+        // Crypto::Rfc2898DeriveBytes   derivedBytes(key, saltSize);
+        // auto                         salt       = derivedBytes.salt();
+        // auto                         keyBytes   = derivedBytes.getBytes(32);
+        // auto                         ivBytes    = derivedBytes.getBytes(16);
+
+        // We have a key
+        // We have an IV
+        // We have some data
+        // Let's do it.
+
+        AES_set_decrypt_key((unsigned char *)pIBRand->symmetricSessionKey.pData, pIBRand->symmetricSessionKey.cbData*8, &dec_key); // Size of key is in bits
+        if (TEST_BIT(pIBRand->fVerbose,DBGBIT_DATA))
+            app_tracef("INFO: Decrypting %u bytes", pIBRand->symmetricSessionKey.cbData);
+        unsigned char *pRawData = (unsigned char *)malloc(cbEncryptedData);
+        if (!pRawData)
+        {
+            app_tracef("ERROR: Malloc for decrypted data failed");
+            return; // todo cleanup
+        }
+        AES_cbc_encrypt(pEncryptedData, pRawData, cbEncryptedData, &dec_key, iv, AES_DECRYPT);
+        size_t cbRawData = cbEncryptedData;
+
+        free(pEncryptedData);
+        pEncryptedData = NULL;
+        cbEncryptedData = 0;
+
+        pIBRand->ResultantData.pData = (char *)pRawData;
+        pIBRand->ResultantData.cbData = cbRawData;
+#endif
+        //dumpToFile("/home/jgilmore/dev/dump_SRNG_D_raw_data.txt", (uint8_t *)pIBRand->ResultantData.pData, (size_t)pIBRand->ResultantData.cbData);
+
+        // The data is now raw data
+        if (strcmp(pIBRand->szStorageDataFormat,"RAW")!=0)
+        {
+            app_tracef("WARNING: Only RAW format is supported for SRNG. Discarding %u bytes.", pIBRand->ResultantData.cbData);
+            return; // todo cleanup
         }
     }
-    else if (strcmp(pIBRand->szStorageDataFormat,"BASE64")==0)
+    else // RNG
     {
-        // Nothing to do. The data is already Base64 encoded
+        // The data is currently Base64 encoded raw data
 
-        // The data may be wrapped in double-quotes, which will need removing
-        char * pOriginalData  = pIBRand->ResultantData.pData;
-        size_t cbOriginalData = pIBRand->ResultantData.cbData;
-
-        if (pOriginalData[0] == '"' && pOriginalData[cbOriginalData-1] == '"')
+        // Format the output data
+        if (strcmp(pIBRand->szStorageDataFormat,"RAW")==0)
         {
-            // Alloc a new, smaller buffer, copy the data in, and free up the original buffer.
-            // Not the most efficient, but simple - for now.
-            pIBRand->ResultantData.cbData = cbOriginalData - 2;
-            pIBRand->ResultantData.pData = malloc(pIBRand->ResultantData.cbData);
+            // Curl_base64_decode() - Given a base64 string at src, decode it and return
+            // an allocated memory in the *outptr. Returns the length of the decoded data.
+            //*pcbData = Curl_base64_decode(p, (unsigned char **)ppData)
+            // *ppData will, and must, be freed by the caller
+
+            //dumpToFile("/home/jgilmore/dev/dump_Data_A_base64_encrypted_data.txt", p, n);
+
+            //app_tracef("INFO: %s ResultantData[%u] = [%*.*s]", pIBRand->useSecureRng?"SRNG":"RNG", pIBRand->ResultantData.cbData, pIBRand->ResultantData.cbData, pIBRand->ResultantData.cbData, pIBRand->ResultantData.pData);
+            char * pOriginalData  = pIBRand->ResultantData.pData;
+            size_t cbOriginalData = pIBRand->ResultantData.cbData;
+
+            char * pDecodeData = pOriginalData;
+            size_t cbDecodeData = cbOriginalData;
+            if (pOriginalData[0] == '"' && pOriginalData[cbOriginalData-1] == '"')
+            {
+                pDecodeData = pOriginalData + 1;
+                cbDecodeData = cbOriginalData - 2;
+            }
+            else
+            {
+                pDecodeData = pOriginalData;
+                cbDecodeData = cbOriginalData;
+            }
+
+            // Debugging Begin
+            {
+                //char *p = pDecodeData;
+                //size_t n = cbDecodeData;
+                //dumpToFile("/home/jgilmore/dev/dump_Data_A_base64_encrypted_data.txt", (unsigned char *)p, n);
+                //app_trace_hexall("DEBUG: base64 encoded data:", p, n);
+            }
+            // Debugging End
+
+            pIBRand->ResultantData.pData = (char *)base64_decode(pDecodeData, cbDecodeData, (size_t *)&(pIBRand->ResultantData.cbData));
             if (!pIBRand->ResultantData.pData)
             {
-                app_tracef("WARNING: Failed to clean Base64 data. Discarding %u bytes.", pIBRand->ResultantData.cbData);
-                pIBRand->ResultantData.pData = pOriginalData;
-                pIBRand->ResultantData.cbData = cbOriginalData;
-                return;
+               app_tracef("WARNING: Failed to decode Base64 data. Discarding %u bytes.", pIBRand->ResultantData.cbData);
+               return;
             }
-            memcpy(pIBRand->ResultantData.pData, pOriginalData+1, pIBRand->ResultantData.cbData);
             free(pOriginalData);
+            if (TEST_BIT(pIBRand->fVerbose,DBGBIT_DATA))
+            {
+                app_tracef("INFO: %s ResultantData[%u]", pIBRand->useSecureRng?"SRNG":"RNG", pIBRand->ResultantData.cbData);
+                //app_tracef("INFO: %s ResultantData[%u] = [%*.*s]", pIBRand->useSecureRng?"SRNG":"RNG", pIBRand->ResultantData.cbData, pIBRand->ResultantData.cbData, pIBRand->ResultantData.cbData, pIBRand->ResultantData.pData);
+            }
         }
-        if (TEST_BIT(pIBRand->fVerbose,DBGBIT_DATA))
+        else if (strcmp(pIBRand->szStorageDataFormat,"BASE64")==0)
         {
-            app_tracef("INFO: RNG ResultantData = [%*.*s]", pIBRand->ResultantData.cbData, pIBRand->ResultantData.cbData, pIBRand->ResultantData.pData);
+            // Nothing to do. The data is already Base64 encoded
+
+            // The data may be wrapped in double-quotes, which will need removing
+            char * pOriginalData  = pIBRand->ResultantData.pData;
+            size_t cbOriginalData = pIBRand->ResultantData.cbData;
+
+            if (pOriginalData[0] == '"' && pOriginalData[cbOriginalData-1] == '"')
+            {
+                // Alloc a new, smaller buffer, copy the data in, and free up the original buffer.
+                // Not the most efficient, but simple - for now.
+                pIBRand->ResultantData.cbData = cbOriginalData - 2;
+                pIBRand->ResultantData.pData = malloc(pIBRand->ResultantData.cbData);
+                if (!pIBRand->ResultantData.pData)
+                {
+                    app_tracef("WARNING: Failed to clean Base64 data. Discarding %u bytes.", pIBRand->ResultantData.cbData);
+                    pIBRand->ResultantData.pData = pOriginalData;
+                    pIBRand->ResultantData.cbData = cbOriginalData;
+                    return;
+                }
+                memcpy(pIBRand->ResultantData.pData, pOriginalData+1, pIBRand->ResultantData.cbData);
+                free(pOriginalData);
+            }
+            if (TEST_BIT(pIBRand->fVerbose,DBGBIT_DATA))
+            {
+                app_tracef("INFO: %s ResultantData = [%*.*s]", pIBRand->useSecureRng?"SRNG":"RNG", pIBRand->ResultantData.cbData, pIBRand->ResultantData.cbData, pIBRand->ResultantData.pData);
+            }
         }
-    }
-    else if (strcmp(pIBRand->szStorageDataFormat,"HEX")==0)
-    {
-        // TODO
-    }
+        else if (strcmp(pIBRand->szStorageDataFormat,"HEX")==0)
+        {
+            // TODO
+            app_tracef("WARNING: Storage data format \"%s\"  not yet implemented. Discarding %u bytes.", pIBRand->szStorageDataFormat, pIBRand->ResultantData.cbData);
+            return;
+        }
+        else
+        {
+            app_tracef("WARNING: Unsupported storage data format \"%s\". Discarding %u bytes.", pIBRand->szStorageDataFormat, pIBRand->ResultantData.cbData);
+            return;
+        }
+    } // RNG
+
 
     if (strcmp(pIBRand->szStorageType,"FILE")==0)
     {
         //fprintf(stdout, "%u:%s\n", pIBRand->ResultantData.cbData, pIBRand->ResultantData.pData);
         FILE *f;
-        unsigned int bytesWritten;
+        unsigned int bytesWritten1 = 0;
+        unsigned int bytesWritten2 = 0;
 
         my_waitForFileLock(pIBRand->szStorageLockfilePath, pIBRand->szStorageFilename, FILELOCK_LOGLEVEL);
         f = fopen(pIBRand->szStorageFilename,"ab");
@@ -430,22 +898,26 @@ void storeRandomBytes(tIB_INSTANCEDATA *pIBRand)
             sleep(1);
             return;
         }
-        bytesWritten = fwrite(pIBRand->ResultantData.pData, 1, pIBRand->ResultantData.cbData, f);
-        if (bytesWritten != pIBRand->ResultantData.cbData)
+        bytesWritten1 = fwrite(pIBRand->ResultantData.pData, 1, pIBRand->ResultantData.cbData, f);
+        if (bytesWritten1 != pIBRand->ResultantData.cbData)
         {
-            app_tracef("WARNING: Unable to write all bytes (%d/%d)", bytesWritten, pIBRand->ResultantData.cbData);
+            app_tracef("WARNING: Unable to write all bytes (%d/%d)", bytesWritten1, pIBRand->ResultantData.cbData);
         }
         // Delimit each Base64 block with a LF
         if (strcmp(pIBRand->szStorageDataFormat,"BASE64")==0)
         {
-            bytesWritten = fwrite("\n", 1, 1, f);
-            if (bytesWritten != 1)
+            bytesWritten2 = fwrite("\n", 1, 1, f);
+            if (bytesWritten2 != 1)
             {
                 app_tracef("WARNING: Unable to write LF");
             }
         }
         fclose(f);
         my_releaseFileLock(pIBRand->szStorageLockfilePath, pIBRand->szStorageFilename, FILELOCK_LOGLEVEL);
+        if (TEST_BIT(pIBRand->fVerbose,DBGBIT_DATA))
+        {
+            app_tracef("INFO: %s %u+%u bytes stored", pIBRand->useSecureRng?"SRNG":"RNG", bytesWritten1, bytesWritten2);
+        }
     }
     else
     {
@@ -464,7 +936,7 @@ char *ExtractSubstring(char *pTokenData, const char *pPrefix, const char *pSuffi
     char *p1 = strstr(pTokenData, pPrefix );
     if (!p1)
     {
-        app_tracef("ERROR: ExtractSubstring() Cannot find token in \"%s\"", pTokenData);
+        //app_tracef("WARNING: ExtractSubstring() Cannot find token in \"%s\"", pTokenData);
         return NULL;
     }
     p1 += strlen(pPrefix);
@@ -473,13 +945,13 @@ char *ExtractSubstring(char *pTokenData, const char *pPrefix, const char *pSuffi
     char *p2 = strstr(p1, pSuffix );
     if (!p2)
     {
-        app_tracef("ERROR: ExtractSubstring() Cannot find end of token in \"%s\"", pTokenData);
+        app_tracef("WARNING: ExtractSubstring() Cannot find end of token in \"%s\"", pTokenData);
         return NULL;
     }
     // p1 now points to the first character following the substring
     substringLen = p2-p1;
 
-    pSubstring = (char *)malloc (substringLen+1);
+    pSubstring = (char *)malloc(substringLen+1);
     if (!pSubstring)
     {
         app_tracef("ERROR: ExtractSubstring() malloc error");
@@ -499,18 +971,18 @@ int validateSettings(tIB_INSTANCEDATA *pIBRand)
     if (strlen(pIBRand->szUsername) == 0)
     {
         app_tracef("ERROR: Username is mandatory, but not supplied. Aborting.");
-        return 2401;
+        return 2250;
     }
     if (strlen(pIBRand->szPassword) == 0)
     {
         app_tracef("ERROR: Password is mandatory, but not supplied. Aborting.");
-        return 2402;
+        return 2251;
     }
     if (strlen(pIBRand->szBaseUrl) == 0)
     {
         // Parameter error
         app_tracef("ERROR: URL is mandatory, but not supplied. Aborting.");
-        return 2403;
+        return 2252;
     }
     return 0;
 }
@@ -520,25 +992,54 @@ int validateSettings(tIB_INSTANCEDATA *pIBRand)
 //-----------------------------------------------------------------------
 int InitialiseCurl(tIB_INSTANCEDATA *pIBRand)
 {
-    //app_tracef("{B}");
     //////////////////////////////
     // Initialise libcurl
     //////////////////////////////
     /* In windows, this will init the winsock stuff */
     curl_global_init(CURL_GLOBAL_ALL);
 
-    //app_tracef("{C}");
     pIBRand->hCurl = curl_easy_init();
     if (!pIBRand->hCurl)
     {
       app_tracef("ERROR: Library initialisation failed");
-      return 2102;
+      return 2260;
     }
 
     if (TEST_BIT(pIBRand->fVerbose,DBGBIT_CURL))
     {
-        curl_easy_setopt(pIBRand->hCurl, CURLOPT_VERBOSE, 1);
+        //curl_easy_setopt(pIBRand->hCurl, CURLOPT_TIMEOUT, xxx);
+        //curl_easy_setopt(pIBRand->hCurl, CURLOPT_FAILONERROR, true);
+
+
+        // CURLOPT_STDERR must be set to something specific.
+        // Setting curl_setopt($c, CURLOPT_STDERR, fopen('/curl.txt', 'w+')); fixed my issue.
+        // As it turns out curl_setopt($c, CURLOPT_VERBOSE, 1); is not printing the output to STDERR for some reason which I have not uncovered. I did not find the output in any of my PHP, Apache, nor Event Viewer logs.
+        // After setting curl_setopt($c, CURLOPT_STDERR, fopen('/curl.txt', 'w+'));, I was able to see the output in the curl.txt file.
+        // I am not sure if this is specific to Windows environments.
+        //curl_easy_setopt(pIBRand->hCurl, CURLOPT_STDERR, fopen('/curl.txt', 'w+'));
+
+        curl_easy_setopt(pIBRand->hCurl, CURLOPT_VERBOSE, 1L);
+        /*
+            typedef enum
+            {
+              CURLINFO_TEXT = 0,
+              CURLINFO_HEADER_IN,    // 1
+              CURLINFO_HEADER_OUT,   // 2
+              CURLINFO_DATA_IN,      // 3
+              CURLINFO_DATA_OUT,     // 4
+              CURLINFO_SSL_DATA_IN,  // 5
+              CURLINFO_SSL_DATA_OUT, // 6
+              CURLINFO_END
+            } tCURL_INFOTYPE;
+
+            int CurlDebugCallback(CURL *handle, tCURL_INFOTYPE type, char *data, size_t size, void *userptr)
+            {
+            }
+            CURLcode curl_easy_setopt(pIBRand->hCurl, CURLOPT_DEBUGFUNCTION, CurlDebugCallback);
+            CURLcode curl_easy_setopt(pIBRand->hCurl, CURLOPT_DEBUGDATA, pIBRand); // JG: Does this call exist - i.e. does CURLOPT_DEBUGFUNCTION have userdata?
+        */
     }
+
     pIBRand->fCurlInitialised = TRUE;
     return 0;
 }
@@ -550,7 +1051,6 @@ int DoAuthentication(tIB_INSTANCEDATA *pIBRand)
 {
     int rc;
 
-    //app_tracef("{A1}");
     //////////////////////////////
     // Authenticate the user
     //////////////////////////////
@@ -563,18 +1063,22 @@ int DoAuthentication(tIB_INSTANCEDATA *pIBRand)
       return rc; // 2200..2299
     }
 
-    //app_tracef("{A2}");
     // TokenData is something of the form (without the EOLs)...
     // {"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6InVzZXIxIiwibmJmIjoxNTc1MzgzOTI5LCJleHAiOjE1NzU0NzAzMjksImlhdCI6MTU3NTM4MzkyOSwiaXNzIjoiaHR0cHM6Ly9pcm9uYnJpZGdlYXBpLmNvbSIsImF1ZCI6IkFueSJ9.DvrJew9dLYVgmzB36N8LgRT1zT4hJsDtr0pjG_8WJBs",
     //  "notBefore":"2019-12-03T14:38:49.10979Z",
     //  "notAfter":"2019-12-04T14:38:49.10979Z"}
 
+    // Todo: Use strtok or regex or similar
     pIBRand->pRealToken = ExtractSubstring(pIBRand->Token.pData, "\"token\":\"", "\"");
     if (!pIBRand->pRealToken)
     {
-      app_tracef("ERROR: Cannot find token in TokenData pData=[%s]", pIBRand->Token.pData);
-      //app_tracef("{A3}");
-      return 2301;
+        // Check with space after colon
+        pIBRand->pRealToken = ExtractSubstring(pIBRand->Token.pData, "\"token\": \"", "\"");
+        if (!pIBRand->pRealToken)
+        {
+          app_tracef("ERROR: Cannot find token in TokenData pData=[%s]", pIBRand->Token.pData);
+          return 2270;
+        }
     }
 
     if (TEST_BIT(pIBRand->fVerbose,DBGBIT_AUTH))
@@ -587,7 +1091,6 @@ int DoAuthentication(tIB_INSTANCEDATA *pIBRand)
 
     pIBRand->fAuthenticated = TRUE;
 
-    //app_tracef("{A4}");
     return 0;
 }
 
@@ -598,26 +1101,51 @@ void ironbridge_api_finalise(tIB_INSTANCEDATA *pIBRand)
 {
     if (TEST_BIT(pIBRand->fVerbose,DBGBIT_STATUS))
         app_tracef("INFO: ironbridge_api_finalise()");
+
     //////////////////////////////
-    // Cleanup
+    // Cleanup and wipe away our footprints
     //////////////////////////////
     if (pIBRand->pRealToken)
     {
+        memset(pIBRand->pRealToken, 0, strlen(pIBRand->pRealToken));
         free(pIBRand->pRealToken);
+        pIBRand->pRealToken = NULL;
     }
     if (pIBRand->ResultantData.pData)
     {
+        memset(pIBRand->ResultantData.pData, 0, pIBRand->ResultantData.cbData);
         free(pIBRand->ResultantData.pData);
         pIBRand->ResultantData.cbData = 0;
         pIBRand->ResultantData.pData = NULL;
     }
     if (pIBRand->Token.pData)
     {
+        memset(pIBRand->Token.pData, 0, pIBRand->Token.cbData);
         free(pIBRand->Token.pData);
         pIBRand->Token.cbData = 0;
         pIBRand->Token.pData = NULL;
     }
-    //app_tracef("{j}");
+    if (pIBRand->symmetricSessionKey.pData)
+    {
+        memset(pIBRand->symmetricSessionKey.pData, 0, pIBRand->symmetricSessionKey.cbData);
+        free(pIBRand->symmetricSessionKey.pData);
+        pIBRand->symmetricSessionKey.cbData = 0;
+        pIBRand->symmetricSessionKey.pData = NULL;
+    }
+    if (pIBRand->ourKemSecretKey.pData)
+    {
+        memset(pIBRand->ourKemSecretKey.pData, 0, pIBRand->ourKemSecretKey.cbData);
+        free(pIBRand->ourKemSecretKey.pData);
+        pIBRand->ourKemSecretKey.cbData = 0;
+        pIBRand->ourKemSecretKey.pData = NULL;
+    }
+    if (pIBRand->theirSigningPublicKey.pData)
+    {
+        memset(pIBRand->theirSigningPublicKey.pData, 0, pIBRand->theirSigningPublicKey.cbData);
+        free(pIBRand->theirSigningPublicKey.pData);
+        pIBRand->theirSigningPublicKey.cbData = 0;
+        pIBRand->theirSigningPublicKey.pData = NULL;
+    }
     curl_easy_cleanup(pIBRand->hCurl);
     curl_global_cleanup();
 
@@ -632,13 +1160,67 @@ void ironbridge_api_finalise(tIB_INSTANCEDATA *pIBRand)
 //-----------------------------------------------------------------------
 // ReadConfig
 //-----------------------------------------------------------------------
+static int ReadContentsOfFile(char *szFilename, tLSTRING *pDest, size_t expectedNumberOfBytes)
+{
+    if (szFilename == NULL || strlen(szFilename) == 0)
+    {
+        app_tracef("ERROR: Cannot read the contents of a file with no name");
+        return 2280;
+    }
+
+    if (!my_fileExists(szFilename))
+    {
+        app_tracef("ERROR: File not found: \"%s\"", szFilename);
+        return 2281;
+    }
+
+    size_t filesize = my_getFilesize(szFilename);
+    if (filesize != expectedNumberOfBytes)
+    {
+        app_tracef("ERROR: Size of file (%s, %u bytes) is not as expected (%u bytes)", szFilename, filesize, expectedNumberOfBytes);
+        return 2282;
+    }
+    pDest->pData = malloc(filesize);
+    if (!pDest->pData)
+    {
+        app_tracef("ERROR: Failed to allocate %u bytes for file contents", filesize);
+        return 2283;
+    }
+
+    FILE *fIn = fopen(szFilename, "rb");
+    if (!fIn)
+    {
+        app_tracef("ERROR: Failed to open input file: \"%s\"", szFilename);
+        memset(pDest->pData, 0, filesize);
+        free(pDest->pData);
+        pDest->pData = NULL;
+        pDest->cbData = 0;
+        return 2284;
+    }
+    size_t bytesRead = fread(pDest->pData, 1, filesize, fIn);
+    if (bytesRead != filesize)
+    {
+        app_tracef("ERROR: Failed to read key from file: \"%s\"", szFilename);
+        fclose(fIn);
+        memset(pDest->pData, 0, filesize);
+        free(pDest->pData);
+        pDest->pData = NULL;
+        pDest->cbData = 0;
+        return 2285;
+    }
+    pDest->cbData = bytesRead;
+    fclose(fIn);
+
+    return 0;
+}
+
 #if (USE_CONFIG==CONFIG_HARDCODED)
 static int ReadConfig(char *szConfigFilename, tIB_INSTANCEDATA *pIBRand)
 {
     int rc;
     if (!pIBRand)
     {
-        return 2101;
+        return 2290;
     }
 
     UNUSED_PARAM(szConfigFilename);
@@ -666,6 +1248,15 @@ static int ReadConfig(char *szConfigFilename, tIB_INSTANCEDATA *pIBRand)
     pIBRand->storageLowWaterMark          = 10240; // 102400; // 100KB
     pIBRand->idleDelay                    = 10;
 
+    pIBRand->useSecureRng                 = true;
+    pIBRand->ourKemSecretKeyFilename      = "";
+    pIBRand->theirSigningPublicKeyFilename= "";
+
+    pIBRand->ourKemSecretKey.pData        = NULL;
+    pIBRand->ourKemSecretKey.cbData       = 0;
+    pIBRand->theirSigningPublicKey.pData  = NULL;
+    pIBRand->theirSigningPublicKey.cbData = 0;
+
     //pIBRand->fVerbose                     = 0x03;
     SET_BIT(pIBRand->fVerbose, DBGBIT_STATUS );
     SET_BIT(pIBRand->fVerbose, DBGBIT_CONFIG );
@@ -687,7 +1278,7 @@ static int ReadConfig(char *szConfigFilename, tIB_INSTANCEDATA *pIBRand)
     int rc;
     if (!pIBRand)
     {
-        return 2101;
+        return 2300;
     }
 
     //////////////////////////////////////
@@ -695,7 +1286,6 @@ static int ReadConfig(char *szConfigFilename, tIB_INSTANCEDATA *pIBRand)
     /////////////////////////////////////
     char *szFilename;
     FILE *hConfigFile;
-    int tempval = 0;
 
     rc = my_openSimpleConfigFile(szConfigFilename, &hConfigFile);
     if (rc)
@@ -706,23 +1296,26 @@ static int ReadConfig(char *szConfigFilename, tIB_INSTANCEDATA *pIBRand)
     app_tracef("INFO: Configuration file (SIMPLE format) [%s]", szConfigFilename);
     if (hConfigFile)
     {
-        rc = my_readSimpleConfigFileStr (hConfigFile, "AUTHTYPE"            , pIBRand->szAuthType            , sizeof(pIBRand->szAuthType           ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "AUTHTYPE"            , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "SIMPLE"
-        rc = my_readSimpleConfigFileStr (hConfigFile, "AUTHURL"             , pIBRand->szAuthUrl             , sizeof(pIBRand->szAuthUrl            ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "AUTHURL"             , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "https://ironbridgeapi.com/login"
-        rc = my_readSimpleConfigFileStr (hConfigFile, "AUTHUSER"            , pIBRand->szUsername            , sizeof(pIBRand->szUsername           ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "AUTHUSER"            , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "Pa55w0rd"
-        rc = my_readSimpleConfigFileStr (hConfigFile, "AUTHPSWD"            , pIBRand->szPassword            , sizeof(pIBRand->szPassword           ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "AUTHPSWD"            , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "Username"
-        rc = my_readSimpleConfigFileInt (hConfigFile, "AUTHRETRYDELAY"      , &pIBRand->authRetryDelay                                                ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "AUTHRETRYDELAY"      , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. 15 or 30
-        rc = my_readSimpleConfigFileStr (hConfigFile, "BASEURL"             , pIBRand->szBaseUrl             , sizeof(pIBRand->szBaseUrl            ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "BASEURL"             , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "ironbridgeapi.com/api" or "192.168.9.128:6502/v1/ironbridge/api"
-        rc = my_readSimpleConfigFileInt (hConfigFile, "BYTESPERREQUEST"     , &pIBRand->bytesPerRequest                                               ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "BYTESPERREQUEST"     , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. 16;
-        rc = my_readSimpleConfigFileInt (hConfigFile, "RETRIEVALRETRYDELAY" , &pIBRand->retrievalRetryDelay                                           ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "RETRIEVALRETRYDELAY" , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. 15 or 30
-        rc = my_readSimpleConfigFileStr (hConfigFile, "STORAGETYPE"         , pIBRand->szStorageType         , sizeof(pIBRand->szStorageType        ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "STORAGETYPE"         , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. FILE, MEMORY, MYSQL etc
-        rc = my_readSimpleConfigFileStr (hConfigFile, "STORAGEDATAFORMAT"   , pIBRand->szStorageDataFormat   , sizeof(pIBRand->szStorageDataFormat  ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "STORAGEDATAFORMAT"   , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. RAW, BASE64, HEX
-        rc = my_readSimpleConfigFileStr (hConfigFile, "STORAGEFILENAME"     , pIBRand->szStorageFilename     , sizeof(pIBRand->szStorageFilename    ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "STORAGEFILENAME"     , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "/var/lib/ibrand/ibrand_data.bin"
-        rc = my_readSimpleConfigFileStr (hConfigFile, "STORAGELOCKFILEPATH" , pIBRand->szStorageLockfilePath , sizeof(pIBRand->szStorageLockfilePath) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "STORAGELOCKFILEPATH" , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "/tmp"
-        rc = my_readSimpleConfigFileLong(hConfigFile, "STORAGEHIGHWATERMARK", &pIBRand->storageHighWaterMark                                          ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "STORAGEHIGHWATERMARK", rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. 1038336 (1MB)
-        rc = my_readSimpleConfigFileLong(hConfigFile, "STORAGELOWWATERMARK" , &pIBRand->storageLowWaterMark                                           ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "STORAGELOWWATERMARK" , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. 102400 (100KB)
-        rc = my_readSimpleConfigFileInt (hConfigFile, "IDLEDELAY"           , &pIBRand->idleDelay                                                     ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "IDLEDELAY"           , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. 15 or 30
-        rc = my_readSimpleConfigFileInt (hConfigFile, "VERBOSE"             , &tempval                                                                ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "VERBOSE"             , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. 3
-        pIBRand->fVerbose = (unsigned char)tempval;
+        rc = my_readSimpleConfigFileStr (hConfigFile, "AUTHTYPE"                     , pIBRand->szAuthType            , sizeof(pIBRand->szAuthType           ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "AUTHTYPE"                     , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "SIMPLE"
+        rc = my_readSimpleConfigFileStr (hConfigFile, "AUTHURL"                      , pIBRand->szAuthUrl             , sizeof(pIBRand->szAuthUrl            ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "AUTHURL"                      , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "https://ironbridgeapi.com/login"
+        rc = my_readSimpleConfigFileStr (hConfigFile, "AUTHUSER"                     , pIBRand->szUsername            , sizeof(pIBRand->szUsername           ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "AUTHUSER"                     , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "Pa55w0rd"
+        rc = my_readSimpleConfigFileStr (hConfigFile, "AUTHPSWD"                     , pIBRand->szPassword            , sizeof(pIBRand->szPassword           ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "AUTHPSWD"                     , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "Username"
+        rc = my_readSimpleConfigFileInt (hConfigFile, "AUTHRETRYDELAY"               , &pIBRand->authRetryDelay                                                ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "AUTHRETRYDELAY"               , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. 15 or 30
+        rc = my_readSimpleConfigFileStr (hConfigFile, "BASEURL"                      , pIBRand->szBaseUrl             , sizeof(pIBRand->szBaseUrl            ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "BASEURL"                      , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "ironbridgeapi.com/api" or "192.168.9.128:6502/v1/ironbridge/api"
+        rc = my_readSimpleConfigFileInt (hConfigFile, "BYTESPERREQUEST"              , &pIBRand->bytesPerRequest                                               ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "BYTESPERREQUEST"              , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. 16;
+        rc = my_readSimpleConfigFileInt (hConfigFile, "RETRIEVALRETRYDELAY"          , &pIBRand->retrievalRetryDelay                                           ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "RETRIEVALRETRYDELAY"          , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. 15 or 30
+        rc = my_readSimpleConfigFileStr (hConfigFile, "STORAGETYPE"                  , pIBRand->szStorageType         , sizeof(pIBRand->szStorageType        ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "STORAGETYPE"                  , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. FILE, MEMORY, MYSQL etc
+        rc = my_readSimpleConfigFileStr (hConfigFile, "STORAGEDATAFORMAT"            , pIBRand->szStorageDataFormat   , sizeof(pIBRand->szStorageDataFormat  ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "STORAGEDATAFORMAT"            , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. RAW, BASE64, HEX
+        rc = my_readSimpleConfigFileStr (hConfigFile, "STORAGEFILENAME"              , pIBRand->szStorageFilename     , sizeof(pIBRand->szStorageFilename    ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "STORAGEFILENAME"              , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "/var/lib/ibrand/ibrand_data.bin"
+        rc = my_readSimpleConfigFileStr (hConfigFile, "STORAGELOCKFILEPATH"          , pIBRand->szStorageLockfilePath , sizeof(pIBRand->szStorageLockfilePath) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "STORAGELOCKFILEPATH"          , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "/tmp"
+        rc = my_readSimpleConfigFileLong(hConfigFile, "STORAGEHIGHWATERMARK"         , &pIBRand->storageHighWaterMark                                          ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "STORAGEHIGHWATERMARK"         , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. 1038336 (1MB)
+        rc = my_readSimpleConfigFileLong(hConfigFile, "STORAGELOWWATERMARK"          , &pIBRand->storageLowWaterMark                                           ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "STORAGELOWWATERMARK"          , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. 102400 (100KB)
+        rc = my_readSimpleConfigFileInt (hConfigFile, "IDLEDELAY"                    , &pIBRand->idleDelay                                                     ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "IDLEDELAY"                    , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. 15 or 30
+        rc = my_readSimpleConfigFileByte(hConfigFile, "VERBOSE"                      , &pIBRand->fVerbose                                                      ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "VERBOSE"                      , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. 3
+        rc = my_readSimpleConfigFileByte(hConfigFile, "USESECURERNG"                 , &pIBRand->useSecureRng                                                  ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "USESECURERNG"                 , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. 3
+        rc = my_readSimpleConfigFileStr (hConfigFile, "OURKEMSECRETKEYFILENAME"      , pIBRand->ourKemSecretKeyFilename                                        ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "OURKEMSECRETKEYFILENAME"      , rc); my_closeSimpleConfigFile(hConfigFile); return rc; }
+        rc = my_readSimpleConfigFileStr (hConfigFile, "THEIRSIGNINGPUBLICKEYFILENAME", pIBRand->theirSigningPublicKeyFilename                                  ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "THEIRSIGNINGPUBLICKEYFILENAME", rc); my_closeSimpleConfigFile(hConfigFile); return rc; }
+
         my_closeSimpleConfigFile(hConfigFile);
     }
 
@@ -755,6 +1348,8 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_INSTANCEDATA *pIBRan
         if (localConfigTracing)
             app_tracef("DEBUG: Found json item[%d] %s=%s\r\n", ii, json2->pairs[ii].key, (json2->pairs[ii].type == JSON_STRING)?(json2->pairs[ii].value->stringValue):"[JSON object]");
 
+
+
         if (strcmp(json2->pairs[ii].key,"AuthSettings") == 0 && json2->pairs[ii].type == JSON_OBJECT)
         {
             JSONObject *childJson = json2->pairs[ii].value->jsonObject;
@@ -785,6 +1380,32 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_INSTANCEDATA *pIBRan
                     else if (strcmp(childJson->pairs[jj].key,"AUTHRETRYDELAY")==0)
                     {
                         pIBRand->authRetryDelay = atoi(childJson->pairs[jj].value->stringValue);
+                    }
+                }
+            }
+        }
+        else if (strcmp(json2->pairs[ii].key,"SecuritySettings") == 0 && json2->pairs[ii].type == JSON_OBJECT)
+        {
+            JSONObject *childJson = json2->pairs[ii].value->jsonObject;
+
+            for (int jj=0; jj<childJson->count; jj++)
+            {
+                if (localConfigTracing)
+                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\r\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
+
+                if (childJson->pairs[jj].type == JSON_STRING)
+                {
+                    if (strcmp(childJson->pairs[jj].key,"USESECURERNG")==0)
+                    {
+                        pIBRand->useSecureRng = atoi(childJson->pairs[jj].value->stringValue);
+                    }
+                    else if (strcmp(childJson->pairs[jj].key,"OURKEMSECRETKEYFILENAME")==0)
+                    {
+                        my_strlcpy(pIBRand->ourKemSecretKeyFilename, childJson->pairs[jj].value->stringValue, sizeof(pIBRand->ourKemSecretKeyFilename));
+                    }
+                    else if (strcmp(childJson->pairs[jj].key,"THEIRSIGNINGPUBLICKEYFILENAME")==0)
+                    {
+                        my_strlcpy(pIBRand->theirSigningPublicKeyFilename, childJson->pairs[jj].value->stringValue, sizeof(pIBRand->theirSigningPublicKeyFilename));
                     }
                 }
             }
@@ -910,7 +1531,19 @@ static int ReadConfig(char *szConfigFilename, tIB_INSTANCEDATA *pIBRand)
         app_tracef("ERROR: One or more settings are invalid");
         return rc;
     }
-    return 0;
+
+    rc = ReadContentsOfFile(pIBRand->ourKemSecretKeyFilename, &pIBRand->ourKemSecretKey, CRYPTO_SECRETKEYBYTES);
+    if (rc != 0)
+    {
+        app_tracef("ERROR: Failed to read our secret key from file");
+        return rc;
+    }
+    rc = ReadContentsOfFile(pIBRand->theirSigningPublicKeyFilename, &pIBRand->theirSigningPublicKey, CRYPTO_PUBLICKEYBYTES);
+    if (rc != 0)
+    {
+        app_tracef("ERROR: Failed to read their public key from file");
+        return rc;
+    }
 
     return 0;
 }
@@ -925,12 +1558,14 @@ static void PrintConfig(tIB_INSTANCEDATA *pIBRand)
     for (int ii=0; ii<my_minimum(sizeof(hiddenPassword)-1,strlen(pIBRand->szPassword)); ii++)
        hiddenPassword[ii] = '*';
 
-
     app_tracef("szAuthType            =[%s]" , pIBRand->szAuthType            ); // char          szAuthType               [16]   // "SIMPLE";
     app_tracef("szAuthUrl             =[%s]" , pIBRand->szAuthUrl             ); // char          szAuthUrl                [128]  // "https://ironbridgeapi.com/login";
     app_tracef("szUsername            =[%s]" , pIBRand->szUsername            ); // char          szUsername               [32]   //
     app_tracef("szPassword            =[%s]" , hiddenPassword                 ); // char          szPassword               [32]   //
     app_tracef("authRetryDelay        =[%d]" , pIBRand->authRetryDelay        ); // int           authRetryDelay                  //
+    //app_tracef("ourKemSecretKey       =[%s]" , hiddenKemSecretKey             );
+    //app_tracef("theirSigningPublicKey =[%s]" , pIBRand->theirSigningPublicKey );
+    app_tracef("useSecureRng          =[%u]" , pIBRand->useSecureRng          );
     app_tracef("szBaseUrl             =[%s]" , pIBRand->szBaseUrl             ); // char          szBaseUrl                [128]  // "https://ironbridgeapi.com/api"; // http://192.168.9.128:6502/v1/ironbridge/api
     app_tracef("bytesPerRequest       =[%d]" , pIBRand->bytesPerRequest       ); // int           bytesPerRequest                 // 16
     app_tracef("retrievalRetryDelay   =[%d]" , pIBRand->retrievalRetryDelay   ); // int           retrievalRetryDelay             //
@@ -969,7 +1604,7 @@ int main(int argc, char * argv[])
     // =========================================================================
     // And they're off!!!
     // =========================================================================
-    fprintf(stdout, "IronBridge(tm) IBRand Service v0.30\n");
+    fprintf(stdout, "IronBridge(tm) IBRand Service v0.40\n");
     fprintf(stdout, "Copyright (c) 2020 Cambridge Quantum Computing Limited. All rights reserved.\n");
     fprintf(stdout, "\n");
 
@@ -1105,7 +1740,6 @@ int main(int argc, char * argv[])
     if (TEST_BIT(pIBRand->fVerbose,DBGBIT_STATUS))
         app_tracef("INFO: Running");
 
-
     unsigned long numberOfAuthSuccesses =  0;
     unsigned long numberOfAuthFailures =  0;
     unsigned long numberOfConsecutiveAuthFailures =  0;
@@ -1126,7 +1760,6 @@ int main(int argc, char * argv[])
     // The Big Loop
     while (1)
     {
-
         if (TEST_BIT(pIBRand->fVerbose,DBGBIT_STATUS))
         {
             app_tracef("INFO: Stats("
@@ -1151,6 +1784,8 @@ int main(int argc, char * argv[])
                 break;
 #endif // RUN_AS_DAEMON
             }
+            if (TEST_BIT(pIBRand->fVerbose,DBGBIT_CURL))
+                app_tracef("INFO: Curl Initialisation OK");
         }
 
         if (!pIBRand->fAuthenticated)
@@ -1169,6 +1804,58 @@ int main(int argc, char * argv[])
                 break;
 #endif // RUN_AS_DAEMON
             }
+            if (TEST_BIT(pIBRand->fVerbose,DBGBIT_AUTH))
+                app_tracef("INFO: Authentication OK");
+            numberOfAuthSuccesses++;
+            numberOfConsecutiveAuthFailures = 0;
+        }
+
+        // Get SessionKey (aka SharedSecret)
+        if (pIBRand->symmetricSessionKey.pData == NULL)
+        {
+            // Do we already have an encapsulatedSessionKey ?
+            if (pIBRand->encapsulatedSessionKey.pData == NULL)
+            {
+                rc = getSecureRNGSessionKey(pIBRand);
+                if (rc != 0)
+                {
+                    numberOfAuthFailures++;
+                    numberOfConsecutiveAuthFailures++;
+#ifdef RUN_AS_DAEMON
+                    app_tracef("ERROR: DoRequestSessionKey failed with rc=%d. Will retry in %d seconds", rc, pIBRand->authRetryDelay);
+                    sleep(pIBRand->authRetryDelay);
+                    continue;
+#else // RUN_AS_DAEMON
+                    app_tracef("ERROR: DoRequestSessionKey failed with rc=%d. Aborting.", rc);
+                    break;
+#endif // RUN_AS_DAEMON
+                }
+                if (TEST_BIT(pIBRand->fVerbose,DBGBIT_AUTH))
+                    app_tracef("INFO: Encapsulated Session Key OK");
+                // Loop around and try again
+                continue;
+            }
+            else
+            {
+                if (TEST_BIT(pIBRand->fVerbose,DBGBIT_AUTH))
+                    app_tracef("INFO: Decapsulating session key");
+                int rc = DecapsulateAndStoreSessionKey(pIBRand);
+                if (rc != 0)
+                {
+                    numberOfAuthFailures++;
+                    numberOfConsecutiveAuthFailures++;
+#ifdef RUN_AS_DAEMON
+                    app_tracef("ERROR: KEM decapsulation failed with rc=%d. Will retry in %d seconds", rc, pIBRand->authRetryDelay);
+                    sleep(pIBRand->authRetryDelay);
+                    continue;
+#else // RUN_AS_DAEMON
+                    app_tracef("ERROR: KEM decapsulation failed with rc=%d. Aborting.", rc);
+                    break;
+#endif // RUN_AS_DAEMON
+                }
+            }
+            if (TEST_BIT(pIBRand->fVerbose,DBGBIT_AUTH))
+                app_tracef("INFO: Session key OK");
             numberOfAuthSuccesses++;
             numberOfConsecutiveAuthFailures = 0;
         }
@@ -1211,7 +1898,15 @@ int main(int argc, char * argv[])
             {
                 numberOfRetreivalFailures++;
                 numberOfConsecutiveRetreivalFailures++;
-                app_tracef("ERROR: RNG failed with rc=%d. Will try again in %d seconds", rc, pIBRand->retrievalRetryDelay);
+                app_tracef("ERROR: %s Failed with rc=%d. Will try again in %d seconds", pIBRand->useSecureRng?"SRNG":"RNG", rc, pIBRand->retrievalRetryDelay);
+                sleep(pIBRand->retrievalRetryDelay);
+            }
+            else if (pIBRand->ResultantData.pData == NULL || pIBRand->ResultantData.cbData == 0 )
+            {
+                numberOfRetreivalFailures++;
+                numberOfConsecutiveRetreivalFailures++;
+                if (TEST_BIT(pIBRand->fVerbose,DBGBIT_DATA))
+                    app_tracef("WARNING: %s No data received. Will try again in %d seconds", pIBRand->useSecureRng?"SRNG":"RNG", pIBRand->retrievalRetryDelay);
                 sleep(pIBRand->retrievalRetryDelay);
             }
             else

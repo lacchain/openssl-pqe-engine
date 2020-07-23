@@ -201,6 +201,26 @@ int my_readSimpleConfigFileStr(FILE *hConfigFile, const char *szKey, char *pDest
     return 0;
 }
 
+int my_readSimpleConfigFileByte(FILE * hConfigFile, const char *szKey, unsigned char *pDest)
+{
+    int rc;
+    int tempval;
+
+    if (!hConfigFile  || !szKey || !pDest)
+    {
+        //printf("ERROR: Parameter error\n");
+       return 6007;
+    }
+
+    rc = my_readSimpleConfigFileInt(hConfigFile, szKey, &tempval);
+    if (rc)
+    {
+        return rc;
+    }
+    *pDest = (unsigned char)tempval;
+    return 0;
+}
+
 int my_readSimpleConfigFileInt(FILE * hConfigFile, const char *szKey, int *pDest)
 {
     int rc;

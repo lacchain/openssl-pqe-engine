@@ -36,15 +36,18 @@
 ///////////////////////////////////////////////////////////////////////////////
 // Logging Functions
 ///////////////////////////////////////////////////////////////////////////////
-extern void   setLogFilename(char *szPath, char *szFilename);
-extern char * FormatData ( char *szTarget, char *szTitle, unsigned char *pData, int cbData, int bControlCharsOnly );
+extern int OUTPUT_TO_CONSOLE_ENABLED;
+extern void   setLogFilename(const char *szPath, const char *szFilename);
+extern char * FormatData ( char *szTarget, const char *szTitle, const unsigned char *pData, int cbData, int bControlCharsOnly );
 extern void   app_trace_openlog(const char *ident, int logopt, int facility);
 extern void   app_trace_closelog(void);
-extern void   app_trace_hex(char *pHeader, char *pData, int cbData);
-extern void   app_trace_zstring(char *szString);
-extern void   app_trace_zstring_nocrlf(char *szString);
-extern void   app_trace(char *szString);
-extern int    app_tracef(char *formatStr, ...);
-extern int    my_getToken(char *pSrcData, char *pDstField, int nFieldNum, int nDstFieldMaxLen);
+extern void   app_trace_hex(const char *pHeader, const char *pData, int cbData);
+extern void   app_trace_hexall(const char *pHeader, const unsigned char *pData, unsigned int cbData);
+extern void   app_trace_zstring(const char *szString);
+extern void   app_trace_zstring_nocrlf(const char *szString);
+extern void   app_trace(const char *szString);
+extern int    app_tracef(const char *formatStr, ...);
+extern int    my_getToken(const char *pSrcData, char *pDstField, int nFieldNum, int nDstFieldMaxLen);
+extern void   dumpToFile(const char *szFilename, const unsigned char *p, size_t n);
 
 #endif // _INCLUDE_MY_LOGGING_H_

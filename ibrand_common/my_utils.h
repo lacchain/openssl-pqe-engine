@@ -92,5 +92,5 @@ extern char * my_removeTrailingString(char *szStr, char *szStrToRemove);
 extern char * my_removeTrailingStringi(char *szStr, char *szStrToRemove);
 extern long   my_getFilesize(const char *szFilename);
 extern bool   my_fileExists(const char *szFilename);
-
+extern int    my_roundUp(int num, int multipleOf);
 #endif // _INCLUDE_MY_UTILS_H_

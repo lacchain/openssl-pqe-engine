@@ -7,8 +7,8 @@ CFLAGS = -g -Wall -Wextra -Werror -std=c99 -O3 -fPIC \
  -DLINUX
 
 .PHONY: all
-all: MARKER my_utilslib.a my_utilslib.so
-	@echo --- $@ Done
+all: MARKER my_utilslib.a
+	@echo --- $@ IBRAND_COMMON Done
 
 MARKER:
 	@echo ================================================================================

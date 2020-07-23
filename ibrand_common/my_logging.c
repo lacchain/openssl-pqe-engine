@@ -29,7 +29,7 @@
 #include "my_logging.h"
 
 //#define MK_WIN_EMUL
-//#define OUTPUT_TO_CONSOLE_ENABLED
+int OUTPUT_TO_CONSOLE_ENABLED = 0;
 #define OUTPUT_TO_LOGFILE_ENABLED
 #define OUTPUT_TO_SYSLOG_ENABLED
 #define ALSO_LOG_INTERNAL_ERRORS
@@ -56,7 +56,8 @@ static char *FormatCharHex ( char *szTarget, unsigned char ch )
 // Jonnie, Fri 02-Oct-1998, 16:11:57
 ////////////////////////////////////////////////////////////
 {
-   sprintf(szTarget+strlen(szTarget),"<0x%2.2X>",ch);
+   //sprintf(szTarget+strlen(szTarget),"<0x%2.2X>",ch);
+   sprintf(szTarget+strlen(szTarget),"%2.2X",ch);
    return szTarget;
 }
 
@@ -76,7 +77,7 @@ static char *FormatCharDisplayable ( char *szTarget, unsigned char ch )
    return szTarget;
 }
 
-char *FormatData ( char *szTarget, char *szTitle, unsigned char *pData, int cbData, int bControlCharsOnly )
+char *FormatData ( char *szTarget, const char *szTitle, const unsigned char *pData, int cbData, int bControlCharsOnly )
 ////////////////////////////////////////////////////////////
 // Jonnie, Thu 01-Oct-1998, 11:20:50
 // Minimum length of szTarget is...
@@ -133,7 +134,7 @@ char *FormatData ( char *szTarget, char *szTitle, unsigned char *pData, int cbDa
    return szTarget;
 }
 
-void app_trace_hex(char *pHeader, char *pData, int cbData)
+void app_trace_hex(const char *pHeader, const char *pData, int cbData)
 {
   char *pTemp;
   size_t malloc_size;
@@ -174,6 +175,46 @@ void app_trace_hex(char *pHeader, char *pData, int cbData)
   }
 }
 
+void app_trace_hexall(const char *pHeader, const unsigned char *pData, unsigned int cbData)
+{
+  char *pTemp;
+  size_t malloc_size;
+
+  //if (cbData<0)
+  //  return;
+
+  //
+  // "<=="
+  malloc_size =   (pHeader?strlen(pHeader):0) +       // Space for "%s"
+                + (pHeader?(6+5+2):0) +               // Space for " (len=%d) "
+                + (pHeader?3:0) +                     // Space for "==>"
+                + (cbData*6)                          // Space for Max 6 bytes per character eg "<0x12>"
+                + (pHeader?strlen(pHeader)+4+3:0) +   // Space for "<=="
+                + 1;                                  // Space for trailing NULL
+
+  pTemp = (char *)malloc(malloc_size);
+  if (pTemp)
+  {
+    app_trace_zstring(FormatData(pTemp, pHeader, (unsigned char *)pData, cbData, FALSE)); // NB FALSE <=========== ALL chars in hex
+    app_timer_delay(10);
+    free(pTemp);
+  }
+  else
+  {
+    char tempStr[20];
+#ifdef ALSO_LOG_INTERNAL_ERRORS
+    app_trace_zstring_nocrlf("ERROR: Cannot display data do due malloc failure: ==>\"");
+#else
+    app_trace_zstring_nocrlf("Data ==>\"");
+#endif
+    app_trace_zstring_nocrlf(pHeader);
+    app_trace_zstring_nocrlf("\", ");
+    sprintf(tempStr, "%d bytes", cbData);
+    app_trace_zstring_nocrlf(tempStr);
+    app_trace_zstring("<==");
+    app_timer_delay(10);
+  }
+}
 #ifdef OUTPUT_TO_LOGFILE_ENABLED
 
 #ifdef INCLUDE_WINDOWS_TYPE_FUNCTIONS
@@ -210,7 +251,7 @@ void app_trace_closelog(void)
 {
    closelog();
 }
-static void appendToLogfile(char *szString, bool emitCrLf)
+static void appendToLogfile(const char *szString, bool emitCrLf)
 {
     syslog(LOG_ERR, "%s%s", szString, emitCrLf?"\n":"");
     // LOG_EMERG, LOG_ALERT, LOG_CRIT, LOG_ERR, LOG_WARNING, LOG_NOTICE, LOG_INFO and LOG_DEBUG
@@ -225,13 +266,13 @@ void app_trace_closelog(void)
 {
 }
 
-void setLogFilename(char *szPath, char *szFilename)
+void setLogFilename(const char *szPath, const char *szFilename)
 {
     strcpy(DEFAULTLOGFILEPATH, szPath);     // e.g. "/var/lib/<projectname>";
     strcpy(DEFAULTLOGFILENAME, szFilename); // e.g. "<projectname>_<component>.log"};
 }
 
-static const char *getLogFilename(char *szFilename)
+static const char *getLogFilename(const char *szFilename)
 {
     static char szLogFilename[_MAX_PATH];
 #ifdef INCLUDE_WINDOWS_TYPE_FUNCTIONS
@@ -246,7 +287,7 @@ static const char *getLogFilename(char *szFilename)
     return szLogFilename;
 }
 
-static void appendToLogfile(char *szString, bool emitCrLf)
+static void appendToLogfile(const char *szString, bool emitCrLf)
 {
     FILE *fLogfile;
     const char *pszLogFilename;
@@ -285,25 +326,25 @@ static void appendToLogfile(char *szString, bool emitCrLf)
 #endif // OUTPUT_TO_SYSLOG_ENABLED
 #endif // OUTPUT_TO_LOGFILE_ENABLED
 
-#ifdef OUTPUT_TO_CONSOLE_ENABLED
-static void OutputDebugStringA(char *szString)
+static void OutputDebugStringA(const char *szString)
 {
-    //printf(szString);
-    int n = write(STDERR_FILENO, szString, strlen(szString));
+    int n;
+    if (OUTPUT_TO_CONSOLE_ENABLED)
+    {
+        //printf(szString);
+        n = write(STDERR_FILENO, szString, strlen(szString));
+    }
     UNUSED_PARAM(n);
 }
-#endif // OUTPUT_TO_CONSOLE_ENABLED
 
-void app_trace_zstring(char *szString)
+void app_trace_zstring(const char *szString)
 {
     //TRACE ("msg=%s, int=%d\n", (LPCTSTR)sMsg, i);
     //OutputDebugString (LPCTSTR szMessage)
     //app_trace(szMessage);
 
-#ifdef OUTPUT_TO_CONSOLE_ENABLED
     OutputDebugStringA(szString);
     OutputDebugStringA(EOL);
-#endif
 
 #ifdef OUTPUT_TO_LOGFILE_ENABLED
     // Append this to our log file
@@ -311,11 +352,9 @@ void app_trace_zstring(char *szString)
 #endif
 }
 
-void app_trace_zstring_nocrlf(char *szString)
+void app_trace_zstring_nocrlf(const char *szString)
 {
-#ifdef OUTPUT_TO_CONSOLE_ENABLED
     OutputDebugStringA(szString);
-#endif
 
 #ifdef OUTPUT_TO_LOGFILE_ENABLED
     // Append this to our log file
@@ -323,12 +362,12 @@ void app_trace_zstring_nocrlf(char *szString)
 #endif
 }
 
-void app_trace(char *szString)
+void app_trace(const char *szString)
 {
     app_trace_zstring(szString);
 }
 
-int app_tracef(char *formatStr, ...)
+int app_tracef(const char *formatStr, ...)
 {
 #define SPRINTF_TRACE_BUFSIZE 4096
     va_list va;
@@ -352,7 +391,7 @@ int app_tracef(char *formatStr, ...)
 // GetToken Functions
 ///////////////////////////////////////////////////////////////////////////////
 
-int my_getToken(char *pSrcData, char *pDstField, int nFieldNum, int nDstFieldMaxLen)
+int my_getToken(const char *pSrcData, char *pDstField, int nFieldNum, int nDstFieldMaxLen)
 ///////////////////////////////////////////////////////////////////////////////
 // Name:    GetToken
 // Description: This function will get the specified field in a string.
@@ -439,4 +478,23 @@ int my_getToken(char *pSrcData, char *pDstField, int nFieldNum, int nDstFieldMax
   app_timer_delay(10);
 
   return TRUE;
+}
+
+void dumpToFile(const char *szFilename, const unsigned char *p, size_t n)
+{
+    app_tracef("Dumping %d bytes to %s", n, szFilename);
+    FILE *f = fopen(szFilename, "wb");
+    if (!f)
+    {
+        app_tracef("ERROR: DumpToFile - open failed");
+        return;
+    }
+    size_t bytesWritten = fwrite(p,1,n,f);
+    if (bytesWritten != n)
+    {
+       app_tracef("ERROR: DumpToFile - write failed");
+       fclose(f);
+       return;
+    }
+    fclose(f);
 }

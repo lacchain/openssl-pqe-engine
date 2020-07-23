@@ -277,4 +277,18 @@ bool my_fileExists(const char *szFilename)
 //     my_strlcpy(szDstStr, (char *)digest, cbDstStr);
 // }
 
+int my_roundUp(int num, int multipleOf)
+{
+    // Return a number which is a whole multiple of N
+    // e.g. newlen = RoundUp (oldlen, 16);
+
+    int newlen = num;
+
+    if (num % multipleOf)
+    {
+        newlen += multipleOf - (num % multipleOf);
+    }
+    return newlen;
+}
+
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------------
