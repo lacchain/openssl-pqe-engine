@@ -7,7 +7,7 @@ then
 	pushd ibrand_lib/software/
 	sudo make -f Makefile.linux install-lib
 	popd
-	echo --- Build RNG Engine for OpenSSL 
+	echo --- Build RNG Engine for OpenSSL
 	pushd ibrand_openssl/
 	sudo make -f Makefile.linux install-lib
 	popd
@@ -25,7 +25,7 @@ then
 	pushd ibrand_lib/software/
 	sudo make -f Makefile.linux install-lib -B
 	popd
-	echo --- ReBuild RNG Engine for OpenSSL 
+	echo --- ReBuild RNG Engine for OpenSSL
 	pushd ibrand_openssl/
 	sudo make -f Makefile.linux install-lib -B
 	popd
@@ -39,10 +39,13 @@ then
 	#sudo ibrand_service/ibrand_service
 	sudo ibrand_service/ibrand_service -f /usr/local/ssl/ibrand.cnf
 	pgrep ibrand_service -l
-	tail -f -n 10 /var/log/syslog
+	#tail -f -n 10 /var/log/syslog
 elif [[ $1 = "viewsvc" ]]
 then
 	pgrep ibrand_service -l
+elif [[ $1 = "killsvc" ]]
+then
+	sudo pkill -e ibrand_service
 elif [[ $1 = "viewlog" ]]
 then
 	tail -f -n 10 /var/log/syslog
@@ -53,7 +56,7 @@ then
 	sudo find /usr/local -printf "%c %p\n" | grep -i "ibrand\|ibapi\|ib_\|iron"
 	sudo find /tmp       -printf "%c %p\n" | grep -i "ibrand\|ibapi\|ib_\|iron"
 	echo --- Environment Variable OPENSSL_CONF:
-	printenv OPENSSL_CONF 
+	printenv OPENSSL_CONF
 	echo --- Environment Variable IBRAND_CONF:
 	printenv IBRAND_CONF
 	echo --- OpenSSL engines
@@ -67,4 +70,3 @@ then
 else
 	echo "Usage: $0 build|rebuild|runsvc|viewsvc|viewlog|showall"
 fi
-
