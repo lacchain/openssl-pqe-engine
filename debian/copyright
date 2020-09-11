@@ -1,0 +1,143 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: openssl-pqe-engine
+Source: <url://example.com>
+#
+# Please double check copyright with the licensecheck(1) command.
+
+Files:     CMakeLists.txt
+           PQCrypto-LWEKE/CMakeLists.txt
+           PQCrypto-LWEKE/aes/aes.c
+           PQCrypto-LWEKE/aes/aes.h
+           PQCrypto-LWEKE/aes/aes_c.c
+           PQCrypto-LWEKE/aes/aes_local.h
+           PQCrypto-LWEKE/aes/aes_ni.c
+           PQCrypto-LWEKE/api_frodo1344.h
+           PQCrypto-LWEKE/api_frodo640.h
+           PQCrypto-LWEKE/api_frodo976.h
+           PQCrypto-LWEKE/config.h
+           PQCrypto-LWEKE/frodo1344.c
+           PQCrypto-LWEKE/frodo640.c
+           PQCrypto-LWEKE/frodo976.c
+           PQCrypto-LWEKE/frodo_macrify.c
+           PQCrypto-LWEKE/frodo_macrify.h
+           PQCrypto-LWEKE/frodo_macrify_reference.c
+           PQCrypto-LWEKE/kem.c
+           PQCrypto-LWEKE/noise.c
+           PQCrypto-LWEKE/random/random.c
+           PQCrypto-LWEKE/random/random.h
+           PQCrypto-LWEKE/sha3/fips202.c
+           PQCrypto-LWEKE/sha3/fips202.h
+           PQCrypto-LWEKE/sha3/fips202x4.c
+           PQCrypto-LWEKE/sha3/fips202x4.h
+           PQCrypto-LWEKE/sha3/keccak4x/KeccakP-1600-times4-SIMD256.c
+           PQCrypto-LWEKE/sha3/keccak4x/KeccakP-1600-times4-SnP.h
+           PQCrypto-LWEKE/sha3/keccak4x/KeccakP-1600-unrolling.macros
+           PQCrypto-LWEKE/sha3/keccak4x/SIMD256-config.h
+           PQCrypto-LWEKE/sha3/keccak4x/align.h
+           PQCrypto-LWEKE/util.c
+           ibrand_common/.vscode/launch.json
+           ibrand_common/CMakeLists.txt
+           ibrand_common/Makefile.linux
+           ibrand_common/my_json.c
+           ibrand_common/my_json.h
+           ibrand_common/my_utilslib.version
+           ibrand_lib/.gitignore
+           ibrand_lib/CMakeLists.txt
+           ibrand_lib/Keccak/KeccakF-1600-interface.h
+           ibrand_lib/Keccak/KeccakF-1600-reference.c
+           ibrand_lib/Makefile.linux
+           ibrand_lib/README.md
+           ibrand_lib/healthcheck.c
+           ibrand_lib/healthcheck.h
+           ibrand_lib/libibrand.c
+           ibrand_lib/libibrand.h
+           ibrand_lib/libibrand.version
+           ibrand_lib/libibrand_private.h
+           ibrand_lib/writeentropy.c
+           ibrand_openssl/.gitignore
+           ibrand_openssl/CMakeLists.txt
+           ibrand_openssl/Makefile.linux
+           ibrand_openssl/README.md
+           ibrand_openssl/e_ibrand.d
+           ibrand_openssl/ibrand_openssl.cnf
+           ibrand_openssl/infnoise-openssl-master.txt
+           ibrand_openssl/infnoise-openssl-master.zip
+           ibrand_openssl/makefile
+           ibrand_service/.gitignore
+           ibrand_service/CMakeLists.txt
+           ibrand_service/IB_SymmetricEncryption.c
+           ibrand_service/IB_SymmetricEncryption.h
+           ibrand_service/RFC2898DeriveBytes.c
+           ibrand_service/RFC2898DeriveBytes.h
+           ibrand_service/makefile
+           ibrand_service/test_aes.c
+Copyright: __NO_COPYRIGHT_NOR_LICENSE__
+License:   __NO_COPYRIGHT_NOR_LICENSE__
+
+Files:     ibrand_common/my_base64.c
+           ibrand_common/my_base64.h
+           ibrand_common/my_config.c
+           ibrand_common/my_config.h
+           ibrand_common/my_filelock.c
+           ibrand_common/my_filelock.h
+           ibrand_common/my_logging.c
+           ibrand_common/my_logging.h
+           ibrand_common/my_utils.c
+           ibrand_common/my_utils.h
+           ibrand_common/my_utilslib.h
+Copyright: 1998-2020 Jonathan Gilmore.
+           1998-2020 Jonathan Gilmore. Original: J. Gilmore, Fri 02-Oct-1998, 16:11:57
+           2020 Cambridge Quantum Computing Ltd.
+License:   __UNKNOWN__
+ Licensed under the Apache License 2.0 (the "License").  You may not use
+ this file except in compliance with the License.  You can obtain a copy
+ in the file LICENSE in the source distribution or at
+ https://www.openssl.org/source/license.html
+
+Files:     PQCrypto-LWEKE/sha3/keccak4x/brg_endian.h
+           ibrand_lib/Keccak/brg_endian.h
+Copyright: 1998-2008 Brian Gladman, Worcester, UK.
+License:   __UNKNOWN__
+ LICENSE TERMS
+ .
+ The redistribution and use of this software (with or without changes)
+ is allowed without the payment of fees or royalties provided that:
+ .
+ 1. source code distributions include the above copyright notice, this
+ list of conditions and the following disclaimer;
+ .
+ 2. binary distributions include the above copyright notice, this list
+ of conditions and the following disclaimer in their documentation;
+ .
+ 3. the name of the copyright holder is not used to endorse products
+ built using this software without specific written permission.
+ .
+ DISCLAIMER
+ .
+ This software is provided 'as is' with no explicit or implied warranties
+ in respect of its properties, including, but not limited to, correctness
+ and/or fitness for purpose.
+
+Files:     ibrand_service/ibrand_service.c
+           ibrand_service/ibrand_service.h
+Copyright: 2020 Cambridge Quantum Computing Ltd.
+License:   __UNKNOWN__
+ Licensed under the Apache License 2.0 (the "License").  You may not use
+ this file except in compliance with the License.  You can obtain a copy
+ in the file LICENSE in the source distribution or at
+ https://www.openssl.org/source/license.html
+ .
+ Based on the service template provided by Devin Watson:
+ http://www.netzmafia.de/skripten/unix/linux-daemon-howto.html
+
+Files:     ibrand_openssl/e_ibrand.c
+Copyright: 2018 Thomás Inskip. https://github.com/tinskip/infnoise-openssl-engine
+License:   __UNKNOWN__
+ Implementation of OpenSSL RAND engine which uses the infnoise TRNG to
+ generate true random numbers: https://github.com/waywardgeek/infnoise
+ .
+ 23/06/2020: Changes added to support IronBridge RNG API
+
+#----------------------------------------------------------------------------
+# Files marked as NO_LICENSE_TEXT_FOUND may be covered by the following
+# license/copyright files.
