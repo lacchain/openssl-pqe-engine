@@ -1,2 +1,0 @@
-SUBSYSTEM=="usb", ATTRS{idVendor}=="FFFF", ATTRS{idProduct}=="FFFF", SYMLINK+="ibrand", GROUP="dialout", MODE="0664"
-ACTION=="add", SUBSYSTEM=="usb", ATTRS{idVendor}=="FFFF", ATTRS{idProduct}=="FFFF" ,TAG+="systemd", ENV{SYSTEMD_WANTS}="ibrand.service"
