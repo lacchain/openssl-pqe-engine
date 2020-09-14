@@ -1,5 +1,0 @@
-libibrand {
-  global: listUSBDevices; initIBRand; deinitIBRand; readRawData; readData; # explicitly list symbols to be exported
-  local: *;         # hide everything else
-};
-
