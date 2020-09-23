@@ -24,9 +24,11 @@
 #include <syslog.h>
 #include <libgen.h>
 
-
 #include "my_utils.h"
 
+
+// Detail of last error
+int my_errno = 0; // We'll use the std errno values e.g. ENOMEM, EINVAL, ERANGE, ENOTSUPP, etc
 
 ///////////////////////////////////////////////////////////////////////////////
 // Utility Functions

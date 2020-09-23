@@ -14,10 +14,13 @@
 #ifndef _INCLUDE_MY_UTILS_H_
 #define _INCLUDE_MY_UTILS_H_
 
+
 #define DEBUG
 //#define NDEBUG
 
 #include <stdio.h>
+#include <stdbool.h>
+#include <ctype.h>
 
 #ifdef __linux__
    #define PATHSEPARATOR '/'
@@ -71,6 +74,38 @@
 #ifndef NOTUSED
 #define NOTUSED(x) (void)(x)
 #endif
+#ifndef UNUSED_VAR
+#define UNUSED_VAR(x)  (void)(x);
+#endif
+
+#define MINIMUM(a,b) (a<b?a:b)
+#define MAXIMUM(a,b) (a>b?a:b)
+
+
+typedef unsigned char   BYTE;           //  8-bit
+typedef unsigned short  WORD;           // 16-bit
+typedef unsigned long   DWORD;          // 32-bit
+typedef BYTE *          PBYTE;
+typedef WORD *          PWORD;
+typedef DWORD *         PDWORD;
+
+#define LOBYTE(w)                ((BYTE)(w))
+#define HIBYTE(w)                ((BYTE)(((WORD)(w) >> 8) & 0xFF))
+#define LOWORD(d)                ((WORD)(d))
+#define HIWORD(d)                ((WORD)((((DWORD)(d)) >> 16) & 0xFFFF))
+//#define LODWORD(q)               ((q).u.dwLowDword)
+//#define HIDWORD(q)               ((q).u.dwHighDword)
+#define MAKEWORD(lb, hb)         ((WORD)(((BYTE)(lb)) | (((WORD)((BYTE)(hb))) << 8)))
+#define MAKEDWORD(lw, hw)        ((DWORD)(((WORD)(lw)) | (((DWORD)((WORD)(hw))) << 16)))
+#define MAKEDWORDB(b3,b2,b1,b0)  ((DWORD)((MAKEWORD(b0, b1)) | (((DWORD)(MAKEWORD(b2, b3))) << 16)))
+
+typedef struct tagLSTRING
+{
+    size_t cbData;
+    char *pData;
+} tLSTRING;
+
+extern int my_errno; // We'll use the std errno values e.g. ENOMEM, EINVAL, ERANGE, ENOTSUPP, etc
 
 ///////////////////////////////////////////////////////////////////////////////
 // Utility Functions

@@ -1,0 +1,60 @@
+# Set the default behavior for all files.
+* text=lf
+
+# Normalized and converts to native line endings on checkout.
+*.c text
+*.h text
+*.cpp text
+*.hpp text
+*.md text
+*.txt text
+*.cnf text
+*.cfg text
+*.conf text
+*.config text
+*.ini text
+*.b64 text
+*.mak text
+*.mk text
+Makefile text
+makefile text
+Makefile.* text
+makefile.* text
+*.yml text
+*.run text
+*.build text
+
+# Convert to CRLF line endings on checkout.
+*.sln text eol=crlf
+*.vcproj text eol=crlf
+*.vcxproj text eol=crlf
+*.vcxproj.filters text eol=crlf
+*.vcxproj.user text eol=crlf
+*.csproj text eol=crlf
+*.asax text eol=crlf
+*.reg text eol=crlf
+
+# Convert to LF line endings on checkout.
+*.sh text eol=lf
+
+# Binary files.
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.ddd binary
+
+*.bin binary
+*.o binary
+*.a binary
+*.so binary
+*.out binary
+*.obj binary
+*.lib binary
+*.dll binary
+*.exe binary
+*.zip binary
+*.gz binary
+*.7z binary
+*.tar binary
+*.tgz binary
