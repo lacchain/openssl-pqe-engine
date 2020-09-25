@@ -1,0 +1,44 @@
+JSON:{
+  "GeneralSettings":
+  {
+    "_1_Verbosity_bitmapped_field":"STATUS=1, CONFIG=2, PROGRESS=4, AUTH=8, DATA=16, CURL=32, SPARE6=64, SPARE7=128",
+    "LOGGING_VERBOSITY":"1"
+  },
+  "AuthSettings":
+  {
+    "AUTHTYPE":"CLIENT_CERT",
+    "AUTHURL":"https://ironbridgeapi.com/api/login",
+    "AUTHUSER":"notused1",
+    "AUTHPSWD":"notused2",
+    "AUTHSSLCERTFILE":"/etc/ssl/certs/client.ironbridgeapi.com.crt.pem",
+    "AUTHSSLCERTTYPE":"PEM",
+    "AUTHSSLKEYFILE":"/etc/ssl/private/client.ironbridgeapi.com.key.pem",
+    "AUTHRETRYDELAY":"5"
+  },
+  "SecuritySettings":
+  {
+    "USESECURERNG":"1",
+    "CLIENTSETUPOOBFILENAME":"/usr/local/ssl/IBClientSetup_client.ironbridgeapi.com_SN-005ea23d4725755e5a__OOB.json",
+    "OURKEMSECRETKEYFILENAME":"/usr/local/ssl/ibrand_sk.bin",
+  },
+  "CommsSettings":
+  {
+    "BASEURL":"https://ironbridgeapi.com/api",
+    "BYTESPERREQUEST":"256",
+    "RETRIEVALRETRYDELAY":"3"
+  },
+  "StorageSettings":
+  {
+    "STORAGETYPE":"SHMEM",
+    "STORAGEDATAFORMAT":"RAW",
+    "STORAGEFILENAME":"/var/lib/ibrand/ibrand_data.bin",
+    "STORAGELOCKFILEPATH":"/tmp",
+    "SHMEM_BACKINGFILENAME":"shmem_ibrand01",
+    "SHMEM_STORAGESIZE":"20480",
+    "SHMEM_SEMAPHORENAME":"sem_ibrand01",
+    "STORAGEHIGHWATERMARK":"20480",
+    "STORAGELOWWATERMARK":"5120",
+    "IDLEDELAY":"3"
+  }
+}
+

@@ -2,13 +2,10 @@
 # CQC IronBridge OpenSSL Engine
 
 ## Quick Start
-In the top level folder are three files:
+To get up and running quickly, please see the following:
 
-* Config file (where to find the IronBridge Data). The Playbook explains that an env var is needed to point to this config file.
-* Sample data file. Playbook explains how this needs to be copied to /var/lib/ibrand/
-* Playbook
-
-Playbook also has sample commands and sample output
+* Config files: The "_sample_data" folder contains sample config files.  The Playbook explains that an env var is needed to point to this config file.
+* Playbook - This covers the steps required to build, test and deploy the system, as well as some sample commands and sample output.
 
 ### Building
 The `Dockerfile` image in this distribution is useful for building the library. The container building process compiles the project, e.g.

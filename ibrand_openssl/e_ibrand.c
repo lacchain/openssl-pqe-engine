@@ -178,7 +178,7 @@ static int Status(void)
 int ibrand_bind(ENGINE *engine, const char *id)
 {
   static const char kEngineId[] = "ibrand";
-  static const char kEngineName[] = "RNG engine using the IronBridge API";
+  static const char kEngineName[] = "IronBridge SRNG rand engine";
 
   static RAND_METHOD rand_method = {NULL,   &Bytes, NULL, NULL,
                                     &Bytes, // No 'pseudo'.

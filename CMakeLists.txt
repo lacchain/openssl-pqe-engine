@@ -23,6 +23,10 @@ install(TARGETS ibrand_lib
         LIBRARY
           DESTINATION ${CMAKE_INSTALL_LIBDIR}
        )
+install(TARGETS ibrand_service_shmem
+        LIBRARY
+          DESTINATION ${CMAKE_INSTALL_LIBDIR}
+       )
 install(TARGETS ibrand_service
         RUNTIME
           DESTINATION ${CMAKE_INSTALL_BINDIR}

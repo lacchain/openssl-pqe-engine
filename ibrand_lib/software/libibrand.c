@@ -1,30 +1,7 @@
 /* Library for the Infinite Noise Multiplier USB stick */
 
-#define RANDSRC_USB    0
-#define RANDSRC_FILE   1
-#define IB_SOURCE_OF_RANDOMNESS RANDSRC_FILE
-
-#define CONFIG_HARDCODED 1
-#define CONFIG_SIMPLE    2
-#define CONFIG_JSON      3
-#define USE_CONFIG CONFIG_JSON
-
-#define DBGBIT_STATUS  0
-#define DBGBIT_CONFIG  1
-#define DBGBIT_AUTH    2
-#define DBGBIT_DATA    3
-#define DBGBIT_CURL    4
-#define DBGBIT_SPARE5  5
-#define DBGBIT_SPARE6  6
-#define DBGBIT_SPARE7  7
-
-
 // Required to include clock_gettime
 #define _POSIX_C_SOURCE 200809L
-
-#define IBRAND_VENDOR_ID 0xFFFF
-#define IBRAND_PRODUCT_ID 0xFFFF
-
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,46 +13,28 @@
 #include <sys/types.h>
 #include <syslog.h>
 
+#include "libibrand_globals.h"
+
 //#if (IB_SOURCE_OF_RANDOMNESS == RANDSRC_USB)
 #include <ftdi.h>
 #include "libibrand_private.h"
 #include "KeccakF-1600-interface.h"
 //#endif
 
-#include "my_utilslib.h"
-
 #if defined(__OpenBSD__) || defined(__NetBSD__) || defined(__DragonFly__) || defined(__FreeBSD__)
 #include <fcntl.h>
 #endif
 
-#define MINIMUM(a,b) (a<b?a:b)
-#define MAXIMUM(a,b) (a>b?a:b)
+#include "my_utilslib.h"
+#include "libibrand_get_new_entropy.h"
+#include "libibrand_config.h"
 
-#define FILELOCK_LOGLEVEL 0x00  // 0x01 is stdout, 0x02 is syslog
 
 uint8_t keccakState[KeccakPermutationSizeInBytes] = {0};
 uint8_t outBuf[BUFLEN] = {0};
 
-#define UNUSED_VAR(x)  (void)(x);
-
-typedef struct tagIB_INSTANCEDATA
-{
-    char          szStorageType[16];                // "FILE";
-    char          szStorageDataFormat[16];          // RAW, BASE64, HEX
-    char          szStorageFilename[_MAX_PATH];     // "/var/lib/ibrand/ibrand_data.bin";
-    char          szStorageLockfilePath[_MAX_PATH]; // "/tmp";
-    long          storageHighWaterMark;             // 1038336; // 1MB
-    long          storageLowWaterMark;              // 102400; // 100KB
-    unsigned char  fVerbose;                        // bit 0=general, bit1=config bit2=auth, bit3=data, bit4=curl:
-
-    char          szConfigFilename[_MAX_PATH];      //  "/usr/local/ssl/ibrand.cnf"
-} tIB_INSTANCEDATA;
-
 #if (USE_CONFIG==CONFIG_JSON)
 tIB_INSTANCEDATA *pIBRand = NULL;
-static bool __ParseJsonConfig(const char *szJsonConfig, tIB_INSTANCEDATA *pIBRand);
-static int ReadConfig(char *szConfigFilename, tIB_INSTANCEDATA *pIBRand);
-static void PrintConfig(tIB_INSTANCEDATA *pIBRand);
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -89,12 +48,11 @@ bool initIBRand(struct ibrand_context *context, char *serial, bool keccak, bool 
     context->bytesGiven = 0;
     context->bytesWritten = 0;
 
-
-//#if (IB_SOURCE_OF_RANDOMNESS == RANDSRC_USB)
-//    printf("initIBRand: IB_SOURCE_OF_RANDOMNESS == RANDSRC_USB\n");
-//#elif (IB_SOURCE_OF_RANDOMNESS == RANDSRC_FILE)
-//    printf("initIBRand: IB_SOURCE_OF_RANDOMNESS == RANDSRC_FILE\n");
-//#endif
+    //#if (IB_SOURCE_OF_RANDOMNESS == RANDSRC_USB)
+    //    printf("initIBRand: IB_SOURCE_OF_RANDOMNESS == RANDSRC_USB\n");
+    //#elif (IB_SOURCE_OF_RANDOMNESS == RANDSRC_IRONBRIDGE)
+    //    printf("initIBRand: IB_SOURCE_OF_RANDOMNESS == RANDSRC_IRONBRIDGE\n");
+    //#endif
 
     prepareOutputBuffer();
 
@@ -119,51 +77,12 @@ bool initIBRand(struct ibrand_context *context, char *serial, bool keccak, bool 
     UNUSED_VAR(context);
     UNUSED_VAR(serial);
 
-#if (USE_CONFIG==CONFIG_JSON)
-    int rc;
-    // =========================================================================
-    // Create instance storage
-    // =========================================================================
-    pIBRand = malloc(sizeof(tIB_INSTANCEDATA));
+    pIBRand = cfgInitConfig();
     if (!pIBRand)
     {
-        fprintf(stderr, "FATAL: Failed to allocate memory for local storage. Aborting.");
+        fprintf(stderr, "FATAL: Failed to initialise config. Aborting.");
         exit(EXIT_FAILURE);
     }
-    memset(pIBRand, 0, sizeof(tIB_INSTANCEDATA));
-
-    char *tempPtr;
-    rc = my_getFilenameFromEnvVar("IBRAND_CONF", &tempPtr);
-    if (rc==0)
-    {
-        my_strlcpy(pIBRand->szConfigFilename, tempPtr, sizeof(pIBRand->szConfigFilename));
-        free(tempPtr);
-    }
-    if (strlen(pIBRand->szConfigFilename) == 0)
-    {
-        fprintf(stderr, "FATAL: Configuration not specified, neither on commandline nor via an environment variable.\n");
-        free(pIBRand);
-        exit(EXIT_FAILURE);
-    }
-
-    app_trace_openlog("ibrand_openssl", LOG_PID|LOG_CONS|LOG_PERROR, LOG_USER );
-
-    rc = ReadConfig(pIBRand->szConfigFilename, pIBRand);
-    if (rc != 0)
-    {
-        fprintf(stderr, "FATAL: Configuration error. rc=%d\n", rc);
-        app_tracef("FATAL: Configuration error. Aborting. rc=%d", rc);
-        app_trace_closelog();
-        free(pIBRand);
-        exit(EXIT_FAILURE);
-    }
-    if (TEST_BIT(pIBRand->fVerbose,DBGBIT_CONFIG))
-    {
-        PrintConfig(pIBRand);
-    }
-
-#endif // (USE_CONFIG==CONFIG_JSON)
-
 #endif // IB_SOURCE_OF_RANDOMNESS
 
     // initialize keccak
@@ -567,85 +486,6 @@ bool initializeUSB(struct ftdi_context *ftdic, const char **message, char *seria
 ////////////////////////////////////////////////////////////////////////////////
 //
 ////////////////////////////////////////////////////////////////////////////////
-char *GetValueFromConfigFile(char *szEnvVariableWithFilename, char *szKey)
-{
-    const char *szConfigfilePath;
-    FILE *fConfFile;
-    char *szRetVal = NULL;
-
-    szConfigfilePath = getenv(szEnvVariableWithFilename);
-    if (!szConfigfilePath)
-    {
-        printf("ERROR: Cannot find environment variable: %s\n", szEnvVariableWithFilename);
-        return NULL;
-    }
-
-    fConfFile = fopen(szConfigfilePath, "rt");
-    if (fConfFile == NULL)
-    {
-        printf("ERROR: Cannot open config file: %s\n", szConfigfilePath);
-        return NULL;
-    }
-
-    char line[1024] = {0};
-    while (!feof(fConfFile))
-    {
-        memset(line, 0, 1024);
-        char *ret = fgets(line, 1024, fConfFile);
-        if (ret==NULL)
-        {
-            break; // EOF
-        }
-        if (line[0] == '#')
-        {
-            continue;
-        }
-
-        int len = strlen(line);
-        char *pos = strchr(line, '=');
-        if (pos == NULL)
-        {
-            continue;
-        }
-        char key[64] = {0};
-        char val[64] = {0};
-
-        int offset = 1;
-        if (line[len-1] == '\n')
-        {
-            offset = 2;
-        }
-
-        strncpy(key, line, pos-line);
-        strncpy(val, pos+1, line+len-offset-pos);
-
-        //printf("INFO: Found Key:Value pair:  %s:%s\n", key, val);
-
-        if (strcmp(key, szKey) == 0)
-        {
-            szRetVal = malloc(strlen(val+1));
-            if (!szRetVal)
-            {
-                printf("ERROR: Out of memory\n");
-                fclose(fConfFile);
-                return NULL;
-            }
-            strcpy(szRetVal, val);
-            break;
-        }
-    }
-    if (!szRetVal)
-    {
-        printf("ERROR: Cannot find config key: %s\n", szKey);
-    }
-    fclose(fConfFile);
-    return szRetVal;
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-////////////////////////////////////////////////////////////////////////////////
 uint32_t readData_Protected(struct ibrand_context *context, uint8_t *result, bool raw, uint32_t outputMultiplier);
 
 uint32_t readData(struct ibrand_context *context, uint8_t *result, bool raw, uint32_t outputMultiplier)
@@ -669,11 +509,11 @@ uint32_t readData(struct ibrand_context *context, uint8_t *result, bool raw, uin
 
 uint32_t readData_Protected(struct ibrand_context *context, uint8_t *result, bool raw, uint32_t outputMultiplier)
 {
-    // check if data can be squeezed from the keccak sponge from previous state
+    // Check if data can be squeezed from the keccak sponge from previous state
     // (or we need to collect some new entropy to get bytesGiven >0)
     if (context->bytesGiven > 0u)
     {
-        // squeeze the sponge!
+        // Squeeze the sponge!
 
         // Output up to 1024 bits at a time.
         uint32_t bytesToWrite = 1024u / 8u;
@@ -692,107 +532,16 @@ uint32_t readData_Protected(struct ibrand_context *context, uint8_t *result, boo
     }
     else
     {
-        // collect new entropy
+        // Collect new entropy
         uint8_t inBuf[BUFLEN];
         struct timespec start;
         clock_gettime(CLOCK_REALTIME, &start);
 
-#if (IB_SOURCE_OF_RANDOMNESS == RANDSRC_FILE)
+#if (IB_SOURCE_OF_RANDOMNESS == RANDSRC_IRONBRIDGE)
+        if (!GetNewEntropy(context, pIBRand, inBuf))
         {
-            FILE * fIBDatafile;
-            char * szIBDatafilename = "/var/lib/ibrand/ibrand_data.bin";
-            char * szLockfilePath = "/tmp";
-            size_t filesize;
-            size_t bytesToRead;
-            size_t bytesRead;
-
-#if (USE_CONFIG==CONFIG_HARDCODED)
-            szIBDatafilename = "/var/lib/ibrand/ibrand_data.bin";
-#elif (USE_CONFIG==CONFIG_SIMPLE)
-            char * mallocedStorageFilename;
-
-            // STORAGETYPE=FILE
-            // STORAGEFILENAME=/var/lib/ibrand/ibrand_data.bin
-            // STORAGEHIGHWATERMARK=1038336
-            // STORAGELOWWATERMARK=102400
-
-            mallocedStorageFilename = GetValueFromConfigFile("IBRAND_CONF","STORAGEFILENAME");
-            if (mallocedStorageFilename)
-            {
-                szIBDatafilename = mallocedStorageFilename;
-            }
-#elif (USE_CONFIG==CONFIG_JSON)
-            szIBDatafilename = pIBRand->szStorageFilename;
-#endif // USE_CONFIG
-
-            bytesToRead = sizeof(inBuf);
-
-            my_waitForFileLock(szLockfilePath, szIBDatafilename, FILELOCK_LOGLEVEL);
-
-            // Open the file
-            fIBDatafile = fopen(szIBDatafilename,"rb");
-            if (fIBDatafile == NULL)
-            {
-                context->message = "ERROR: Unable to open IBDatafile";
-                context->errorFlag = true;
-                printf("%s - (%s)\n", context->message, szIBDatafilename);
-#if (USE_CONFIG==CONFIG_SIMPLE)
-                if (mallocedStorageFilename)
-                {
-                    free(mallocedStorageFilename);
-                }
-#endif
-                my_releaseFileLock(szLockfilePath, szIBDatafilename, FILELOCK_LOGLEVEL);
-                return 0;
-            }
-#if (USE_CONFIG==CONFIG_SIMPLE)
-            if (mallocedStorageFilename)
-            {
-                free(mallocedStorageFilename);
-            }
-#endif
-            // Ensure that there is enough data
-            fseek (fIBDatafile, 0, SEEK_END);
-            filesize = ftell(fIBDatafile);
-            rewind(fIBDatafile);
-            if (filesize < bytesToRead)
-            {
-                context->message = "ERROR: Insufficient data in IBDatafile";
-                context->errorFlag = true;
-                fclose(fIBDatafile);
-                printf("%s - (requested=%lu, actual=%lu)\n", context->message, bytesToRead, filesize);
-                my_releaseFileLock(szLockfilePath, szIBDatafilename, FILELOCK_LOGLEVEL);
-                return 0;
-            }
-
-            // Read the data
-            // Not ideal, but for now we will read from the end of the file, and then truncate what we have read.
-            fseek (fIBDatafile, filesize - bytesToRead, SEEK_SET);
-            bytesRead = fread(inBuf, sizeof(char), bytesToRead, fIBDatafile);
-            if (bytesRead != bytesToRead)
-            {
-                context->message = "ERROR: Failed to read from IBDatafile";
-                context->errorFlag = true;
-                fclose(fIBDatafile);
-                printf("%s - (requested=%lu, bytesRead=%ld)\n", context->message, bytesToRead, bytesRead );
-                my_releaseFileLock(szLockfilePath, szIBDatafilename, FILELOCK_LOGLEVEL);
-                return 0;
-            }
-
-            // ...and close the file
-            fclose(fIBDatafile);
-
-            // Then... remove the data we have just read.
-            if (truncate(szIBDatafilename, filesize - bytesToRead) != 0)
-            {
-                context->message = "ERROR: Unable to remove the data from the file";
-                context->errorFlag = true;
-                my_releaseFileLock(szLockfilePath, szIBDatafilename, FILELOCK_LOGLEVEL);
-                return 0;
-            }
-            my_releaseFileLock(szLockfilePath, szIBDatafilename, FILELOCK_LOGLEVEL);
-
-            //printf(".");
+            printf("ERROR: GetNewEntropy set errorFlag: %d\n", context->errorFlag);
+            return 0;
         }
 #endif // IB_SOURCE_OF_RANDOMNESS
 
@@ -842,156 +591,4 @@ uint32_t readData_Protected(struct ibrand_context *context, uint8_t *result, boo
     }
 
     return 0;
-}
-
-
-#if (USE_CONFIG==CONFIG_JSON)
-////////////////////////////////////////////////////////////////////////////////
-// Config Top Level Functions
-////////////////////////////////////////////////////////////////////////////////
-static bool __ParseJsonConfig(const char *szJsonConfig, tIB_INSTANCEDATA *pIBRand)
-{
-    JSONObject *json2 = NULL;
-    const int localConfigTracing = false;
-
-    json2 = my_parseJSON(szJsonConfig);
-    if (!json2)
-    {
-        app_tracef("ERROR: Failed to parse JSON string\n");
-        return false;
-    }
-
-    for (int ii=0; ii<json2->count; ii++)
-    {
-        if (localConfigTracing)
-            app_tracef("DEBUG: Found json item[%d] %s=%s\r\n", ii, json2->pairs[ii].key, (json2->pairs[ii].type == JSON_STRING)?(json2->pairs[ii].value->stringValue):"[JSON object]");
-
-        if (strcmp(json2->pairs[ii].key,"AuthSettings") == 0 && json2->pairs[ii].type == JSON_OBJECT)
-        {
-            JSONObject *childJson = json2->pairs[ii].value->jsonObject;
-
-            for (int jj=0; jj<childJson->count; jj++)
-            {
-                if (localConfigTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\r\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
-
-                if (childJson->pairs[jj].type == JSON_STRING)
-                {
-                    // None of these items are interesting for us
-                }
-            }
-        }
-        else if (strcmp(json2->pairs[ii].key,"CommsSettings") == 0 && json2->pairs[ii].type == JSON_OBJECT)
-        {
-            JSONObject *childJson = json2->pairs[ii].value->jsonObject;
-
-            for (int jj=0; jj<childJson->count; jj++)
-            {
-                if (localConfigTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\r\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
-
-                if (childJson->pairs[jj].type == JSON_STRING)
-                {
-                    // None of these items are interesting for us
-                }
-            }
-        }
-        else if (strcmp(json2->pairs[ii].key,"StorageSettings") == 0 && json2->pairs[ii].type == JSON_OBJECT)
-        {
-            JSONObject *childJson = json2->pairs[ii].value->jsonObject;
-
-            for (int jj=0; jj<childJson->count; jj++)
-            {
-                if (localConfigTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\r\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
-
-                if (childJson->pairs[jj].type == JSON_STRING)
-                {
-                    if (strcmp(childJson->pairs[jj].key,"STORAGETYPE")==0)
-                    {
-                        my_strlcpy(pIBRand->szStorageType, childJson->pairs[jj].value->stringValue, sizeof(pIBRand->szStorageType));
-                    }
-                    else if (strcmp(childJson->pairs[jj].key,"STORAGEDATAFORMAT")==0)
-                    {
-                        my_strlcpy(pIBRand->szStorageDataFormat, childJson->pairs[jj].value->stringValue, sizeof(pIBRand->szStorageDataFormat));
-                    }
-                    else if (strcmp(childJson->pairs[jj].key,"STORAGEFILENAME")==0)
-                    {
-                        my_strlcpy(pIBRand->szStorageFilename, childJson->pairs[jj].value->stringValue, sizeof(pIBRand->szStorageFilename));
-                    }
-                    else if (strcmp(childJson->pairs[jj].key,"STORAGELOCKFILEPATH")==0)
-                    {
-                        my_strlcpy(pIBRand->szStorageLockfilePath, childJson->pairs[jj].value->stringValue, sizeof(pIBRand->szStorageLockfilePath));
-                    }
-                    else if (strcmp(childJson->pairs[jj].key,"STORAGEHIGHWATERMARK")==0)
-                    {
-                        pIBRand->storageHighWaterMark = atoi(childJson->pairs[jj].value->stringValue);
-                    }
-                    else if (strcmp(childJson->pairs[jj].key,"STORAGELOWWATERMARK")==0)
-                    {
-                        pIBRand->storageLowWaterMark = atoi(childJson->pairs[jj].value->stringValue);
-                    }
-                }
-            }
-        }
-        else if (strcmp(json2->pairs[ii].key,"GeneralSettings") == 0 && json2->pairs[ii].type == JSON_OBJECT)
-        {
-            JSONObject *childJson = json2->pairs[ii].value->jsonObject;
-
-            for (int jj=0; jj<childJson->count; jj++)
-            {
-                if (localConfigTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\r\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
-
-                if (childJson->pairs[jj].type == JSON_STRING)
-                {
-                    if (strcmp(childJson->pairs[jj].key,"LOGGING_VERBOSITY")==0)
-                    {
-                        pIBRand->fVerbose = atoi(childJson->pairs[jj].value->stringValue);
-                    }
-                }
-            }
-        }
-    }
-
-    my_freeJSONFromMemory(json2);
-    return true;
-}
-
-static int ReadConfig(char *szConfigFilename, tIB_INSTANCEDATA *pIBRand)
-{
-    char *szJsonConfig;
-    int rc;
-
-    rc = my_readEntireConfigFileIntoMemory(szConfigFilename, &szJsonConfig);
-    if (rc)
-    {
-        app_tracef("ERROR: Error %d reading JSON config from file: %s", rc, szConfigFilename);
-        if (szJsonConfig) free(szJsonConfig);
-        return rc;
-    }
-    app_tracef("INFO: Configuration file (JSON format) [%s] (%u bytes)", szConfigFilename, strlen(szJsonConfig));
-
-    rc = __ParseJsonConfig(szJsonConfig, pIBRand);
-    if (!rc)
-    {
-        app_tracef("ERROR: Error %d parsing JSON config\n", rc);
-        if (szJsonConfig) free(szJsonConfig);
-        return rc;
-    }
-    if (szJsonConfig) free(szJsonConfig);
-
-    return 0;
-}
-#endif // USE_CONFIG
-
-static void PrintConfig(tIB_INSTANCEDATA *pIBRand)
-{
-    app_tracef("szStorageType         =[%s]" , pIBRand->szStorageType         ); // char          szStorageType            [16]   // "FILE";
-    app_tracef("szStorageDataFormat   =[%s]" , pIBRand->szStorageDataFormat   ); // char          szStorageDataFormat      [16]   // RAW, BASE64, HEX
-    app_tracef("szStorageFilename     =[%s]" , pIBRand->szStorageFilename     ); // char          szStorageFilename        [128]  // "/var/lib/ibrand/ibrand_data.bin";
-    app_tracef("szStorageLockfilePath =[%s]" , pIBRand->szStorageLockfilePath ); // char          szStorageLockfilePath    [128]  // "/tmp";
-    app_tracef("storageHighWaterMark  =[%ld]", pIBRand->storageHighWaterMark  ); // long          storageHighWaterMark            // 1038336; // 1MB
-    app_tracef("storageLowWaterMark   =[%ld]", pIBRand->storageLowWaterMark   ); // long          storageLowWaterMark             // 102400; // 100KB
-    app_tracef("fVerbose              =[%u]" , pIBRand->fVerbose              ); // unsigned char fVerbose                        // bit 0=general, bit1=auth, bit2=data, bit3=curl:
 }

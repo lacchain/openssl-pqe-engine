@@ -1,3 +1,7 @@
+
+#ifndef _INCLUDE_LIBIBRAND_H_
+#define _INCLUDE_LIBIBRAND_H_
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <sys/types.h>
@@ -20,10 +24,12 @@ extern "C" {
 #endif
 
 #if !defined(_WIN32)
-struct ibrand_context {
+struct ibrand_context
+{
     struct ftdi_context ftdic;
     uint32_t entropyThisTime;
     const char *message;
+    char tempMessageBuffer200[200];
     bool errorFlag;
     //uint8_t keccakState[KeccakPermutationSizeInBytes];
 
@@ -33,7 +39,8 @@ struct ibrand_context {
 };
 
 typedef struct _ibrand_devlist_node_t ibrand_devlist_node_t;
-struct _ibrand_devlist_node_t {
+struct _ibrand_devlist_node_t
+{
     char manufacturer[128];
     char description[128];
     char serial[128];
@@ -96,3 +103,5 @@ uint32_t readData(struct ibrand_context *context, uint8_t *result, bool raw, uin
 #endif
 
 #endif
+
+#endif // _INCLUDE_LIBIBRAND_H_

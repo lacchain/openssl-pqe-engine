@@ -98,7 +98,10 @@ unsigned char* base64_decode(const char *data, size_t input_length, size_t *pout
     unsigned char* decoded_data;
 
     if (input_length % 4 != 0)
+    {
+        my_errno = EINVAL;
         return NULL;
+    }
 
     *poutput_length = input_length / 4 * 3;
 
@@ -107,7 +110,10 @@ unsigned char* base64_decode(const char *data, size_t input_length, size_t *pout
 
     decoded_data = (unsigned char*)malloc(*poutput_length);
     if (decoded_data == NULL)
+    {
+        my_errno = ENOMEM;
         return NULL;
+    }
 
     for (size_t i = 0, j = 0; i < input_length;)
     {

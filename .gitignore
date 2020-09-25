@@ -1,4 +1,40 @@
+ibrand
+*.a
+*.o
+*.so
+*.lib
+*.obj
+*.dll
+*.exe
+
+#########################################
+# Build results
+#[Dd]ebug/
+#[Rr]elease/
+#[Bb]uild/
+#[Bb]in/
+#[Oo]bj/
+#[Dd]ist/
+#[Ll]ib/
+
+
+# Personal/Local notes folders
+_*[Ii]gnore[Mm]e/
+_*[Ii]gnore_[Mm]e/
+_*[Mm]y[Nn]otes/
+_*[Mm]y_[Nn]otes/
+_*[Mm]y_[Nn]otes/
+_*[Tt]emp/
+_*[Tt]mp/
+_*[Nn]ot[Uu]sed/
+
+# System Files
 .DS_Store
+Thumbs.db
+desktop.ini
+
+# IDB
 .idea/
 .vscode/
 ib_password
+
