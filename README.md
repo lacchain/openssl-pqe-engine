@@ -8,27 +8,22 @@ To get up and running quickly, please see the following:
 * Playbook - This covers the steps required to build, test and deploy the system, as well as some sample commands and sample output.
 
 ### Building
-The `Dockerfile` image in this distribution is useful for building the library. The container building process compiles the project, e.g.
+The `Dockerfile` image in this distribution is a multi-stage build used for building a debian package and then installing it to start retrieving remote entropy.
+To just extract the Debian package you should run
 ```shell
-$ docker build -f Dockerfile.build . -t pqe_engine
-```
-and for getting the Debian installer you just run it mounting the `/build/packages/` volume, e.g.
-```shell
-$ docker run -v `pwd`/output:/build/packages/ --rm pqe_build
+$ docker build --target builder . -t pqe_build
+$ docker run pqe_build cat /openssl-pqe-engine_0.1.0_amd64.deb > openssl-pqe-engine_0.1.0_amd64.deb
 ```
 
 ### Smoke test
-Using Docker compose we can follow a minimal installation and usage of the IB engine.
-You'll need to create a `ib_password` file containing your password for accessing the Iron Bridge platform in the root of the project, e.g.
+As said, the multi-stage build is ready for running a smoke test against a [PQE RPC server](https://github.com/lacchain/pqe-rpc-server-ng/) instance. You must mount the following volumes 
+  * **/certs/client.pem**: client certificate
+  * **/certs/client_key.pem**: client certificate private key
+E.g.:
 ```shell
-$ echo xxxxxxxx > ib_password
+$ docker build . -t pqe_run
+$ docker run -v `pwd`/client.crt:/certs/client.pem -v `pwd`/client.key:/certs/client_key.pem --rm pqe_run
 ```
-and then run
-```shell
-$ docker-compose up
-```
-In this composition, a service will build the Debian installer while another one will install and use it
-
 
 ## Component Details
 
