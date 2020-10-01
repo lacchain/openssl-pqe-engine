@@ -1,7 +1,35 @@
-FROM debian:testing-slim
+FROM debian:testing-slim as builder
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install --no-install-recommends -yV \
+    build-essential \
+    devscripts \
+    equivs
+
+WORKDIR /openssl-pqe-engine-0.1.0/
+
+COPY CMakeLists.txt                ./
+COPY ibrand_common                 ./ibrand_common/
+COPY ibrand_lib/CMakeLists.txt     ./ibrand_lib/
+COPY ibrand_lib/software           ./ibrand_lib/software/
+COPY ibrand_service                ./ibrand_service/
+COPY ibrand_openssl                ./ibrand_openssl/
+COPY PQCrypto-LWEKE/CMakeLists.txt ./PQCrypto-LWEKE/
+COPY PQCrypto-LWEKE/src            ./PQCrypto-LWEKE/src/
+COPY debian                        ./debian/
+
+ENV DEBIAN_FRONTEND noninteractive
+ENV DEBIAN_PRIORITY critical
+ENV DEBCONF_NOWARNINGS yes
+
+RUN mk-build-deps -irt 'apt-get --no-install-recommends -yV' ./debian/control
+RUN rm -rf /var/lib/apt/lists/*
+RUN debuild -b -uc -us -nc
+
+FROM debian:testing-slim as runner
+
+RUN apt-get update && apt-get install --no-install-recommends -yV \
     openssl \
+    ca-certificates \
     libftdi1 \
     libcurl4 \
     rsyslog \
@@ -9,12 +37,12 @@ RUN apt-get update && apt-get install -y \
     jq \
  && rm -rf /var/lib/apt/lists/*
 
-RUN sed -i '/imklog/s/^/#/' /etc/rsyslog.conf
-
 COPY ./_sample_data/ibrand_openssl.cnf /usr/lib/ssl/
+COPY --from=builder /openssl-pqe-engine_0.1.0_amd64.deb .
 
+RUN dpkg -i ./openssl-pqe-engine_0.1.0_amd64.deb
+RUN sed -i '/imklog/s/^/#/' /etc/rsyslog.conf
 RUN mkdir -p /var/lib/ibrand/
-
 RUN echo '#!/bin/sh\n\
 set -x\n\
 service rsyslog start\n\
@@ -70,20 +98,10 @@ JSON:{\n\
   }\n\
 }\n\
 _EOF_\n\
-for i in `seq 20` ; do\n\
-  dpkg -i /debs/openssl-pqe-engine_0.1.0_amd64.deb\n\
-  result=$?\n\
-  if [ $result -eq 0 ] ; then\n\
-    export OPENSSL_CONF=/usr/lib/ssl/ibrand_openssl.cnf\n\
-    export IBRAND_CONF=/ibrand.cnf\n\
-    ibrand_service\n\
-    openssl engine\n\
-    break\n\
-  fi\n\
-  sleep 1\n\
-done\n'\
+export OPENSSL_CONF=/usr/lib/ssl/ibrand_openssl.cnf\n\
+ibrand_service -f /ibrand.cnf\n\
+openssl engine\n'\
 >> /run.sh
-
 RUN chmod +x /run.sh
 
 ENTRYPOINT ["/run.sh"]
