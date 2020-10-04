@@ -1,0 +1,23 @@
+name: Integration Test
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log into GitHub Container Registry
+        run: echo "${{ secrets.CR_PAT }}" | docker login https://ghcr.io -u ${{ github.repository_owner }} --password-stdin
+      - name: Pull PQE RPC Server Test Docker image
+        run: |
+          docker pull ghcr.io/lacchain/pqe-rpc-server-test:latest
+          docker tag ghcr.io/lacchain/pqe-rpc-server-test:latest pqe-rpc-server-test:latest
+      - uses: actions/checkout@v2
+      - name: Run integration test
+        run: docker-compose -f docker-compose.test.yml up --build
