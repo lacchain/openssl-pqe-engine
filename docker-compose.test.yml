@@ -1,0 +1,25 @@
+version: "3.8"
+services:
+  pqe-rpc-server:
+    image: pqe-rpc-server-test:latest
+    expose:
+      - 443
+      - 8080
+    environment:
+     - SERVICE_NAME=pqe-rpc-server
+    volumes:
+      - shared-volume:/ca-certs/
+
+  openssl-pqe-engine:
+    build:
+      context: .
+    environment:
+     - SERVER_HOST=pqe-rpc-server
+    volumes:
+      - shared-volume:/ca-certs/
+    command: ["wait-for-it", "pqe-rpc-server:443", "--", "./run.sh"]
+    depends_on:
+     - pqe-rpc-server
+
+volumes:
+  shared-volume:
