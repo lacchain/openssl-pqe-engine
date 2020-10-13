@@ -27,10 +27,10 @@
 #include "libibrand.h"
 #include "libibrand_get_new_entropy.h"
 
-static bool GetNewEntropyFromFile(struct ibrand_context *context, char *szIBDatafilename, char *szStorageLockfilePath, uint8_t *inBuf);
-static bool GetNewEntropyFromSharedMemory(struct ibrand_context *context, uint8_t *inBuf);
+static bool GetNewEntropyFromFile(struct ibrand_context *context, char *szIBDatafilename, char *szStorageLockfilePath, uint8_t *inBuf, size_t inBufLen);
+static bool GetNewEntropyFromSharedMemory(struct ibrand_context *context, uint8_t *inBuf, size_t inBufLen);
 
-bool GetNewEntropy(struct ibrand_context *context, tIB_INSTANCEDATA *pIBRand, uint8_t *inBuf)
+bool GetNewEntropy(struct ibrand_context *context, tIB_INSTANCEDATA *pIBRand, uint8_t *inBuf, size_t inBufLen)
 {
     bool rc = false;
 
@@ -38,16 +38,16 @@ bool GetNewEntropy(struct ibrand_context *context, tIB_INSTANCEDATA *pIBRand, ui
     {
         char filename[_MAX_PATH];
         cfgGetDatafilename(filename, sizeof(filename), pIBRand );
-        rc = GetNewEntropyFromFile(context, filename, pIBRand->cfg.szStorageLockfilePath, inBuf);
+        rc = GetNewEntropyFromFile(context, filename, pIBRand->cfg.szStorageLockfilePath, inBuf, inBufLen);
     }
     if (strcmp(pIBRand->cfg.szStorageType, "SHMEM") == 0)
     {
-        rc = GetNewEntropyFromSharedMemory(context, inBuf);
+        rc = GetNewEntropyFromSharedMemory(context, inBuf, inBufLen);
     }
     return rc;
 }
 
-static bool GetNewEntropyFromFile(struct ibrand_context *context, char *szIBDatafilename, char *szStorageLockfilePath, uint8_t *inBuf)
+static bool GetNewEntropyFromFile(struct ibrand_context *context, char *szIBDatafilename, char *szStorageLockfilePath, uint8_t *inBuf, size_t inBufLen)
 {
     FILE * fIBDatafile = NULL;
     char * szLockfilePath = szStorageLockfilePath; // "/tmp";
@@ -56,7 +56,7 @@ static bool GetNewEntropyFromFile(struct ibrand_context *context, char *szIBData
     size_t bytesRead;
     bool   success = false;
 
-    bytesToRead = sizeof(inBuf);
+    bytesToRead = inBufLen;
 
     my_waitForFileLock(szLockfilePath, szIBDatafilename, FILELOCK_LOGLEVEL);
 
@@ -122,13 +122,13 @@ static bool GetNewEntropyFromFile(struct ibrand_context *context, char *szIBData
     return success;
 }
 
-static bool GetNewEntropyFromSharedMemory(struct ibrand_context *context, uint8_t *inBuf)
+static bool GetNewEntropyFromSharedMemory(struct ibrand_context *context, uint8_t *inBuf, size_t inBufLen)
 {
     size_t bytesToRead;
     size_t bytesRead;
     bool   success = false;
 
-    bytesToRead = sizeof(inBuf);
+    bytesToRead = inBufLen;
 
     for(;;) // Not a real loop - just an exitable code block
     {

@@ -16,6 +16,6 @@
 #include "libibrand_config.h"
 #include <stdint.h>
 
-extern bool GetNewEntropy(struct ibrand_context *context, tIB_INSTANCEDATA *pIBRand, uint8_t *inBuf);
+extern bool GetNewEntropy(struct ibrand_context *context, tIB_INSTANCEDATA *pIBRand, uint8_t *inBuf, size_t inBufLen);
 
 #endif // _INCLUDE_LIBIBRAND_GETNEWENTROPY_H_

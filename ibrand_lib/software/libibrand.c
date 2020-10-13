@@ -541,7 +541,7 @@ uint32_t readData_Protected(struct ibrand_context *context, uint8_t *result, boo
         clock_gettime(CLOCK_REALTIME, &start);
 
 #if (IB_SOURCE_OF_RANDOMNESS == RANDSRC_IRONBRIDGE)
-        if (!GetNewEntropy(context, pIBRand, inBuf))
+        if (!GetNewEntropy(context, pIBRand, inBuf, BUFLEN))
         {
             printf("ERROR: GetNewEntropy set errorFlag: %d\n", context->errorFlag);
             return 0;
