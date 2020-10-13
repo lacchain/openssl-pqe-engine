@@ -48,7 +48,10 @@ set -x\n\
 service rsyslog start\n\
 certSerial=$(openssl x509 -noout -serial -in /certs/client.pem | cut -d'\''='\'' -f2)\n\
 jwtToken=$(curl --http1.1 --silent --cert /certs/client.pem --key /certs/client_key.pem --data-raw "" '\''https://ironbridgeapi.com/api/login'\'' | jq -r '\''.token'\'')\n\
-curl --http1.1 --silent --fail --show-error --cert /certs/client.pem --key /certs/client_key.pem --header "Authorization: Bearer $jwtToken" --header "Content-Type: application/json" --data-raw "{\"clientCertName\":\"monarca.iadb.org\", \"clientCertSerialNumber\":\"$certSerial\", \"countryCode\":\"GB\", \"smsNumber\":\"10000000001\", \"email\":\"diegol@iadb.org\", \"keyparts\": \"2\", \"kemAlgorithm\":\"222\"}" '\''https://ironbridgeapi.com/api/setupclient'\'' -o /ironbridge_clientsetup_OOB.json\n\
+# Diago's config:
+#curl --http1.1 --silent --fail --show-error --cert /certs/client.pem --key /certs/client_key.pem --header "Authorization: Bearer $jwtToken" --header "Content-Type: application/json" --data-raw "{\"clientCertName\":\"monarca.iadb.org\", \"clientCertSerialNumber\":\"$certSerial\", \"countryCode\":\"GB\", \"smsNumber\":\"10000000001\", \"email\":\"diegol@iadb.org\", \"keyparts\": \"2\", \"kemAlgorithm\":\"222\"}" '\''https://ironbridgeapi.com/api/setupclient'\'' -o /ironbridge_clientsetup_OOB.json\n\
+# Ben's config:
+curl --http1.1 --cert /certs/client.pem --key /certs/client_key.pem --header "Authorization: Bearer $jwtToken" --header "Content-Type: application/json" --data-raw "{\"clientCertName\":\"client.ironbridgeapi.com\", \"clientCertSerialNumber\":\"$certSerial\", \"countryCode\":\"GB\", \"smsNumber\":\"10000000001\", \"email\":\"ben.merriman@cambridgequantum.com\", \"keyparts\": \"2\", \"kemAlgorithm\":\"222\"}" '\''https://ironbridgeapi.com/api/setupclient'\'' -o /ironbridge_clientsetup_OOB.json\n\
 ret=$?\n\
 if [ $ret -ne 0 ] ; then\n\
   exit 1\n\
@@ -58,7 +61,7 @@ JSON:{\n\
   "GeneralSettings":\n\
   {\n\
     "_1_Verbosity_bitmapped_field":"STATUS=1, CONFIG=2, PROGRESS=4, AUTH=8, DATA=16, CURL=32, SPARE6=64, SPARE7=128",\n\
-    "LOGGING_VERBOSITY":"1"\n\
+    "LOGGING_VERBOSITY":"27"\n\
   },\n\
   "AuthSettings":\n\
   {\n\
@@ -99,8 +102,12 @@ JSON:{\n\
 }\n\
 _EOF_\n\
 export OPENSSL_CONF=/usr/lib/ssl/ibrand_openssl.cnf\n\
+export IBRAND_CONF=/ibrand.cnf\n\
 ibrand_service -f /ibrand.cnf\n\
-openssl engine\n'\
+openssl engine\n\
+#tail -f /var/log/syslog\n'\
+sleep 15\n\
+openssl rand 24\n'\
 >> /run.sh
 RUN chmod +x /run.sh
 
