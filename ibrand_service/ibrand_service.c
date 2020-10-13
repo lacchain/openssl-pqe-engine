@@ -529,8 +529,8 @@ int authenticateUser(tIB_INSTANCEDATA *pIBRand)
     }
 
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pIBRand->cfg.szAuthUrl);
-//#define USE_CORRECT_ENGINE
-#ifdef USE_CORRECT_ENGINE
+#define FORCE_USE_OF_NON_IRONBRIDGE_RNG_ENGINE
+#ifdef FORCE_USE_OF_NON_IRONBRIDGE_RNG_ENGINE
     // Anything except ourselves.
     // Ideally: RAND_set_rand_engine(NULL)
     //curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, "dynamic");
@@ -541,7 +541,7 @@ int authenticateUser(tIB_INSTANCEDATA *pIBRand)
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
         app_tracef("INFO: CURLOPT_SSLENGINE_DEFAULT");
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE_DEFAULT, 1L);
-#endif // USE_CORRECT_ENGINE
+#endif // FORCE_USE_OF_NON_IRONBRIDGE_RNG_ENGINE
 
     //if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
     //    app_tracef("INFO: Construct HTTP Headers");
