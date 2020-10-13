@@ -152,6 +152,9 @@ uint32_t extractBytes(uint8_t *bytes, uint32_t length, uint8_t *inBuf, const cha
     inmClearEntropyLevel();
     uint32_t i;
 
+    UNUSED_PARAM(errorFlag);
+    UNUSED_PARAM(message = message);
+
     for (i = 0u; i < length; i++)
     {
         uint32_t j;
@@ -166,12 +169,12 @@ uint32_t extractBytes(uint8_t *bytes, uint32_t length, uint8_t *inBuf, const cha
             byte = (byte << 1u) | bit;
 
             // This is a good place to feed the bit from the INM to the health checker.
-            if (!inmHealthCheckAddBit(evenBit, oddBit, even))
-            {
-                *message = "Health check of Infinite Noise Multiplier failed!";
-                *errorFlag = true;
-                return 0;
-            }
+            //if (!inmHealthCheckAddBit(evenBit, oddBit, even))
+            //{
+            //    *message = "Health check of Infinite Noise Multiplier failed!";
+            //    *errorFlag = true;
+            //    return 0;
+            //}
         }
         bytes[i] = byte;
     }
@@ -561,7 +564,7 @@ uint32_t readData_Protected(struct ibrand_context *context, uint8_t *result, boo
                 return 0;
             }
             // Call health check and return bytes if OK
-            if (inmHealthCheckOkToUseData() && inmEntropyOnTarget(context->entropyThisTime, BUFLEN))
+            //if (inmHealthCheckOkToUseData() && inmEntropyOnTarget(context->entropyThisTime, BUFLEN))
             {
                 uint32_t ret;
                 ret = processBytes(bytes,
@@ -574,10 +577,10 @@ uint32_t readData_Protected(struct ibrand_context *context, uint8_t *result, boo
                 //printf("INFO: processBytes returned %u\n", ret);
                 return ret;
             }
-            else
-            {
-                printf("ERROR: inmHealthCheckOkToUseData failed\n");
-            }
+            //else
+            //{
+            //    printf("ERROR: inmHealthCheckOkToUseData failed\n");
+            //}
 
         }
         else
