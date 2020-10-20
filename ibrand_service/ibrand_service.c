@@ -1680,7 +1680,7 @@ int main(int argc, char * argv[])
         exit(EXIT_FAILURE);
     }
 
-#define FORCE_ALL_LOGGING_ON
+//#define FORCE_ALL_LOGGING_ON
 #ifdef FORCE_ALL_LOGGING_ON
     // Leave the standard file descriptors open
 #else // FORCE_ALL_LOGGING_ON
