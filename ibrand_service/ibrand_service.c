@@ -78,6 +78,9 @@ typedef enum tagSERVICE_STATE
 #define HTTP_RESP_KEMKEYPAIREXPIRED      (498) // TokenExpiredOrInvalid 498
 #define HTTP_RESP_SHAREDSECRETEXPIRED    (498) // TokenExpiredOrInvalid 498
 
+
+//#define KAT_KNOWN_ANSWER_TESTING
+
 static const int localDebugTracing = false;
 
 /////////////////////////////////////
@@ -86,6 +89,47 @@ static const int localDebugTracing = false;
 static int DecryptAndStoreKemSecretKey(tIB_INSTANCEDATA *pIBRand);
 static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand);
 static int ImportKemSecretKeyFromClientSetupOOBFile(tIB_INSTANCEDATA *pIBRand);
+
+#ifdef KAT_KNOWN_ANSWER_TESTING
+///////////////////////////////////////////////////////
+// KAT - Known Answer Test
+// For info: A 16 byte shared secret of "CambridgeQuantum" translates to "Q2FtYnJpZGdlUXVhbnR1bQ==" in Base64.
+///////////////////////////////////////////////////////
+static void KatDataAppend(tLSTRING *pDest, int destOffset, int numBytesToAppend)
+{
+    //const char *pSrc = "The Quick Brown Fox Jumped Over The Lazy Dog. ";
+    const char *pSrc = "CambridgeQuantumComputingLimited"; // Convenient 32 bytes
+    //const char *pSrc = "UpcomingMildAutumnTimeBirdcageQt"; // Anagram of the above
+    size_t cbSrc = strlen(pSrc);
+
+    while (numBytesToAppend > 0)
+    {
+        int bytesToCopy = my_minimum(cbSrc, numBytesToAppend);
+        memcpy(pDest->pData + destOffset, pSrc, bytesToCopy);
+        pDest->cbData += bytesToCopy;
+        numBytesToAppend -= bytesToCopy;
+    }
+}
+
+static bool KatDataVerify(tLSTRING *pActualData, size_t expectedLength, char *szTitle)
+{
+    tLSTRING expectedData;
+    expectedData.pData = malloc(expectedLength);
+    expectedData.cbData = 0;
+    KatDataAppend(&expectedData, 0, expectedLength);
+    if (pActualData->cbData != expectedLength)
+    {
+        app_tracef("WARNING: PassthroughTesting failed. %s length mismatch: actual:%u vs expected:%u", szTitle, pActualData->cbData, expectedLength);
+        return false;
+    }
+    if (memcmp(pActualData->pData, expectedData.pData, expectedLength) != 0)
+    {
+        app_tracef("WARNING: PassthroughTesting failed. %s content mismatch", szTitle);
+        return false;
+    }
+    return true;
+}
+#endif // KAT_KNOWN_ANSWER_TESTING
 
 //-----------------------------------------------------------------------
 // ReceiveDataHandler_login
@@ -410,6 +454,12 @@ static int DecryptAndStoreKemSecretKey(tIB_INSTANCEDATA *pIBRand)
         return rc;
     }
 
+#ifdef KAT_KNOWN_ANSWER_TESTING
+    size_t expectedLength = 9616; // Size of Frodo KEM private key
+    // TODO: Extend to support alogorithms other than just Frodo
+    KatDataVerify(&(pIBRand->ourKemSecretKey), expectedLength, "KemSecretKey");
+#endif // KAT_KNOWN_ANSWER_TESTING
+
     //dumpToFile("/home/jgilmore/dev/dump_KemSecretKey_D_raw.txt", (unsigned char *)pIBRand->ourKemSecretKey.pData, pIBRand->ourKemSecretKey.cbData);
     app_tracef("INFO: KEM key stored successfully (%lu bytes)", pIBRand->ourKemSecretKey.cbData);
 
@@ -496,6 +546,11 @@ static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
     // We will set the size once we know it has completed
     pIBRand->symmetricSharedSecret.cbData = CRYPTO_BYTES;
 
+#ifdef KAT_KNOWN_ANSWER_TESTING
+    size_t expectedLength = CRYPTO_BYTES; // Size of the SharedSecret
+    KatDataVerify(&(pIBRand->symmetricSharedSecret), expectedLength, "SharedSecret");
+#endif // KAT_KNOWN_ANSWER_TESTING
+
     //dumpToFile("/home/jgilmore/dev/dump_SharedSecret_D_raw.txt", (unsigned char *)pIBRand->symmetricSharedSecret.pData, pIBRand->symmetricSharedSecret.cbData);
     app_tracef("INFO: SharedSecret stored successfully (%lu bytes)", pIBRand->symmetricSharedSecret.cbData);
 
@@ -531,22 +586,22 @@ int authenticateUser(tIB_INSTANCEDATA *pIBRand)
     }
 
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pIBRand->cfg.szAuthUrl);
-#define FORCE_USE_OF_NON_IRONBRIDGE_RNG_ENGINE
-#ifdef FORCE_USE_OF_NON_IRONBRIDGE_RNG_ENGINE
-    // Anything except ourselves.
-    // Ideally: RAND_set_rand_engine(NULL)
-    //curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, "dynamic");
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
-        app_tracef("INFO: Force use of alternate OpenSSL RNG engine");
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, "rdrand");
-    //curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, NULL);
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
-        app_tracef("INFO: CURLOPT_SSLENGINE_DEFAULT");
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE_DEFAULT, 1L);
-#endif // FORCE_USE_OF_NON_IRONBRIDGE_RNG_ENGINE
 
-    //if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
-    //    app_tracef("INFO: Construct HTTP Headers");
+
+    {
+        // FORCE_USE_OF_NON_IRONBRIDGE_RNG_ENGINE
+        // Anything except ourselves.
+        // Ideally: RAND_set_rand_engine(NULL)
+        //curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, "dynamic");
+        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
+            app_tracef("INFO: Force use of alternate OpenSSL RNG engine");
+        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, "rdrand");
+        //curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, NULL);
+        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
+            app_tracef("INFO: CURLOPT_SSLENGINE_DEFAULT");
+        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE_DEFAULT, 1L);
+    }
+
     /* Pass our list of custom made headers */
     struct curl_slist *headers = NULL;
     headers = curl_slist_append ( headers, "Content-Type: application/json" );
@@ -1191,6 +1246,12 @@ static bool prepareSRNGBytes(tIB_INSTANCEDATA *pIBRand)
         app_tracef("WARNING: Only RAW format is supported for SRNG. Discarding %u bytes.", pIBRand->ResultantData.cbData);
         return false; // todo cleanup
     }
+
+#ifdef KAT_KNOWN_ANSWER_TESTING
+    size_t expectedLength = pIBRand->ResultantData.cbData; // TODO: Use the Size of the SRNG Request
+    KatDataVerify(&(pIBRand->ResultantData), expectedLength, "SRNG");
+#endif // KAT_KNOWN_ANSWER_TESTING
+
     return true;
 }
 
