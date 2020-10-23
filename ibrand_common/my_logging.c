@@ -328,7 +328,7 @@ static void appendToLogfile(const char *szString, bool emitCrLf)
         else
             fprintf(stderr, "FATAL: Error opening Logfile: \"%s\". errno=%d. Terminating.\n",pszLogFilename, errno);
 
-        exit(3001);
+        exit(155);
         return;
     }
     bInitialised = TRUE;

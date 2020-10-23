@@ -24,7 +24,7 @@ static uint32_t readNumberFromFile(char *fileName)
     if(file == NULL)
     {
         fprintf(stderr, "[ibrand_lib] FATAL: Unable to open %s\n", fileName);
-        exit(1);
+        exit(455);
     }
 
     uint32_t value = 0u;
@@ -48,14 +48,14 @@ void inmWriteEntropyStart(uint32_t bufLen, bool debug)
     if(pfd.fd < 0)
     {
         fprintf(stderr, "[ibrand_lib] FATAL: Unable to open /dev/random\n");
-        exit(1);
+        exit(456);
     }
 
     inmPoolInfo = calloc(1, sizeof(struct rand_pool_info) + bufLen);
     if(inmPoolInfo == NULL)
     {
         fprintf(stderr, "[ibrand_lib] FATAL: Unable to allocate memory\n");
-        exit(1);
+        exit(457);
     }
 
     inmFillWatermark = readNumberFromFile(FILL_PROC_FILENAME);

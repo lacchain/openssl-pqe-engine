@@ -224,7 +224,7 @@ static bool __ShMem_DoActivity(tSHMEM_ACTIVITY whichActivity, void *pUserData)
                     munmap(memptr, __shMemSizeInBytes); // Unmap the storage
                     close(fd);
                     //return false;
-                    exit(556);
+                    exit(555);
                 }
             }
 
@@ -266,7 +266,7 @@ static bool __ShMem_DoActivity(tSHMEM_ACTIVITY whichActivity, void *pUserData)
                 munmap(memptr, __shMemSizeInBytes); // Unmap the storage
                 close(fd);
                 //return false;
-                exit(555);
+                exit(557);
             }
         }
 
@@ -286,7 +286,7 @@ static bool __ShMem_DoActivity(tSHMEM_ACTIVITY whichActivity, void *pUserData)
                 munmap(memptr, __shMemSizeInBytes); // Unmap the storage
                 close(fd);
                 //return false;
-                exit(555);
+                exit(558);
             }
         }
 

@@ -204,7 +204,7 @@ int ibrand_bind(ENGINE *engine, const char *id)
 
   if (IBRandEngineStateInit(&engine_state) != kEngineOk)
   {
-    exit(-1);
+    exit(355);
   }
 
   //fprintf(stderr, "[ibrand_openssl] INFO: IBRand engine loaded.\n");
