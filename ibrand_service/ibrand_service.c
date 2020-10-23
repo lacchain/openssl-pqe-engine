@@ -55,8 +55,6 @@
 #error "ERROR - Requires libcurl of 7.12.3 or greater"
 #endif
 
-#define RUN_AS_DAEMON
-
 typedef enum tagSERVICE_STATE
 {
     STATE_START = 0,
@@ -1547,10 +1545,8 @@ int ReadOurKemPrivateKey(tIB_INSTANCEDATA *pIBRand, size_t secretKeyBytes)
 int main(int argc, char * argv[])
 {
     // Our process ID and Session ID
-#ifdef RUN_AS_DAEMON
     pid_t processId = {0};
     pid_t sessionId = {0};
-#endif // RUN_AS_DAEMON
     int rc;
     tIB_INSTANCEDATA *pIBRand;
 
@@ -1598,11 +1594,7 @@ int main(int argc, char * argv[])
         exit(EXIT_FAILURE);
     }
 
-#ifdef RUN_AS_DAEMON
     app_trace_openlog("ibrand_service", LOG_PID, LOG_DAEMON);
-#else // RUN_AS_DAEMON
-    app_trace_openlog("ibrand_service", LOG_PID|LOG_CONS|LOG_PERROR, LOG_USER );
-#endif // RUN_AS_DAEMON
 
     app_tracef("===ibrand_service==================================================================================================");
 
@@ -1691,10 +1683,6 @@ int main(int argc, char * argv[])
     close(STDOUT_FILENO);
     close(STDERR_FILENO);
 #endif // FORCE_ALL_LOGGING_ON
-
-#else // RUN_AS_DAEMON
-    app_tracef("INFO: CQC IronBridge IBRand Process Started Successfully ====================");
-#endif // RUN_AS_DAEMON
 
     // =========================================================================
     // Daemon-specific initialization
@@ -1802,14 +1790,9 @@ int main(int argc, char * argv[])
                 rc = InitialiseCurl(pIBRand);
                 if (rc != 0)
                 {
-#ifdef RUN_AS_DAEMON
                     app_tracef("ERROR: InitialiseCurl failed with rc=%d. Will retry initialisation in %d seconds", rc, pIBRand->cfg.authRetryDelay);
                     sleep(pIBRand->cfg.authRetryDelay);
                     currentState = STATE_INITIALISECURL;
-#else // RUN_AS_DAEMON
-                    app_tracef("ERROR: InitialiseCurl failed with rc=%d. Aborting.", rc);
-                    currentState = STATE_SHUTDOWN;
-#endif // RUN_AS_DAEMON
                     continue;
                 }
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CURL))
@@ -1832,14 +1815,9 @@ int main(int argc, char * argv[])
                 {
                     numberOfAuthFailures++;
                     numberOfConsecutiveAuthFailures++;
-    #ifdef RUN_AS_DAEMON
                     app_tracef("ERROR: DoAuthentication failed with rc=%d. Will retry in %d seconds", rc, pIBRand->cfg.authRetryDelay);
                     sleep(pIBRand->cfg.authRetryDelay);
                     currentState = STATE_AUTHENTICATE;
-    #else // RUN_AS_DAEMON
-                    app_tracef("ERROR: DoAuthentication failed with rc=%d. Aborting.", rc);
-                    currentState = STATE_SHUTDOWN;
-    #endif // RUN_AS_DAEMON
                     continue;
                 }
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
@@ -1858,14 +1836,9 @@ int main(int argc, char * argv[])
                 {
                     numberOfAuthFailures++;
                     numberOfConsecutiveAuthFailures++;
-#ifdef RUN_AS_DAEMON
                     app_tracef("ERROR: getNewKemKeyPair failed with rc=%d. Will retry in %d seconds", rc, pIBRand->cfg.authRetryDelay);
                     sleep(pIBRand->cfg.authRetryDelay);
                     currentState = STATE_GETNEWKEMKEYPAIR;
-#else // RUN_AS_DAEMON
-                    app_tracef("ERROR: getNewKemKeyPair failed with rc=%d. Aborting.", rc);
-                    currentState = STATE_SHUTDOWN;
-#endif // RUN_AS_DAEMON
                     continue;
                 }
                 currentState = STATE_DECRYPTKEMSECRETKEY;
@@ -1886,14 +1859,9 @@ int main(int argc, char * argv[])
                 {
                     numberOfAuthFailures++;
                     numberOfConsecutiveAuthFailures++;
-#ifdef RUN_AS_DAEMON
                     app_tracef("ERROR: Decryption of KEM secret key failed with rc=%d. Will retry in %d seconds", rc, pIBRand->cfg.authRetryDelay);
                     sleep(pIBRand->cfg.authRetryDelay);
                     currentState = STATE_DECAPSULATESHAREDSECRET;
-#else // RUN_AS_DAEMON
-                    app_tracef("ERROR: Decryption of KEM secret key failed with rc=%d. Aborting.", rc);
-                    currentState = STATE_SHUTDOWN;
-#endif // RUN_AS_DAEMON
                     continue;
                 }
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
@@ -1917,14 +1885,9 @@ int main(int argc, char * argv[])
                 {
                     numberOfAuthFailures++;
                     numberOfConsecutiveAuthFailures++;
-#ifdef RUN_AS_DAEMON
                     app_tracef("ERROR: DoRequestSharedSecret failed with rc=%d. Will retry in %d seconds", rc, pIBRand->cfg.authRetryDelay);
                     sleep(pIBRand->cfg.authRetryDelay);
                     currentState = STATE_GETNEWSHAREDSECRET;
-#else // RUN_AS_DAEMON
-                    app_tracef("ERROR: DoRequestSharedSecret failed with rc=%d. Aborting.", rc);
-                    currentState = STATE_SHUTDOWN;
-#endif // RUN_AS_DAEMON
                     continue;
                 }
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
@@ -1947,14 +1910,9 @@ int main(int argc, char * argv[])
                 {
                     numberOfAuthFailures++;
                     numberOfConsecutiveAuthFailures++;
-#ifdef RUN_AS_DAEMON
                     app_tracef("ERROR: KEM decapsulation failed with rc=%d. Will retry in %d seconds", rc, pIBRand->cfg.authRetryDelay);
                     sleep(pIBRand->cfg.authRetryDelay);
                     currentState = STATE_DECAPSULATESHAREDSECRET;
-#else // RUN_AS_DAEMON
-                    app_tracef("ERROR: KEM decapsulation failed with rc=%d. Aborting.", rc);
-                    currentState = STATE_SHUTDOWN;
-#endif // RUN_AS_DAEMON
                     continue;
                 }
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
