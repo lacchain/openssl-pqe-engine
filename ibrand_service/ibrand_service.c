@@ -30,6 +30,8 @@
 
 #include "../PQCrypto-LWEKE/src/api_frodo640.h"
 
+#include "my_utils.h"
+
 #include "ibrand_service.h"
 #include "ibrand_service_utils.h"
 #include "ibrand_service_config.h"
@@ -626,39 +628,24 @@ int authenticateUser(tIB_INSTANCEDATA *pIBRand)
 
     if (strcmp(pIBRand->cfg.szAuthType, "CLIENT_CERT") == 0)
     {
-#if 0
-    INFO: Details of new client: {"clientCertName":"jgtestsrv1.com","clientCertSerialNumber":"42619BCC1CD78D32F18F0E40BC232452FCBBCA90","countryCode":"GB","smsNumber":"+447711221555","email":"me@home.com","keyparts":"2","kemAlgorithm":"222"}
-    INFO: Sending NewClient request to https://jgtestsrv1.com/api/setupclient
-    INFO: Client Setup Successful
-    {
-      "clientCertName":"jgtestsrv1.com",
-      "clientCertSerialNumber":"42619BCC1CD78D32F18F0E40BC232452FCBBCA90",
-      "countryCode":"GB",
-      "smsNumber":"+447711221555",
-      "email":"me@home.com",
-      "keyparts":"2",
-      "kemAlgorithm":"222"
-    }
-    ironbridge_clientsetup_OOB.json
-#endif
 
-#if 0
-* In windows, Open Certificate Manager
-* Export cert, with private key to a pfx file e.g. MYDOMAIN.pfx
-* openssl pkcs12 -in MYDOMAIN.pfx -clcerts -nokeys -out MYDOMAIN.crt
-* openssl x509   -in MYDOMAIN.crt                  -out MYDOMAIN.pem
-* openssl pkcs12 -in MYDOMAIN.pfx -nocerts         -out MYDOMAIN-encrypted.key
-* openssl rsa    -in MYDOMAIN-encrypted.key        -out MYDOMAIN.key
-
-For example...
-echo Create PEM file from PFX file:
-openssl pkcs12 -in dev_ironbridgeapi_export_with_pvtkey_aes256sha256.pfx -clcerts -nokeys -out dev_ironbridgeapi_com.crt
-openssl x509   -in dev_ironbridgeapi_com.crt                                              -out dev_ironbridgeapi_com.pem
-
-echo Create KEY file from PFX file:
-openssl pkcs12 -in dev_ironbridgeapi_export_with_pvtkey_aes256sha256.pfx -nocerts         -out dev_ironbridgeapi_com.key
-openssl rsa    -in dev_ironbridgeapi_com.key                                              -out dev_ironbridgeapi_com-decrypted.key
-#endif
+        /***********************************************************************
+        * In windows, Open Certificate Manager
+        * Export cert, with private key to a pfx file e.g. MYDOMAIN.pfx
+        *   openssl pkcs12 -in MYDOMAIN.pfx -clcerts -nokeys -out MYDOMAIN.crt
+        *   openssl x509   -in MYDOMAIN.crt                  -out MYDOMAIN.pem
+        *   openssl pkcs12 -in MYDOMAIN.pfx -nocerts         -out MYDOMAIN-encrypted.key
+        *   openssl rsa    -in MYDOMAIN-encrypted.key        -out MYDOMAIN.key
+        *
+        * For example...
+        *   echo Create PEM file from PFX file:
+        *   openssl pkcs12 -in dev_ironbridgeapi_export_with_pvtkey_aes256sha256.pfx -clcerts -nokeys -out dev_ironbridgeapi_com.crt
+        *   openssl x509   -in dev_ironbridgeapi_com.crt                                              -out dev_ironbridgeapi_com.pem
+        *
+        *   echo Create KEY file from PFX file:
+        *   openssl pkcs12 -in dev_ironbridgeapi_export_with_pvtkey_aes256sha256.pfx -nocerts         -out dev_ironbridgeapi_com.key
+        *   openssl rsa    -in dev_ironbridgeapi_com.key                                              -out dev_ironbridgeapi_com-decrypted.key
+        ***********************************************************************/
 
         // Add the client certificate to our headers
         //curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLCERT, "/etc/ssl/certs/client_cert.pem"); // Load the certificate

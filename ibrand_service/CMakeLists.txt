@@ -1,4 +1,3 @@
-#pkg_search_module(FTDI REQUIRED libftdi)
 find_package(CURL REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)

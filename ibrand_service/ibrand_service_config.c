@@ -572,7 +572,7 @@ int GetBinaryDataFromOOBFile(char *szSrcFilename, tLSTRING *pDestBinaryData)
     //   "checkSum": "39776"
     // }
     tIB_OOBDATA *pOobData = (tIB_OOBDATA *)malloc(sizeof(tIB_OOBDATA));
-    if (!szJsonString)
+    if (!pOobData)
     {
         app_tracef("ERROR: Failed to allocate %u bytes for OOB Data", sizeof(tIB_OOBDATA));
         return 2083;

@@ -27,11 +27,6 @@ static const int localDebugTracing = false;
 // Configuration
 ///////////////////
 
-static const int kIBRandMultiplier = 1;
-static const char *kIBRandSerial = NULL;
-static const bool kKeccak = true;
-static const bool kDebug = false;
-
 ////////////////////////////////
 // Ring buffer implementation
 ////////////////////////////////
@@ -129,7 +124,7 @@ static int IBRandEngineStateInit(IBRandEngineState *engine_state)
 {
   memset(engine_state, 0, sizeof(*engine_state));
   RingBufferInit(&engine_state->ring_buffer);
-  engine_state->status = initIBRand(&engine_state->trng_context, (char *)kIBRandSerial, kKeccak, kDebug);
+  engine_state->status = initIBRand(&engine_state->trng_context);
   if (!engine_state->status)
   {
     fprintf(stderr, "[ibrand_openssl] ERROR: initIBRand initialization error: %s\n", engine_state->trng_context.message ? engine_state->trng_context.message : "unknown");
@@ -154,14 +149,15 @@ static int Bytes(unsigned char *buf, int num)
 
     if (num > 0)
     {
-      // Need more RNG bytes.
+      // Need more RNG bytes - restock ring buffer, and then try again
       uint8_t rand_buffer[BUFLEN];
       if (localDebugTracing) fprintf(stderr, "[ibrand_openssl] DEBUG: (Bytes) restock RingBuffer...\n");
-      size_t rand_bytes = readData(&engine_state.trng_context, rand_buffer, !kKeccak, kIBRandMultiplier);
-      if (engine_state.trng_context.errorFlag)
+      size_t rand_bytes = readData(&engine_state.trng_context, rand_buffer, BUFLEN);
+      if (engine_state.trng_context.errorCode)
       {
         fprintf(stderr, "[ibrand_openssl] ERROR: errorCode=%d, msg=%s\n", engine_state.trng_context.errorCode, engine_state.trng_context.message ? engine_state.trng_context.message : "unknown");
         engine_state.status = kEngineFail;
+        engine_state.trng_context.errorCode = 0;
         break;
       }
       size_t bytes_written = RingBufferWrite(&engine_state.ring_buffer, rand_bytes, rand_buffer);

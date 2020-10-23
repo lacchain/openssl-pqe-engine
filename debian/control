@@ -2,7 +2,7 @@ Source: openssl-pqe-engine
 Section: misc
 Priority: optional
 Maintainer: LACChain Team <support@lacchain.net>
-Build-Depends: debhelper (>=13~), pkg-config, gcc, cmake, libssl-dev, libcurl4-openssl-dev, libftdi-dev
+Build-Depends: debhelper (>=13~), pkg-config, gcc, cmake, libssl-dev, libcurl4-openssl-dev
 Standards-Version: 4.1.4
 Homepage: https://github.com/lacchain/openssl-pqe-engine
 

@@ -1,7 +1,5 @@
-/* Library for the Infinite Noise Multiplier USB stick */
 
-// Required to include clock_gettime
-#define _POSIX_C_SOURCE 200809L
+#define _POSIX_C_SOURCE 200809L  // Required to include clock_gettime
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,12 +12,7 @@
 #include <syslog.h>
 
 #include "libibrand_globals.h"
-
-//#if (IB_SOURCE_OF_RANDOMNESS == RANDSRC_USB)
-#include <ftdi.h>
 #include "libibrand_private.h"
-#include "KeccakF-1600-interface.h"
-//#endif
 
 #include "my_utilslib.h"
 #include "ibrand_service_shmem.h"
@@ -74,7 +67,7 @@ static bool GetNewEntropyFromFile(struct ibrand_context *context, char *szIBData
         {
             sprintf(context->tempMessageBuffer200, "ERROR: Unable to open IBDatafile (%s)\n", szIBDatafilename );
             context->message = context->tempMessageBuffer200;
-            context->errorFlag = true;
+            context->errorCode = 13701;
             break;
         }
 
@@ -86,7 +79,7 @@ static bool GetNewEntropyFromFile(struct ibrand_context *context, char *szIBData
         {
             sprintf(context->tempMessageBuffer200, "ERROR: Insufficient data in IBDatafile (requested=%lu, actual=%lu)\n", (unsigned long)bytesToRead, (unsigned long)filesize);
             context->message = context->tempMessageBuffer200;
-            context->errorFlag = true;
+            context->errorCode = 13702;
             break;
         }
 
@@ -99,7 +92,7 @@ static bool GetNewEntropyFromFile(struct ibrand_context *context, char *szIBData
         {
             sprintf(context->tempMessageBuffer200, "ERROR: Failed to read all requested data from IB DataStore (requested=%lu, delivered=%lu)", (unsigned long)bytesToRead, (unsigned long)bytesRead);
             context->message = context->tempMessageBuffer200;
-            context->errorFlag = true;
+            context->errorCode = 13703;
             break;
         }
 
@@ -111,7 +104,7 @@ static bool GetNewEntropyFromFile(struct ibrand_context *context, char *szIBData
         if (truncate(szIBDatafilename, filesize - bytesToRead) != 0)
         {
             context->message = "ERROR: Unable to remove the data from the file";
-            context->errorFlag = true;
+            context->errorCode = 13704;
             break;
         }
         success = true;
@@ -130,41 +123,39 @@ static bool GetNewEntropyFromFile(struct ibrand_context *context, char *szIBData
 
 static bool GetNewEntropyFromSharedMemory(struct ibrand_context *context, uint8_t *inBuf, size_t inBufLen)
 {
-    size_t bytesToRead;
-    size_t bytesRead;
-    bool   success = false;
+    int32_t bytesToRead;
+    int32_t bytesRead;
+    int32_t waterLevel;
 
     bytesToRead = inBufLen;
 
-    for(;;) // Not a real loop - just an exitable code block
-    {
-        // Ensure that there is enough data
-        int32_t waterLevel = ShMem_GetCurrentWaterLevel();
-        if (waterLevel < (int32_t)bytesToRead)
-        {
-            sprintf(context->tempMessageBuffer200, "ERROR: Insufficient data in IB DataStore (requested=%lu, available=%d)", bytesToRead, waterLevel);
-            context->message = context->tempMessageBuffer200;
-            context->errorFlag = true;
-            break;
-        }
+    if (localDebugTracing)
+        app_tracef("DEBUG: GetNewEntropyFromSharedMemory bytesToRead: %u", bytesToRead);
 
-        // Read the data and remove the data we have just read.
-        bytesRead = ShMem_RetrieveFromDataStore((char *)inBuf, bytesToRead);
-        if (bytesRead <= 0)
-        {
-            context->message = "ERROR: IB DataStore read error - see log above for more details";
-            context->errorFlag = true;
-            break;
-        }
-        if (bytesRead != bytesToRead)
-        {
-            sprintf(context->tempMessageBuffer200, "ERROR: Failed to read enough data from IB DataStore (requested=%lu, delivered=%lu)", bytesToRead, bytesRead);
-            context->message = context->tempMessageBuffer200;
-            context->errorFlag = true;
-            break;
-        }
-        success = true;
-        break;
+    // Ensure that there is enough data
+    waterLevel = ShMem_GetCurrentWaterLevel();
+    if (waterLevel < bytesToRead)
+    {
+        sprintf(context->tempMessageBuffer200, "ERROR: Insufficient data in IB DataStore (requested=%lu, available=%d)", (unsigned long)bytesToRead, waterLevel);
+        context->message = context->tempMessageBuffer200;
+        context->errorCode = 13705;
+        return false;
     }
-    return success;
+
+    // Read the data and remove the data we have just read.
+    bytesRead = ShMem_RetrieveFromDataStore((char *)inBuf, bytesToRead);
+    if (bytesRead < 0)
+    {
+        context->message = "ERROR: IB DataStore read error - see log above for more details";
+        context->errorCode = 13706;
+        return false;
+    }
+    if (bytesRead != bytesToRead)
+    {
+        sprintf(context->tempMessageBuffer200, "ERROR: Failed to read enough data from IB DataStore (requested=%lu, delivered=%lu)", (unsigned long)bytesToRead, (unsigned long)bytesRead);
+        context->message = context->tempMessageBuffer200;
+        context->errorCode = 13707;
+        return false;
+    }
+    return true;
 }
