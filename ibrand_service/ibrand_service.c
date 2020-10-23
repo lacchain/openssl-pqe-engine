@@ -395,7 +395,7 @@ static int DecryptAndStoreKemSecretKey(tIB_INSTANCEDATA *pIBRand)
     rc = AESDecryptBytes(rawEncryptedKey, decodeSize, (uint8_t *)pIBRand->symmetricSharedSecret.pData, pIBRand->symmetricSharedSecret.cbData, 32 /*saltsize*/, &pDecryptedData, &cbDecryptedData);
     if (rc)
     {
-        printf("AESDecryptBytes failed with rc=%d\n", rc);
+        fprintf(stderr, "AESDecryptBytes failed with rc=%d\n", rc);
     }
     pIBRand->ourKemSecretKey.pData = (char *)pDecryptedData;
     pIBRand->ourKemSecretKey.cbData = cbDecryptedData;
@@ -1139,7 +1139,7 @@ static bool prepareSRNGBytes(tIB_INSTANCEDATA *pIBRand)
     rc = AESDecryptBytes(pEncryptedData, cbEncryptedData, (uint8_t *)pIBRand->symmetricSharedSecret.pData, pIBRand->symmetricSharedSecret.cbData, 32, &pDecryptedData, &cbDecryptedData);
     if (rc)
     {
-        printf("AESDecryptBytes failed with rc=%d\n", rc);
+        fprintf(stderr, "ERROR: AESDecryptBytes failed with rc=%d\n", rc);
     }
     pIBRand->ResultantData.pData = (char *)pDecryptedData;
     pIBRand->ResultantData.cbData = cbDecryptedData;
@@ -1336,8 +1336,8 @@ int DoSimpleAuthentication(tIB_INSTANCEDATA *pIBRand)
         app_tracef("INFO: pRealToken = [%s]", pIBRand->pRealToken);
     }
 
-    //fprintf(stderr, "DEBUG: Token.pData=[%s]\n", pIBRand->Token.pData);
-    //fprintf(stderr, "DEBUG: pRealToken=[%s]\n", pIBRand->pRealToken);
+    //fprintf(stderr, "[ibrand-service] DEBUG: Token.pData=[%s]\n", pIBRand->Token.pData);
+    //fprintf(stderr, "[ibrand-service] DEBUG: pRealToken=[%s]\n", pIBRand->pRealToken);
 
     pIBRand->fAuthenticated = TRUE;
     return 0;
@@ -1557,7 +1557,7 @@ int main(int argc, char * argv[])
     pIBRand = malloc(sizeof(tIB_INSTANCEDATA));
     if (!pIBRand)
     {
-        fprintf(stderr, "FATAL: Failed to allocate memory for local storage. Aborting.");
+        fprintf(stderr, "[ibrand-service] FATAL: Failed to allocate memory for local storage. Aborting.");
         exit(EXIT_FAILURE);
     }
     memset(pIBRand, 0, sizeof(tIB_INSTANCEDATA));
@@ -1586,7 +1586,7 @@ int main(int argc, char * argv[])
 
     if (strlen(pIBRand->szConfigFilename) == 0)
     {
-        fprintf(stderr, "FATAL: Configuration not specified, neither on commandline nor via an environment variable.\n");
+        fprintf(stderr, "[ibrand-service] FATAL: Configuration not specified, neither on commandline nor via an environment variable.\n");
         fprintf(stderr, "USAGE: ibrand_service [-f <ConfigFilename>]\n");
         fprintf(stderr, "       If <ConfigFilename> is NOT specified on the command line,\n");
         fprintf(stderr, "       then it must be specified in envar \"IBRAND_CONF\".\n");
@@ -1606,7 +1606,7 @@ int main(int argc, char * argv[])
     rc = ReadConfig(pIBRand->szConfigFilename, &(pIBRand->cfg), CRYPTO_SECRETKEYBYTES, CRYPTO_PUBLICKEYBYTES);
     if (rc != 0)
     {
-        fprintf(stderr, "FATAL: Configuration error. rc=%d\n", rc);
+        fprintf(stderr, "[ibrand-service] FATAL: Configuration error. rc=%d\n", rc);
         app_tracef("FATAL: Configuration error. Aborting. rc=%d", rc);
         app_trace_closelog();
         free(pIBRand);
@@ -1622,12 +1622,11 @@ int main(int argc, char * argv[])
 #endif // FORCE_ALL_LOGGING_ON
 
 
-#ifdef RUN_AS_DAEMON
     // Fork off the parent process
     processId = fork();
     if (processId < 0)
     {
-        fprintf(stderr, "FATAL: Failed to create child process\n");
+        fprintf(stderr, "[ibrand-service] FATAL: Failed to create child process\n");
         app_tracef("FATAL: Failed to create child process. Aborting.");
         app_trace_closelog();
         free(pIBRand);
@@ -1639,7 +1638,7 @@ int main(int argc, char * argv[])
         /////////////////////////////////////////
         // We are the parent process
         /////////////////////////////////////////
-        fprintf(stdout, "INFO: IBRand Service started successfully (pid:%u)\n", processId);
+        fprintf(stdout, "[ibrand-service] INFO: IBRand Service started successfully (pid:%u)\n", processId);
         if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
             app_tracef("INFO: IBRand Service started successfully (pid:%u)", processId);
         app_trace_closelog();

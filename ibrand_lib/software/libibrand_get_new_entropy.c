@@ -118,7 +118,7 @@ static bool GetNewEntropyFromFile(struct ibrand_context *context, char *szIBData
         fIBDatafile = NULL;
     }
     my_releaseFileLock(szLockfilePath, szIBDatafilename, FILELOCK_LOGLEVEL);
-    //printf(".");
+    //fprintf(stderr, ".");
     return success;
 }
 

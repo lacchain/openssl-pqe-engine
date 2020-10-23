@@ -20,23 +20,23 @@ int main(int argc, char *argv[])
     ///////////////////////////////////////////
     // Self tests and Known Answer Tests
     ///////////////////////////////////////////
-    printf("==================================== RFC2898DeriveBytes (PBKDF2) KAT Tests\n");
+    fprintf(stderr, "==================================== RFC2898DeriveBytes (PBKDF2) KAT Tests\n");
     rc = PBKDF2_KAT_verification();
     if (rc == false)
     {
-        printf("PBKDF2_KAT_verification failed\n");
+        fprintf(stderr, "PBKDF2_KAT_verification failed\n");
         return -1;
     }
 
-    printf("==================================== AES Encryption/Decryption Tests with derived keys/IV\n");
-    printf("PLEASE NOTE: These tests are currently failing because the data that it is testing against\n");
-    printf("is based on the deriveFunction doing only 1000 iterations. This has since been increased.\n");
-    printf("To fix the tests, the test data would need to be regenerated with this large value.\n");
-    printf("Search for PKCS5_PBKDF2_HMAC_ITERATIONS\n");
+    fprintf(stderr, "==================================== AES Encryption/Decryption Tests with derived keys/IV\n");
+    fprintf(stderr, "PLEASE NOTE: These tests are currently failing because the data that it is testing against\n");
+    fprintf(stderr, "is based on the deriveFunction doing only 1000 iterations. This has since been increased.\n");
+    fprintf(stderr, "To fix the tests, the test data would need to be regenerated with this large value.\n");
+    fprintf(stderr, "Search for PKCS5_PBKDF2_HMAC_ITERATIONS\n");
     int failed_tests2 = testSymmetricEncryption();
     if (failed_tests2 > 0)
     {
-        printf("testSymmetricEncryption failed\n");
+        fprintf(stderr, "testSymmetricEncryption failed\n");
         return -1;
     }
 

@@ -33,14 +33,14 @@ int my_getFilenameFromEnvVar(const char *szConfigEnvVar, char **pszFilename)
 
     if (!szConfigEnvVar)
     {
-        //printf("ERROR: Parameter error\n");
+        //fprintf(stderr, "ERROR: Parameter error\n");
         return 6000;
     }
 
     szConfigfilePath = getenv(szConfigEnvVar); // Returns a pointer into the current environment
     if (!szConfigfilePath)
     {
-        printf("ERROR: Cannot find environment variable: %s\n", szConfigEnvVar);
+        fprintf(stderr, "ERROR: Cannot find environment variable: %s\n", szConfigEnvVar);
         return 6001;
     }
 
@@ -48,7 +48,7 @@ int my_getFilenameFromEnvVar(const char *szConfigEnvVar, char **pszFilename)
     *pszFilename = malloc(strlen(szConfigfilePath));
     if (*pszFilename == NULL)
     {
-        printf("ERROR: Out of memory\n");
+        fprintf(stderr, "ERROR: Out of memory\n");
         return 6002;
     }
     strcpy(*pszFilename, szConfigfilePath);
@@ -62,7 +62,7 @@ int my_openSimpleConfigFile(char *szFilename, FILE **phConfigFile)
 
     if (!phConfigFile)
     {
-        //printf("ERROR: Parameter error\n");
+        //fprintf(stderr, "ERROR: Parameter error\n");
         return 6000;
     }
 
@@ -71,7 +71,7 @@ int my_openSimpleConfigFile(char *szFilename, FILE **phConfigFile)
     hConfigFile = fopen(szFilename, "rt");
     if (hConfigFile == NULL)
     {
-        //printf("ERROR: Cannot open config file: %s\n", szFilename);
+        //fprintf(stderr, "ERROR: Cannot open config file: %s\n", szFilename);
         return 6003;
     }
 
@@ -86,7 +86,7 @@ int my_openSimpleConfigFileEnv(const char *szConfigEnvVar, char **pszFilename, F
 
     if (!phConfigFile || !pszFilename)
     {
-        //printf("ERROR: Parameter error\n");
+        //fprintf(stderr, "ERROR: Parameter error\n");
         return 6000;
     }
 
@@ -96,14 +96,14 @@ int my_openSimpleConfigFileEnv(const char *szConfigEnvVar, char **pszFilename, F
     rc = my_getFilenameFromEnvVar(szConfigEnvVar, pszFilename);
     if (rc)
     {
-        //printf("ERROR: Parameter error\n");
+        //fprintf(stderr, "ERROR: Parameter error\n");
         return rc;
     }
 
     rc = my_openSimpleConfigFile(*pszFilename, phConfigFile);
     if (rc)
     {
-        //printf("ERROR: Failed to open config file\n");
+        //fprintf(stderr, "ERROR: Failed to open config file\n");
         return rc;
     }
     return 0;
@@ -118,7 +118,7 @@ int my_readSimpleConfigFileStr(FILE *hConfigFile, const char *szKey, char *pDest
 
     if (!hConfigFile  || !szKey || !pDest || cbDest <= 0)
     {
-        //printf("ERROR: Parameter error\n");
+        //fprintf(stderr, "ERROR: Parameter error\n");
        return 6004;
     }
     pDest[0] = '\0';
@@ -127,7 +127,7 @@ int my_readSimpleConfigFileStr(FILE *hConfigFile, const char *szKey, char *pDest
     pLine = malloc(BUFSIZE);
     if (!pLine)
     {
-        //printf("ERROR: Out of memory\n");
+        //fprintf(stderr, "ERROR: Out of memory\n");
        return 6005;
     }
     memset(pLine, 0, BUFSIZE);
@@ -173,7 +173,7 @@ int my_readSimpleConfigFileStr(FILE *hConfigFile, const char *szKey, char *pDest
 
         if (key_len >= sizeof(key) || val_len >= sizeof(val))
         {
-            //printf("ERROR: Either a key or a value is too long\n");
+            //fprintf(stderr, "ERROR: Either a key or a value is too long\n");
             free(pLine);
             return 6006;
         }
@@ -182,7 +182,7 @@ int my_readSimpleConfigFileStr(FILE *hConfigFile, const char *szKey, char *pDest
         // Extract val portion
         my_strlcpy(val, val_pos, val_len);
 
-        //printf("INFO: Found Key:Value pair:  %s:%s\n", key, val);
+        //fprintf(stderr, "INFO: Found Key:Value pair:  %s:%s\n", key, val);
 
         if (strcmp(key, szKey) == 0)
         {
@@ -195,7 +195,7 @@ int my_readSimpleConfigFileStr(FILE *hConfigFile, const char *szKey, char *pDest
 
     if (!found)
     {
-        //printf("ERROR: Cannot find config key: %s\n", szKey);
+        //fprintf(stderr, "ERROR: Cannot find config key: %s\n", szKey);
         return 6007;
     }
     return 0;
@@ -208,7 +208,7 @@ int my_readSimpleConfigFileByte(FILE * hConfigFile, const char *szKey, unsigned 
 
     if (!hConfigFile  || !szKey || !pDest)
     {
-        //printf("ERROR: Parameter error\n");
+        //fprintf(stderr, "ERROR: Parameter error\n");
        return 6007;
     }
 
@@ -228,7 +228,7 @@ int my_readSimpleConfigFileInt(FILE * hConfigFile, const char *szKey, int *pDest
 
     if (!hConfigFile  || !szKey || !pDest)
     {
-        //printf("ERROR: Parameter error\n");
+        //fprintf(stderr, "ERROR: Parameter error\n");
        return 6007;
     }
 
@@ -248,7 +248,7 @@ int my_readSimpleConfigFileLong(FILE * hConfigFile, const char *szKey, long *pDe
 
     if (!hConfigFile  || !szKey || !pDest)
     {
-        //printf("ERROR: Parameter error\n");
+        //fprintf(stderr, "ERROR: Parameter error\n");
        return 6007;
     }
 
@@ -287,19 +287,20 @@ static int __Config_ReadEntireFileIntoMemory (const char *szFilename, void *pDat
     fIn = fopen(szFilename, "rb");
     if (!fIn)
     {
-        printf("ERROR: Error %d opening file \"%s\" for reading\n", errno, szFilename);
+        fprintf(stderr, "ERROR: Error %d opening file \"%s\" for reading\n", errno, szFilename);
         return 6008;
     }
 
     bytesRead = fread(pData, 1, bytesToRead, fIn);
     if (bytesRead == -1)
     {
-        printf("ERROR: Error %d attempting to read %d bytes from file \"%s\"\n", errno, bytesToRead, szFilename);
+        fprintf(stderr, "ERROR: Error %u attempting to read %u bytes from file \"%s\"\n", errno, bytesToRead, szFilename);
+        fclose(fIn);
         return 6009;
     }
 
     fclose(fIn);
-    //printf("INFO: Configuration successfully read from \"%s\" (%d bytes)\n", szFilename, bytesRead );
+    //fprintf(stderr, "INFO: Configuration successfully read from \"%s\" (%d bytes)\n", szFilename, bytesRead );
     return 0;
 }
 
@@ -312,21 +313,21 @@ static int __getFileInfo(const char *szFilename, long *pRetFilesize)
 
     if (!szFilename)
     {
-        printf("ERROR: Parameter error\n");
+        fprintf(stderr, "ERROR: Parameter error\n");
         return 6001;
     }
 
     rc = my_fileExists(szFilename);
     if (rc == false)
     {
-        printf("ERROR: File not found: %s\n", szFilename);
+        fprintf(stderr, "ERROR: File not found: %s\n", szFilename);
         return 6004;
     }
 
     *pRetFilesize = my_getFilesize(szFilename);
     if (*pRetFilesize < 0)
     {
-        printf("ERROR: Unable to determine size of file: %s\n", szFilename);
+        fprintf(stderr, "ERROR: Unable to determine size of file: %s\n", szFilename);
         return 6005;
     }
     return 0;
@@ -341,7 +342,7 @@ int my_readEntireConfigFileIntoMemory(const char *szConfigFilename, char **pszCo
 
     if (!szConfigFilename)
     {
-        printf("ERROR: Parameter error\n");
+        fprintf(stderr, "ERROR: Parameter error\n");
         return 6000;
     }
 
@@ -350,21 +351,21 @@ int my_readEntireConfigFileIntoMemory(const char *szConfigFilename, char **pszCo
         return rc;
     if (filesize == 0)
     {
-        printf("ERROR: Empty file\n");
+        fprintf(stderr, "ERROR: Empty file\n");
         return 6006;
     }
 
     *pszConfigFileContents = malloc(filesize+1); // We will terminate the json string
     if (*pszConfigFileContents == NULL)
     {
-        printf("ERROR: Out of memory\n");
+        fprintf(stderr, "ERROR: Out of memory\n");
         return 6007;
     }
 
     rc = __Config_ReadEntireFileIntoMemory(szConfigFilename, (unsigned char *)(*pszConfigFileContents), (unsigned int)filesize);
     if (rc != 0)
     {
-        printf("ERROR: Read failed\n");
+        fprintf(stderr, "ERROR: Read failed\n");
         free(*pszConfigFileContents);
         return rc;
     }
@@ -388,14 +389,14 @@ int my_readEntireConfigFileIntoMemoryEnv(const char *szConfigEnvVar, char **pszF
 
     if (!szConfigEnvVar)
     {
-        printf("ERROR: Parameter error\n");
+        fprintf(stderr, "ERROR: Parameter error\n");
         return 6000;
     }
 
     rc = my_getFilenameFromEnvVar(szConfigEnvVar, pszFilename);
     if (rc)
     {
-        printf("ERROR: Cannot find config file from: %s\n", szConfigEnvVar);
+        fprintf(stderr, "ERROR: Cannot find config file from: %s\n", szConfigEnvVar);
         return rc;
     }
 

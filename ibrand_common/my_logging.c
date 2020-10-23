@@ -297,7 +297,7 @@ static void appendToLogfile(const char *szString, bool emitCrLf)
     pszLogFilename = getLogFilename(DEFAULTLOGFILENAME);
     if (!bInitialised)
     {
-        printf("Appending to Logfile: \"%s\"\n",pszLogFilename);
+        fprintf(stderr, "Appending to Logfile: \"%s\"\n",pszLogFilename);
     }
     fLogfile = fopen(pszLogFilename, "at");
     if (!fLogfile)
@@ -307,9 +307,9 @@ static void appendToLogfile(const char *szString, bool emitCrLf)
     if (!fLogfile)
     {
         if (errno == EACCES) // 13
-            printf("FATAL: Error opening Logfile: \"%s\". errno=EACCES(13,Permission denied). Terminating.\n",pszLogFilename);
+            fprintf(stderr, "FATAL: Error opening Logfile: \"%s\". errno=EACCES(13,Permission denied). Terminating.\n",pszLogFilename);
         else
-            printf("FATAL: Error opening Logfile: \"%s\". errno=%d. Terminating.\n",pszLogFilename, errno);
+            fprintf(stderr, "FATAL: Error opening Logfile: \"%s\". errno=%d. Terminating.\n",pszLogFilename, errno);
 
         exit(3001);
         return;

@@ -33,7 +33,7 @@ static bool __makeLockfileName(char *szLockFilePath, char *szFilename, char *szL
 
     if (!szFilename || !szLockfileName || !cbLockfileName)
     {
-       if (loglevel & 0x01) printf("__makeLockfileName Param error...\n");
+       if (loglevel & 0x01) fprintf(stderr, "__makeLockfileName Param error...\n");
        if (loglevel & 0x02) app_tracef("__makeLockfileName Param error...\n");
        return false;
     }
@@ -80,7 +80,7 @@ static bool __makeLockfileName(char *szLockFilePath, char *szFilename, char *szL
         strcat(szResult,szFilenameWithoutPath);
         strcat(szResult,".lock");
     }
-    if (loglevel & 0x01) printf("__makeLockfileName(%s)...\n", szResult );
+    if (loglevel & 0x01) fprintf(stderr, "__makeLockfileName(%s)...\n", szResult );
     if (loglevel & 0x02) app_tracef("__makeLockfileName(%s)...\n", szResult );
     my_strlcpy(szLockfileName, szResult, cbLockfileName);
     return true;
@@ -94,44 +94,44 @@ void my_waitForFileLock(char *szLockFilePath, char *szFilename, int loglevel)
 
     __makeLockfileName(szLockFilePath, szFilename, szLockFilename, sizeof(szLockFilename), loglevel);
 
-    if (loglevel & 0x01) printf("WaitForFileLock(%s)...\n", szLockFilename );
+    if (loglevel & 0x01) fprintf(stderr, "WaitForFileLock(%s)...\n", szLockFilename );
     if (loglevel & 0x02) app_tracef("WaitForFileLock(%s)...\n", szLockFilename );
     for(;;)
     {
         if (my_fileExists(szLockFilename))
         {
-            if (loglevel & 0x01) printf("my_fileExists(%s). sleep(3)\n", szLockFilename );
+            if (loglevel & 0x01) fprintf(stderr, "my_fileExists(%s). sleep(3)\n", szLockFilename );
             if (loglevel & 0x02) app_tracef("my_fileExists(%s). sleep(3)\n", szLockFilename );
             sleep(3);
             continue;
         }
-        if (loglevel & 0x01) printf("FileDoesNotExist(%s). Creating...\n", szLockFilename );
+        if (loglevel & 0x01) fprintf(stderr, "FileDoesNotExist(%s). Creating...\n", szLockFilename );
         if (loglevel & 0x02) app_tracef("FileDoesNotExist(%s). Creating...\n", szLockFilename );
         fLock = fopen(szLockFilename,"wb");
         if (!fLock)
         {
-            if (loglevel & 0x01) printf("CreateFailed(%s). sleep(3)\n", szLockFilename );
+            if (loglevel & 0x01) fprintf(stderr, "CreateFailed(%s). sleep(3)\n", szLockFilename );
             if (loglevel & 0x02) app_tracef("CreateFailed(%s). sleep(3)\n", szLockFilename );
             sleep(3);
             continue;
         }
-        if (loglevel & 0x01) printf("CreatedOK(%s). Writing...\n", szLockFilename );
+        if (loglevel & 0x01) fprintf(stderr, "CreatedOK(%s). Writing...\n", szLockFilename );
         if (loglevel & 0x02) app_tracef("CreatedOK(%s). Writing...\n", szLockFilename );
         bytesWritten = fwrite("X",1,1,fLock);
         if (bytesWritten != 1)
         {
             fclose(fLock);
-            if (loglevel & 0x01) printf("WriteFailed(%s). sleep(3)\n", szLockFilename );
+            if (loglevel & 0x01) fprintf(stderr, "WriteFailed(%s). sleep(3)\n", szLockFilename );
             if (loglevel & 0x02) app_tracef("WriteFailed(%s). sleep(3)\n", szLockFilename );
             sleep(3);
             continue;
         }
-        if (loglevel & 0x01) printf("WriteOk(%s). Closing...\n", szLockFilename );
+        if (loglevel & 0x01) fprintf(stderr, "WriteOk(%s). Closing...\n", szLockFilename );
         if (loglevel & 0x02) app_tracef("WriteOk(%s). Closing...\n", szLockFilename );
         fclose(fLock);
         break;
     }
-    if (loglevel & 0x01) printf("WaitForFileLock(%s). LockedOk\n", szLockFilename );
+    if (loglevel & 0x01) fprintf(stderr, "WaitForFileLock(%s). LockedOk\n", szLockFilename );
     if (loglevel & 0x02) app_tracef("WaitForFileLock(%s). LockedOk\n", szLockFilename );
 }
 
@@ -141,32 +141,32 @@ void my_releaseFileLock(char *szLockFilePath, char *szFilename, int loglevel)
 
     __makeLockfileName(szLockFilePath, szFilename, szLockFilename, sizeof(szLockFilename), loglevel);
 
-    if (loglevel & 0x01) printf("ReleaseFileLock(%s)...\n", szLockFilename );
+    if (loglevel & 0x01) fprintf(stderr, "ReleaseFileLock(%s)...\n", szLockFilename );
     if (loglevel & 0x02) app_tracef("ReleaseFileLock(%s)...\n", szLockFilename );
     for(;;)
     {
         if (!my_fileExists(szLockFilename))
         {
-            if (loglevel & 0x01) printf("FileDoesNotExist(%s). Returning\n", szLockFilename );
+            if (loglevel & 0x01) fprintf(stderr, "FileDoesNotExist(%s). Returning\n", szLockFilename );
             if (loglevel & 0x02) app_tracef("FileDoesNotExist(%s). Returning\n", szLockFilename );
             return;
         }
-        if (loglevel & 0x01) printf("FileExistsOk(%s). Deleting...\n", szLockFilename );
+        if (loglevel & 0x01) fprintf(stderr, "FileExistsOk(%s). Deleting...\n", szLockFilename );
         if (loglevel & 0x02) app_tracef("FileExistsOk(%s). Deleting...\n", szLockFilename );
         unlink(szLockFilename);
-        if (loglevel & 0x01) printf("DeleteOk(%s). DoubleChecking...\n", szLockFilename );
+        if (loglevel & 0x01) fprintf(stderr, "DeleteOk(%s). DoubleChecking...\n", szLockFilename );
         if (loglevel & 0x02) app_tracef("DeleteOk(%s). DoubleChecking...\n", szLockFilename );
         if (my_fileExists(szLockFilename))
         {
-            if (loglevel & 0x01) printf("DeleteFailed(%s). sleep(3)\n", szLockFilename );
+            if (loglevel & 0x01) fprintf(stderr, "DeleteFailed(%s). sleep(3)\n", szLockFilename );
             if (loglevel & 0x02) app_tracef("DeleteFailed(%s). sleep(3)\n", szLockFilename );
             sleep(3);
             continue;
         }
-        if (loglevel & 0x01) printf("DeleteOk(%s).\n", szLockFilename );
+        if (loglevel & 0x01) fprintf(stderr, "DeleteOk(%s).\n", szLockFilename );
         if (loglevel & 0x02) app_tracef("DeleteOk(%s).\n", szLockFilename );
         break;
     }
-    if (loglevel & 0x01) printf("ReleaseFileLock(%s). UnlockedOk\n", szLockFilename );
+    if (loglevel & 0x01) fprintf(stderr, "ReleaseFileLock(%s). UnlockedOk\n", szLockFilename );
     if (loglevel & 0x02) app_tracef("ReleaseFileLock(%s). UnlockedOk\n", szLockFilename );
 }

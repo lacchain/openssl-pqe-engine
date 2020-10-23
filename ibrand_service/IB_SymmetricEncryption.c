@@ -202,11 +202,11 @@ int testSymmetricEncryption(void)
     size_t cbDecryptedData = 0;
     int saltSize = 32;
 
-    printf("==================================== Decrypt Dummy Data\n");
+    fprintf(stderr, "==================================== Decrypt Dummy Data\n");
     pSessionKey = malloc(16);
     if (pSessionKey == NULL)
     {
-        printf("pSessionKey == NULL\n");
+        fprintf(stderr, "pSessionKey == NULL\n");
         return -1;
     }
     cbSessionKey = 16;
@@ -215,7 +215,7 @@ int testSymmetricEncryption(void)
     pEncryptedData = malloc(1000);
     if (pEncryptedData == NULL)
     {
-        printf("pEncryptedData == NULL\n");
+        fprintf(stderr, "pEncryptedData == NULL\n");
         free(pSessionKey);
         return -1;
     }
@@ -227,7 +227,7 @@ int testSymmetricEncryption(void)
     //dumpToFile("/home/jgilmore/dev/dump_test1_B_decrypted_data.txt", pRawData, cbRawData);
     if (rc != 0)
     {
-        printf("AESDecryptBytes failed with rc=%d\n", rc);
+        fprintf(stderr, "AESDecryptBytes failed with rc=%d\n", rc);
         free(pEncryptedData);
         free(pSessionKey);
         return -1;
@@ -241,7 +241,7 @@ int testSymmetricEncryption(void)
     ///////////////////////////////////////////
     // IronBridge Data
     ///////////////////////////////////////////
-    printf("==================================== Decrypt Sample IronBridge Data BEGIN\n");
+    fprintf(stderr, "==================================== Decrypt Sample IronBridge Data BEGIN\n");
 
     char *pIronBridgeSessionKeyB64 = "bCgEPw9fFD8/Pz8APz8BCQ==";
     size_t cbIronBridgeSessionKeyB64 = strlen(pIronBridgeSessionKeyB64);
@@ -261,7 +261,7 @@ int testSymmetricEncryption(void)
     rc = AESDecryptBytes(pTransmittedData, cbTransmittedData, pIronBridgeSessionKey, cbIronBridgeSessionKey, 16, &pDecryptedData, &cbDecryptedData);
     if (rc)
     {
-        printf("AESDecryptBytes failed with rc=%d\n", rc);
+        fprintf(stderr, "AESDecryptBytes failed with rc=%d\n", rc);
     }
     //dumpToFile("/home/jgilmore/dev/dump_test1_B_decrypted_data.txt", pRawData, cbRawData);
 
@@ -276,18 +276,18 @@ int testSymmetricEncryption(void)
 
     if ((cbDecryptedData != cbIronBridgeOriginalData) || (memcmp(pDecryptedData,pIronBridgeOriginalData,cbIronBridgeOriginalData) != 0))
     {
-        printf("Data Compare Failed\n");
+        fprintf(stderr, "Data Compare Failed\n");
         app_trace_hexall("pIronBridgeOriginalData", pIronBridgeOriginalData, cbIronBridgeOriginalData);
         app_trace_hexall("pDecryptedData         ", pDecryptedData, cbDecryptedData);
     }
     else
     {
-        printf("Data Compare OK\n");
+        fprintf(stderr, "Data Compare OK\n");
     }
     free(pIronBridgeSessionKey);
     free(pIronBridgeOriginalData);
     free(pTransmittedData);
-    printf("==================================== Decrypt Sample IronBridge Data END\n");
+    fprintf(stderr, "==================================== Decrypt Sample IronBridge Data END\n");
 
     app_tracef("=============================================== DONE");
 

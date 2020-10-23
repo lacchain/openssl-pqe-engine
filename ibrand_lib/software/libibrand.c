@@ -80,7 +80,7 @@ bool initIBRand(struct ibrand_context *context, char *serial, bool keccak, bool 
     pIBRand = cfgInitConfig();
     if (!pIBRand)
     {
-        fprintf(stderr, "FATAL: Failed to initialise config. Aborting.");
+        fprintf(stderr, "[ibrand_lib] FATAL: Failed to initialise config. Aborting.\n");
         exit(EXIT_FAILURE);
     }
 #endif // IB_SOURCE_OF_RANDOMNESS

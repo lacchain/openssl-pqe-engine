@@ -21,7 +21,7 @@ static struct rand_pool_info *inmPoolInfo;
 static uint32_t readNumberFromFile(char *fileName) {
     FILE *file = fopen(fileName, "r");
     if(file == NULL) {
-        fprintf(stderr, "Unable to open %s\n", fileName);
+        fprintf(stderr, "[ibrand_lib] FATAL: Unable to open %s\n", fileName);
         exit(1);
     }
     uint32_t value = 0u;
@@ -51,7 +51,7 @@ void inmWriteEntropyStart(uint32_t bufLen, bool debug) {
     }
     inmFillWatermark = readNumberFromFile(FILL_PROC_FILENAME);
     if(debug) {
-        printf("Entropy pool size:%u, fill watermark:%u\n", readNumberFromFile(SIZE_PROC_FILENAME), inmFillWatermark);
+        fprintf(stderr, "Entropy pool size:%u, fill watermark:%u\n", readNumberFromFile(SIZE_PROC_FILENAME), inmFillWatermark);
     }
 }
 
@@ -75,6 +75,6 @@ void inmWriteEntropyToPool(uint8_t *bytes, uint32_t length, uint32_t entropy) {
     inmPoolInfo->entropy_count = entropy;
     inmPoolInfo->buf_size = length;
     memcpy(inmPoolInfo->buf, bytes, length);
-    //printf("Writing %u bytes with %u bits of entropy to /dev/random\n", length, entropy);
+    //fprintf(stderr, "Writing %u bytes with %u bits of entropy to /dev/random\n", length, entropy);
     ioctl(pfd.fd, RNDADDENTROPY, inmPoolInfo);
 }

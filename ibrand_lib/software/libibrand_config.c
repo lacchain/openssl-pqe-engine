@@ -30,7 +30,7 @@ tIB_INSTANCEDATA *cfgInitConfig (void)
     pIBRand = malloc(sizeof(tIB_INSTANCEDATA));
     if (!pIBRand)
     {
-        fprintf(stderr, "FATAL: Failed to allocate memory for local storage. Aborting.");
+        fprintf(stderr, "[ibrand_lib] FATAL: Failed to allocate memory for local storage. Aborting.");
         return NULL;
     }
     memset(pIBRand, 0, sizeof(tIB_INSTANCEDATA));
@@ -44,7 +44,7 @@ tIB_INSTANCEDATA *cfgInitConfig (void)
     }
     if (strlen(pIBRand->szConfigFilename) == 0)
     {
-        fprintf(stderr, "FATAL: Configuration not specified, neither on commandline nor via an environment variable.\n");
+        fprintf(stderr, "[ibrand_lib] FATAL: Configuration not specified, neither on commandline nor via an environment variable.\n");
         free(pIBRand);
         return NULL;
     }
@@ -54,7 +54,7 @@ tIB_INSTANCEDATA *cfgInitConfig (void)
     rc = cfgReadConfig(pIBRand->szConfigFilename, pIBRand);
     if (rc != 0)
     {
-        fprintf(stderr, "FATAL: Configuration error. rc=%d\n", rc);
+        fprintf(stderr, "[ibrand_lib] FATAL: Configuration error. rc=%d\n", rc);
         app_tracef("FATAL: Configuration error. Aborting. rc=%d", rc);
         app_trace_closelog();
         free(pIBRand);
@@ -240,14 +240,14 @@ char *cfgGetValue(char *szEnvVariableWithFilename, char *szKey)
     szConfigfilePath = getenv(szEnvVariableWithFilename);
     if (!szConfigfilePath)
     {
-        printf("ERROR: Cannot find environment variable: %s\n", szEnvVariableWithFilename);
+        fprintf(stderr, "ERROR: Cannot find environment variable: %s\n", szEnvVariableWithFilename);
         return NULL;
     }
 
     fConfFile = fopen(szConfigfilePath, "rt");
     if (fConfFile == NULL)
     {
-        printf("ERROR: Cannot open config file: %s\n", szConfigfilePath);
+        fprintf(stderr, "ERROR: Cannot open config file: %s\n", szConfigfilePath);
         return NULL;
     }
 
@@ -283,14 +283,14 @@ char *cfgGetValue(char *szEnvVariableWithFilename, char *szKey)
         strncpy(key, line, pos-line);
         strncpy(val, pos+1, line+len-offset-pos);
 
-        //printf("INFO: Found Key:Value pair:  %s:%s\n", key, val);
+        //fprintf(stderr, "INFO: Found Key:Value pair:  %s:%s\n", key, val);
 
         if (strcmp(key, szKey) == 0)
         {
             szRetVal = malloc(strlen(val+1));
             if (!szRetVal)
             {
-                printf("ERROR: Out of memory\n");
+                fprintf(stderr, "ERROR: Out of memory\n");
                 fclose(fConfFile);
                 return NULL;
             }
@@ -300,7 +300,7 @@ char *cfgGetValue(char *szEnvVariableWithFilename, char *szKey)
     }
     if (!szRetVal)
     {
-        printf("ERROR: Cannot find config key: %s\n", szKey);
+        fprintf(stderr, "ERROR: Cannot find config key: %s\n", szKey);
     }
     fclose(fConfFile);
     return szRetVal;
