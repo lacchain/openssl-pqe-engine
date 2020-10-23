@@ -28,17 +28,23 @@
 #define dbg_printf(...)
 #endif /* defined(DEBUG) && !defined(NDEBUG) */
 
-#define PRINTLN_INT(token) printf(#token " = %d\r\n", token)
-#define PRINTLN_UINT(token) printf(#token " = %u\r\n", token)
-#define PRINTLN_ZSTR(token) printf(#token " = \"%s\"\r\n", token)
-#define PRINTLN_CHAR(token) printf(#token " = '%c'\r\n", token)
+#define PRINTLN_INT(token) printf(#token " = %d\n", token)
+#define PRINTLN_UINT(token) printf(#token " = %u\n", token)
+#define PRINTLN_ZSTR(token) printf(#token " = \"%s\"\n", token)
+#define PRINTLN_CHAR(token) printf(#token " = '%c'\n", token)
 
 ///////////////////////////////////////////////////////////////////////////////
 // Logging Functions
 ///////////////////////////////////////////////////////////////////////////////
 extern int OUTPUT_TO_CONSOLE_ENABLED;
 extern void   setLogFilename(const char *szPath, const char *szFilename);
-extern char * FormatData ( char *szTarget, const char *szTitle, const unsigned char *pData, int cbData, int bControlCharsOnly );
+typedef enum eOUTPUTFORMAT
+{
+    ALL_IN_PRETTY_HEX = 0,
+    NONDISPLAYABLE_IN_PRETTY_HEX = 1,
+    ALL_IN_BASIC_HEX = 2
+} tOUTPUTFORMAT;
+extern char * FormatData ( char *szTarget, const char *szTitle, const unsigned char *pData, int cbData, tOUTPUTFORMAT fOutputFormat );
 extern void   app_trace_openlog(const char *ident, int logopt, int facility);
 extern void   app_trace_closelog(void);
 extern void   app_trace_hex(const char *pHeader, const char *pData, int cbData);

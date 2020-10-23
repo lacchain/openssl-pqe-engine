@@ -2,7 +2,7 @@ JSON:{
   "GeneralSettings":
   {
     "_1_Verbosity_bitmapped_field":"STATUS=1, CONFIG=2, PROGRESS=4, AUTH=8, DATA=16, CURL=32, SPARE6=64, SPARE7=128",
-    "LOGGING_VERBOSITY":"27"
+    "LOGGING_VERBOSITY":"1"
   },
   "AuthSettings":
   {

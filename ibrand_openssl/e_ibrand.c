@@ -21,6 +21,8 @@
 static const int kEngineOk = 1;
 static const int kEngineFail = 0;
 
+static const int localDebugTracing = false;
+
 ///////////////////
 // Configuration
 ///////////////////
@@ -143,14 +145,18 @@ static int Bytes(unsigned char *buf, int num)
   unsigned char *w_ptr = buf;
   while ((num > 0) && (engine_state.status == kEngineOk))
   {
+    //if (localDebugTracing) fprintf(stderr, "[ibrand_openssl] DEBUG: (Bytes) Requested from RingBuffer: %u\n", num);
+
     size_t bytes_read = RingBufferRead(&engine_state.ring_buffer, num, w_ptr);
     w_ptr += bytes_read;
     num -= bytes_read;
+    //if (localDebugTracing) fprintf(stderr, "[ibrand_openssl] DEBUG: (Bytes) RingBufferRead - AcquiredFromRingBuffer=%lu. StillNeeded=%u\n", bytes_read, num);
 
     if (num > 0)
     {
       // Need more RNG bytes.
       uint8_t rand_buffer[BUFLEN];
+      if (localDebugTracing) fprintf(stderr, "[ibrand_openssl] DEBUG: (Bytes) restock RingBuffer...\n");
       size_t rand_bytes = readData(&engine_state.trng_context, rand_buffer, !kKeccak, kIBRandMultiplier);
       if (engine_state.trng_context.errorFlag)
       {
@@ -165,8 +171,10 @@ static int Bytes(unsigned char *buf, int num)
         engine_state.status = kEngineFail;
         break;
       }
+      if (localDebugTracing) fprintf(stderr, "[ibrand_openssl] DEBUG: (Bytes) RingBuffer restocked with %lu bytes. Try again...\n", (unsigned long)bytes_written);
     }
   }
+  //if (localDebugTracing) fprintf(stderr, "[ibrand_openssl] DEBUG: ----------------------------------------------------------------------------\n");
   return engine_state.status;
 }
 

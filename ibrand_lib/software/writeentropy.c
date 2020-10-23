@@ -41,12 +41,12 @@ void inmWriteEntropyStart(uint32_t bufLen, bool debug) {
     //pfd.fd = open("/dev/random", O_WRONLY);
     pfd.fd = open("/dev/random", O_RDWR);
     if(pfd.fd < 0) {
-        fprintf(stderr, "Unable to open /dev/random\n");
+        fprintf(stderr, "[ibrand_lib] FATAL: Unable to open /dev/random\n");
         exit(1);
     }
     inmPoolInfo = calloc(1, sizeof(struct rand_pool_info) + bufLen);
     if(inmPoolInfo == NULL) {
-        fprintf(stderr, "Unable to allocate memory\n");
+        fprintf(stderr, "[ibrand_lib] FATAL: Unable to allocate memory\n");
         exit(1);
     }
     inmFillWatermark = readNumberFromFile(FILL_PROC_FILENAME);

@@ -27,12 +27,17 @@
 #include "libibrand.h"
 #include "libibrand_get_new_entropy.h"
 
+static const int localDebugTracing = false;
+
 static bool GetNewEntropyFromFile(struct ibrand_context *context, char *szIBDatafilename, char *szStorageLockfilePath, uint8_t *inBuf, size_t inBufLen);
 static bool GetNewEntropyFromSharedMemory(struct ibrand_context *context, uint8_t *inBuf, size_t inBufLen);
 
 bool GetNewEntropy(struct ibrand_context *context, tIB_INSTANCEDATA *pIBRand, uint8_t *inBuf, size_t inBufLen)
 {
     bool rc = false;
+
+    if (localDebugTracing)
+        app_tracef("DEBUG: GetNewEntropy inBufLen: %u", inBufLen);
 
     if (strcmp(pIBRand->cfg.szStorageType, "FILE") == 0)
     {
@@ -78,7 +83,7 @@ static bool GetNewEntropyFromFile(struct ibrand_context *context, char *szIBData
         rewind(fIBDatafile);
         if (filesize < bytesToRead)
         {
-            sprintf(context->tempMessageBuffer200, "ERROR: Insufficient data in IBDatafile (requested=%lu, actual=%lu)\n", bytesToRead, filesize);
+            sprintf(context->tempMessageBuffer200, "ERROR: Insufficient data in IBDatafile (requested=%lu, actual=%lu)\n", (unsigned long)bytesToRead, (unsigned long)filesize);
             context->message = context->tempMessageBuffer200;
             context->errorFlag = true;
             break;
@@ -91,7 +96,7 @@ static bool GetNewEntropyFromFile(struct ibrand_context *context, char *szIBData
         bytesRead = fread(inBuf, sizeof(char), bytesToRead, fIBDatafile);
         if (bytesRead != bytesToRead)
         {
-            sprintf(context->tempMessageBuffer200, "ERROR: Failed to read all requested data from IB DataStore (requested=%lu, delivered=%lu)", bytesToRead, bytesRead);
+            sprintf(context->tempMessageBuffer200, "ERROR: Failed to read all requested data from IB DataStore (requested=%lu, delivered=%lu)", (unsigned long)bytesToRead, (unsigned long)bytesRead);
             context->message = context->tempMessageBuffer200;
             context->errorFlag = true;
             break;

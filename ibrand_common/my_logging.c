@@ -56,9 +56,17 @@ static char *FormatCharHex ( char *szTarget, unsigned char ch )
 // Jonnie, Fri 02-Oct-1998, 16:11:57
 ////////////////////////////////////////////////////////////
 {
-   //sprintf(szTarget+strlen(szTarget),"<0x%2.2X>",ch);
-   sprintf(szTarget+strlen(szTarget),"%2.2X",ch);
+   sprintf(szTarget+strlen(szTarget),"<0x%2.2X>",ch);
    return szTarget;
+}
+
+static char *FormatCharSimpleHex ( char *szTarget, unsigned char ch )
+////////////////////////////////////////////////////////////
+// Jonnie, Fri 02-Oct-1998, 16:11:57
+////////////////////////////////////////////////////////////
+{
+    sprintf(szTarget+strlen(szTarget),"%2.2X",ch);
+    return szTarget;
 }
 
 static char *FormatCharDisplayable ( char *szTarget, unsigned char ch )
@@ -77,7 +85,7 @@ static char *FormatCharDisplayable ( char *szTarget, unsigned char ch )
    return szTarget;
 }
 
-char *FormatData ( char *szTarget, const char *szTitle, const unsigned char *pData, int cbData, int bControlCharsOnly )
+char *FormatData ( char *szTarget, const char *szTitle, const unsigned char *pData, int cbData, tOUTPUTFORMAT fOutputFormat )
 ////////////////////////////////////////////////////////////
 // Jonnie, Thu 01-Oct-1998, 11:20:50
 // Minimum length of szTarget is...
@@ -121,10 +129,19 @@ char *FormatData ( char *szTarget, const char *szTitle, const unsigned char *pDa
       sprintf(szTarget+strlen(szTarget),"%s (len=%d) ==>", szTitle, cbData);
    for (i=0;i<cbData;i++)
    {
-      if (bControlCharsOnly)
-         FormatCharDisplayable ( szTarget, pData[i] );
-      else
-         FormatCharHex ( szTarget, pData[i] );
+      switch (fOutputFormat)
+      {
+         default:
+         case NONDISPLAYABLE_IN_PRETTY_HEX:
+            FormatCharDisplayable ( szTarget, pData[i] );
+            break;
+         case ALL_IN_PRETTY_HEX:
+            FormatCharHex ( szTarget, pData[i] );
+            break;
+         case ALL_IN_BASIC_HEX:
+            FormatCharSimpleHex ( szTarget, pData[i] );
+            break;
+      }
    }
    if (szTitle)
      sprintf(szTarget+strlen(szTarget),"<==");
@@ -154,7 +171,7 @@ void app_trace_hex(const char *pHeader, const char *pData, int cbData)
   pTemp = (char *)malloc(malloc_size);
   if (pTemp)
   {
-    app_trace_zstring(FormatData(pTemp, pHeader, (unsigned char *)pData, cbData, TRUE));
+    app_trace_zstring(FormatData(pTemp, pHeader, (unsigned char *)pData, cbData, ALL_IN_BASIC_HEX));
     app_timer_delay(10);
     free(pTemp);
   }
@@ -195,7 +212,7 @@ void app_trace_hexall(const char *pHeader, const unsigned char *pData, unsigned 
   pTemp = (char *)malloc(malloc_size);
   if (pTemp)
   {
-    app_trace_zstring(FormatData(pTemp, pHeader, (unsigned char *)pData, cbData, FALSE)); // NB FALSE <=========== ALL chars in hex
+    app_trace_zstring(FormatData(pTemp, pHeader, (unsigned char *)pData, cbData, ALL_IN_BASIC_HEX)); // NB FALSE <=========== ALL chars in hex
     app_timer_delay(10);
     free(pTemp);
   }
@@ -209,7 +226,7 @@ void app_trace_hexall(const char *pHeader, const unsigned char *pData, unsigned 
 #endif
     app_trace_zstring_nocrlf(pHeader);
     app_trace_zstring_nocrlf("\", ");
-    sprintf(tempStr, "%d bytes", cbData);
+    sprintf(tempStr, "%u bytes", cbData);
     app_trace_zstring_nocrlf(tempStr);
     app_trace_zstring("<==");
     app_timer_delay(10);

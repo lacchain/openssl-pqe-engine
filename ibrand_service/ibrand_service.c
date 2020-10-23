@@ -35,6 +35,8 @@
 #include "ibrand_service_config.h"
 #include "ibrand_service_datastore.h"
 
+//#define FORCE_ALL_LOGGING_ON
+
 #define SYSTEM_NAME    "FrodoKEM-640"
 #define crypto_kem_keypair            crypto_kem_keypair_Frodo640
 #define crypto_kem_enc                crypto_kem_enc_Frodo640
@@ -77,6 +79,8 @@ typedef enum tagSERVICE_STATE
 #define HTTP_RESP_TOKENEXPIREDORINVALID  (498) // TokenExpiredOrInvalid 498
 #define HTTP_RESP_KEMKEYPAIREXPIRED      (498) // TokenExpiredOrInvalid 498
 #define HTTP_RESP_SHAREDSECRETEXPIRED    (498) // TokenExpiredOrInvalid 498
+
+static const int localDebugTracing = false;
 
 /////////////////////////////////////
 // Forward declarations
@@ -1679,7 +1683,6 @@ int main(int argc, char * argv[])
         exit(EXIT_FAILURE);
     }
 
-//#define FORCE_ALL_LOGGING_ON
 #ifdef FORCE_ALL_LOGGING_ON
     // Leave the standard file descriptors open
 #else // FORCE_ALL_LOGGING_ON
@@ -1723,7 +1726,7 @@ int main(int argc, char * argv[])
     pIBRand->ResultantData.cbData = 0;
     pIBRand->isPaused = false;
 
-    app_tracef("DEBUG: Calling dataStore_Initialise");
+    if (localDebugTracing) app_tracef("DEBUG: Calling dataStore_Initialise");
     if (!dataStore_Initialise(pIBRand))
     {
         // Log the failure
@@ -1736,6 +1739,7 @@ int main(int argc, char * argv[])
     tSERVICESTATE currentState = STATE_START;
     bool continueInMainLoop = true;
     bool printProgressToSyslog = true;
+    bool printSleepMessageToSyslog = true;
     // The Big Loop
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: Enter State machine");
     while (continueInMainLoop)
@@ -1764,7 +1768,7 @@ int main(int argc, char * argv[])
                 rc = ReadOurKemPrivateKey(pIBRand, CRYPTO_SECRETKEYBYTES);
                 if (rc != 0)
                 {
-                    fprintf(stderr, "FATAL: Configuration error. rc=%d\n", rc);
+                    fprintf(stderr, "[ibrand-service] FATAL: Configuration error. rc=%d\n", rc);
                     app_tracef("FATAL: Configuration error. Aborting. rc=%d", rc);
                     app_trace_closelog();
                     free(pIBRand);
@@ -1776,7 +1780,7 @@ int main(int argc, char * argv[])
                 // rc = ReadTheirSigningPublicKey(pIBRand, CRYPTO_PUBLICKEYBYTES);
                 // if (rc != 0)
                 // {
-                //     fprintf(stderr, "FATAL: Configuration error. rc=%d\n", rc);
+                //     fprintf(stderr, "[ibrand-service] FATAL: Configuration error. rc=%d\n", rc);
                 //     app_tracef("FATAL: Configuration error. Aborting. rc=%d", rc);
                 //     app_trace_closelog();
                 //     free(pIBRand);
@@ -1964,7 +1968,7 @@ int main(int argc, char * argv[])
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: STATE_CHECKIFRANDOMNESSISREQUIRED");
                 // Hysteresis
                 pIBRand->datastoreFilesize = dataStore_GetCurrentWaterLevel(pIBRand);
-                //app_tracef("DEBUG: Filesize=%d", pIBRand->datastoreFilesize);
+                //if (localDebugTracing) app_tracef("DEBUG: Filesize=%d", pIBRand->datastoreFilesize);
                 if (pIBRand->datastoreFilesize < 0) // File not found
                 {
                     app_tracef("INFO: dataStore not found. Starting retrieval.", pIBRand->cfg.retrievalRetryDelay);
@@ -1997,16 +2001,23 @@ int main(int argc, char * argv[])
                     // Fall through to sleep
                 }
                 // Wait for a short while, and then try again
-                if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
-                    app_tracef("INFO: Idle. Sleeping for %d seconds", pIBRand->cfg.idleDelay);
+                if (printSleepMessageToSyslog)
+                {
+                    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
+                    {
+                        app_tracef("INFO: Idle. Sleeping. Checking water level every %d seconds", pIBRand->cfg.idleDelay);
+                    }
+                    printSleepMessageToSyslog = false;
+                }
                 sleep(pIBRand->cfg.idleDelay);
-                printProgressToSyslog = true;
+                printProgressToSyslog = false;
                 currentState = STATE_CHECKIFRANDOMNESSISREQUIRED;
                 break;
 
             case STATE_GETSOMERANDOMNESS:
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: STATE_GETSOMERANDOMNESS");
                 printProgressToSyslog = true;
+                printSleepMessageToSyslog = true;
                 // Get SharedSecret
                 if (pIBRand->symmetricSharedSecret.pData == NULL)
                 {

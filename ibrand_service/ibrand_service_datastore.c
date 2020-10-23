@@ -28,6 +28,7 @@
 #include "ibrand_service_shmem.h"
 #include "ibrand_service_datastore.h"
 
+static const int localDebugTracing = false;
 
 long dataStore_GetCurrentWaterLevel(tIB_INSTANCEDATA *pIBRand)
 {
@@ -36,13 +37,13 @@ long dataStore_GetCurrentWaterLevel(tIB_INSTANCEDATA *pIBRand)
     if (strcmp(pIBRand->cfg.szStorageType,"FILE")==0)
     {
         currentWaterLevel = my_getFilesize(pIBRand->cfg.szStorageFilename);
-        //app_tracef("DEBUG: Filename=\"%s\", currentWaterLevel=%d", pIBRand->szStorageFilename, currentWaterLevel);
+        //if (localDebugTracing) app_tracef("DEBUG: Filename=\"%s\", currentWaterLevel=%d", pIBRand->szStorageFilename, currentWaterLevel);
     }
     else if (strcmp(pIBRand->cfg.szStorageType,"SHMEM")==0)
     {
 
         currentWaterLevel = ShMem_GetCurrentWaterLevel();
-        //app_tracef("DEBUG: Filename=\"%s\", currentWaterLevel=%d", pIBRand->szStorageFilename, currentWaterLevel);
+        //if (localDebugTracing) app_tracef("DEBUG: Filename=\"%s\", currentWaterLevel=%d", pIBRand->szStorageFilename, currentWaterLevel);
     }
 
     return currentWaterLevel;
@@ -55,13 +56,13 @@ long dataStore_GetAvailableStorage(tIB_INSTANCEDATA *pIBRand)
     if (strcmp(pIBRand->cfg.szStorageType,"FILE")==0)
     {
         availableStorage = pIBRand->cfg.storageHighWaterMark - my_getFilesize(pIBRand->cfg.szStorageFilename);
-        //app_tracef("DEBUG: Filename=\"%s\", currentWaterLevel=%d", pIBRand->szStorageFilename, availableStorage);
+        //if (localDebugTracing) app_tracef("DEBUG: Filename=\"%s\", currentWaterLevel=%d", pIBRand->szStorageFilename, availableStorage);
     }
     else if (strcmp(pIBRand->cfg.szStorageType,"SHMEM")==0)
     {
 
         availableStorage = ShMem_GetAvailableStorage();
-        //app_tracef("DEBUG: Filename=\"%s\", currentWaterLevel=%d", pIBRand->szStorageFilename, availableStorage);
+        //if (localDebugTracing) app_tracef("DEBUG: Filename=\"%s\", currentWaterLevel=%d", pIBRand->szStorageFilename, availableStorage);
     }
 
     return availableStorage;
@@ -80,7 +81,7 @@ bool dataStore_Initialise(tIB_INSTANCEDATA *pIBRand)
         //ShMem_SetStorageSize     (pIBRand->cfg.shMemStorageSize    );  // long      // (100*1024)
         //ShMem_SetSemaphoreName   (pIBRand->cfg.shMemSemaphoreName  ); // char[16]  // "sem_ibrand01"
 
-        app_tracef("DEBUG: Calling ShMem_CreateDataStore");
+        if (localDebugTracing) app_tracef("DEBUG: Calling ShMem_CreateDataStore");
         if (!ShMem_CreateDataStore())
         {
            return false;
@@ -95,7 +96,7 @@ static unsigned int __dataStore_AppendToFile(char *pData,
                                     char *szStorageLockfilePath,
                                     char *szStorageDataFormat)
 {
-    //fprintf(stdout, "%u:%s\n", pIBRand->ResultantData.cbData, pIBRand->ResultantData.pData);
+    //if (localDebugTracing) fprintf(stdout, "[ibrand-service] %u:%s\n", pIBRand->ResultantData.cbData, pIBRand->ResultantData.pData);
     FILE *f;
     unsigned int bytesWritten1 = 0;
     unsigned int bytesWritten2 = 0;

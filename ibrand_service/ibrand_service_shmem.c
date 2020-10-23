@@ -52,7 +52,7 @@ static char *                __shMemBackingFilename    = "shmem_ibrand01"; // e.
 static unsigned long         __shMemSizeInBytes        = sizeof(tSHMEMHEADER) + (100*1024);
 static char *                __shMemSemaphoreName      = "sem_ibrand01";
 
-static const int localShMemTracing = true;
+static const int localShMemTracing = false;
 
 // Forward declarations
 static bool __ShMem_CheckIntegrity(const char *memptr);
@@ -271,7 +271,9 @@ static bool __ShMem_DoActivity(tSHMEM_ACTIVITY whichActivity, void *pUserData)
         }
 
         // Do what we came to do...
+        if (localShMemTracing) app_tracef("DEBUG: Calling shMemCallBackFn(memptr=%p, pUserData=%p)", memptr, pUserData);
         shMemCallBackFn(memptr, pUserData);
+        if (localShMemTracing) app_tracef("DEBUG: Back from shMemCallBackFn(memptr=%p, pUserData=%p)", memptr, pUserData);
 
         if (checkIntegrity == AFTER_CALLBACK || checkIntegrity == BEFORE_AND_AFTER_CALLBACK)
         {
@@ -374,7 +376,7 @@ static void __ShMem_PrintStats(const char *memptr, tSHMEM_ACTIVITY currentActivi
         //            ACTIVITY_NAMES[currentActivity], memptr, __shMemBackingFilename,
         //            __shMemSemaphoreName, pShMemHeader->signature,
         //            pShMemHeader->version,  pShMemHeader->tankSize, pShMemHeader->waterLevel);
-        app_tracef("DEBUG: ShMem Stats %s [Sig=0x%4.4X, Ver=0x%4.4X, Siz=%lu, Lev=%ld]",
+        if (localShMemTracing) app_tracef("DEBUG: ShMem Stats %s [Sig=0x%4.4X, Ver=0x%4.4X, Siz=%lu, Lev=%ld]",
                    ACTIVITY_NAMES[currentActivity],
                    pShMemHeader->signature, pShMemHeader->version,
                    pShMemHeader->tankSize, pShMemHeader->waterLevel);
@@ -474,8 +476,14 @@ static void shMemCallBackFn_GetInfo(char * memptr, void *userptr)
 
     if (!pShCopyOfMemHeader || !pShMemHeader)
     {
-        app_tracef("ERROR: shMemCallBackFn_GetInfo invalid ptr (%p, %p)", pShCopyOfMemHeader, pShMemHeader);
+        app_tracef("ERROR: shMemCallBackFn_GetInfo invalid ptr (%p, %p)", pShMemHeader, pShCopyOfMemHeader);
         return;
+    }
+
+    if (localShMemTracing)
+    {
+        app_tracef("DEBUG: pShMemHeader[%p,%lu]", pShMemHeader, sizeof(tSHMEMHEADER));
+        app_trace_hex("ShMemHeader", (const char *)pShMemHeader, sizeof(tSHMEMHEADER));
     }
 
     memcpy(pShCopyOfMemHeader, pShMemHeader, sizeof(tSHMEMHEADER));
@@ -561,12 +569,14 @@ int32_t ShMem_RetrieveFromDataStore(char *pData, size_t cbData)
     retrievedData.pData = pData;
     retrievedData.cbData = cbData;
 
+    if (localShMemTracing) app_tracef("DEBUG: ShMem_RetrieveFromDataStore Requested: %u", cbData);
     bool success = __ShMem_DoActivity(SHMEM_RETRIEVE, (void *)(&retrievedData));
     if (!success)
     {
         return -1;
     }
     // Return bytesRead (and removed)
+    if (localShMemTracing) app_tracef("DEBUG: ShMem_RetrieveFromDataStore Returning: %u", retrievedData.cbData);
     return retrievedData.cbData;
 }
 

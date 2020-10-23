@@ -469,7 +469,14 @@ static JSONObject * _parseJSON(const char * str, int *pOffset)
 
             // Store string as the key part of the keyvalue pair
             JSONPair tempPtr = obj->pairs[obj->count - 1];
+
             tempPtr.key = my_newWithSize(char, i + 1,MLOG_PURPOSE_NEWKEY);
+            if (tempPtr.key == NULL)
+            {
+                fprintf(stderr, "ERROR: Out of memory for tempPtr.key\n");
+                while(true);
+                return NULL;
+            }
             memcpy(tempPtr.key, str, i * sizeof(char));
             tempPtr.key[i] = '\0';
             dbg_stmnt_hv2(fprintf(stderr, "DEBUG: (heap:malloc) newkey size=(%2d+1) ptr=%p key=\"%s\"\n",i,tempPtr.key,tempPtr.key));
@@ -518,6 +525,12 @@ static JSONObject * _parseJSON(const char * str, int *pOffset)
                 prevToken = JSON_STARTOFOBJECT;
 
                 tempPtr.value = my_new(JSONValue,MLOG_PURPOSE_NEWCHILDOBJECT);
+                if (tempPtr.value == NULL)
+                {
+                    fprintf(stderr, "ERROR: Out of memory for tempPtr.value\n");
+                    while(true);
+                    return NULL;
+                }
                 dbg_stmnt_hv2(fprintf(stderr, "DEBUG: (heap:malloc) childobj size=(%2lu) ptr=%p\n", (unsigned long)sizeof(JSONValue), tempPtr.value));
                 tempPtr.type = JSON_OBJECT;
                 // Parse the object recursively

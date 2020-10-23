@@ -56,7 +56,7 @@ int AESDecryptBytes(uint8_t *pEncryptedData, size_t cbEncryptedData, uint8_t *pS
     if (ppDecryptedData)
         *ppDecryptedData = NULL;
 
-    app_tracef("INFO: SRNG Decrypting %d bytes",cbEncryptedData);
+    //app_tracef("INFO: SRNG Decrypting %d bytes",cbEncryptedData);
     //app_tracef("INFO: [SRNGDecrypt] cbEncryptedData=%d",cbEncryptedData);
     //app_tracef("INFO: [SRNGDecrypt] cbSharedSecret  =%d",cbSharedSecret);
     //app_tracef("INFO: [SRNGDecrypt] saltSize        =%d",saltSize);
