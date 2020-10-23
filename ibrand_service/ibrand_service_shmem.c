@@ -74,7 +74,7 @@ static bool __ShMem_DoActivity(tSHMEM_ACTIVITY whichActivity, void *pUserData)
     int sem_open_oflags;
     int ReadOnly;
     enum {BEFORE_CALLBACK=0, AFTER_CALLBACK=1, BEFORE_AND_AFTER_CALLBACK=2} checkIntegrity;
-    void (*shMemCallBackFn)(char * memptr, void *userptr);
+    void (*shMemCallBackFn)(char *memptr, void *userptr);
     int timeToSleep;
 
     switch (whichActivity)

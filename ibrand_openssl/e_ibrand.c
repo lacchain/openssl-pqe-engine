@@ -102,7 +102,7 @@ static size_t RingBufferWrite(RingBuffer *buffer, size_t num_bytes, const uint8_
     num_bytes -= bytes_write;
   }
 
-  size_t bytes_write = MIN(num_bytes, kRingBufferSize - (buffer->w_ptr - buffer->r_ptr));
+  size_t bytes_write = MIN(num_bytes, (size_t)(kRingBufferSize - (buffer->w_ptr - buffer->r_ptr)));
   memcpy(buffer->w_ptr, input, bytes_write);
   buffer->w_ptr += bytes_write;
   if ((buffer->w_ptr - buffer->buffer) == sizeof(buffer->buffer))

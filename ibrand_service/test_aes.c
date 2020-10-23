@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
     ///////////////////////////////////////////
     fprintf(stderr, "==================================== RFC2898DeriveBytes (PBKDF2) KAT Tests\n");
     rc = PBKDF2_KAT_verification();
-    if (rc == false)
+    if (rc == FALSE)
     {
         fprintf(stderr, "PBKDF2_KAT_verification failed\n");
         return -1;

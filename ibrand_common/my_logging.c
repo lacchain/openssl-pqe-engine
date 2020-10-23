@@ -393,11 +393,16 @@ int app_tracef(const char *formatStr, ...)
 
     pBuf = malloc(SPRINTF_TRACE_BUFSIZE);
     if (!pBuf)
+    {
         return -1;
+    }
     va_start(va, formatStr);
     rc = vsnprintf(pBuf, SPRINTF_TRACE_BUFSIZE, formatStr, va);
     if (rc == -1 || rc >= SPRINTF_TRACE_BUFSIZE)
+    {
+        free(pBuf);
         return -1;
+    }
     app_trace_zstring(pBuf);
     va_end(va);
     free(pBuf);

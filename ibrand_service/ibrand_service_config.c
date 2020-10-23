@@ -195,7 +195,7 @@ int ReadConfig(char *szConfigFilename, tIB_CONFIGDATA *pIBConfig, size_t secretK
 ////////////////////////////////////////////////////////////////////////////////
 static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfig)
 {
-    JSONObject *json2 = NULL;
+    JSONObject *json2;
     const int localConfigTracing = false;
 
     json2 = my_parseJSON(szJsonConfig);
@@ -472,7 +472,7 @@ void PrintConfig(tIB_CONFIGDATA *pIBConfig)
 
 static bool __ParseJsonOOBData(const char *szJsonString, tIB_OOBDATA *pOobData)
 {
-    JSONObject *json2 = NULL;
+    JSONObject *json2;
     const int localConfigTracing = false;
 
     json2 = my_parseJSON(szJsonString);

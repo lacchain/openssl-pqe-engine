@@ -659,6 +659,8 @@ static JSONObject * _parseJSON(const char * str, int *pOffset)
         return NULL;
     }
     prevToken = JSON_ENDOFTEXT; // Arbitrary character to indicate the End Of Text
+    UNUSED(prevToken);
+
     // JG: When does this happen??
     // JG: Premature end of input string???
     return obj;

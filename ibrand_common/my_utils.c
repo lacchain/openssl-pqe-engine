@@ -48,14 +48,13 @@ char *my_strrev(char *string)
 {
   char *start = string;
   char *left = string;
-  char ch;
 
   while (*string++); // find end of string
 
   string -= 2;
   while (left < string)
   {
-    ch = *left;
+    char ch = *left;
     *left++ = *string;
     *string-- = ch;
   }
@@ -64,7 +63,7 @@ char *my_strrev(char *string)
 
 void my_itoa(int data, char *dst, char non)
 {
-  non = non; // Avoid compiler warning
+  UNUSED_PARAM(non); // Avoid compiler warning
   sprintf(dst,"%d",data);
 }
 
@@ -108,11 +107,11 @@ void my_translateCharactersInString(char *szString,char *szOldChars,char *szNewC
 
     // Debugging/Testing
     if ((szOldChars[0] == '.') && (szString[i] == ','))
-      szString[i] = szString[i];
+      (void)szString[i]; // Dummy statement
 
     // Debugging/Testing
     if (szString[i] == '$')
-      szString[i] = szString[i];
+      (void)szString[i]; // Dummy statement
 
     for (j=0; j<TranslationCharsLen; j++)
     {
@@ -176,11 +175,9 @@ char *my_trimLeadingWhiteSpace(char *szStr)
 
 char *my_removeTrailingString(char *szStr, char *szStrToRemove)
 {
-  char *p;
-
   if (szStr && strlen(szStr) && szStrToRemove && strlen(szStrToRemove))
   {
-    p = strstr(szStr,szStrToRemove);
+    char *p = strstr(szStr,szStrToRemove);
     if (p && (p==(szStr+strlen(szStr)-strlen(szStrToRemove))))
     {
        *p = 0;
@@ -191,11 +188,9 @@ char *my_removeTrailingString(char *szStr, char *szStrToRemove)
 
 char *my_removeTrailingStringi(char *szStr, char *szStrToRemove)
 {
-  char *p;
-
   if (szStr && strlen(szStr) && szStrToRemove && strlen(szStrToRemove))
   {
-    p = my_strstri(szStr,szStrToRemove);
+    char *p = my_strstri(szStr,szStrToRemove);
     if (p && (p==(szStr+strlen(szStr)-strlen(szStrToRemove))))
     {
        *p = 0;

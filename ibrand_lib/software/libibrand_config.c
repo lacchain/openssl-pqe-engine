@@ -20,7 +20,7 @@
 
 tIB_INSTANCEDATA *cfgInitConfig (void)
 {
-    tIB_INSTANCEDATA *pIBRand = NULL;
+    tIB_INSTANCEDATA *pIBRand;
 
 #if (USE_CONFIG==CONFIG_JSON)
     int rc;
@@ -60,10 +60,11 @@ tIB_INSTANCEDATA *cfgInitConfig (void)
         free(pIBRand);
         return NULL;
     }
-    // if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CONFIG))
-    // {
-    //     cfgPrintConfig(pIBRand);
-    // }
+
+    //if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CONFIG))
+    //{
+    //    cfgPrintConfig(pIBRand);
+    //}
 
     //ShMem_SetBackingFilename (pIBRand->cfg.shMemBackingFilename); // char[128] // "shmem_ibrand01" e.g. /dev/shm/shmem_ibrand01
     //ShMem_SetStorageSize     (pIBRand->cfg.shMemStorageSize    ); // long      // (100*1024)
@@ -80,7 +81,7 @@ tIB_INSTANCEDATA *cfgInitConfig (void)
 ////////////////////////////////////////////////////////////////////////////////
 static bool __ParseJsonConfig(const char *szJsonConfig, tIB_INSTANCEDATA *pIBRand)
 {
-    JSONObject *json2 = NULL;
+    JSONObject *json2;
     const int localConfigTracing = false;
 
     json2 = my_parseJSON(szJsonConfig);

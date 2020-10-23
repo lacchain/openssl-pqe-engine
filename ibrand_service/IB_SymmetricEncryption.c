@@ -143,8 +143,11 @@ int AESDecryptBytes(uint8_t *pEncryptedData, size_t cbEncryptedData, uint8_t *pS
     }
     AES_cbc_encrypt(pCipherText, pRawData, cbCipherText, &opensslAesKey, (unsigned char *)pIV, AES_DECRYPT);
 
-    *ppDecryptedData = pRawData;  // Returns a malloc'd buffer. It is the responsibility of the caller to free this when no longer needed
-    *pcbDecryptedData = cbCipherText;
+    if (ppDecryptedData && pcbDecryptedData)
+    {
+        *ppDecryptedData = pRawData;  // Returns a malloc'd buffer. It is the responsibility of the caller to free this when no longer needed
+        *pcbDecryptedData = cbCipherText;
+    }
 
     retval = 0;
 
@@ -194,7 +197,7 @@ int testSymmetricEncryption(void)
     // Dummy Data
     ///////////////////////////////////////////
 
-    uint8_t *pSessionKey = NULL;
+    uint8_t *pSessionKey;
     size_t cbSessionKey = 0;
     uint8_t *pEncryptedData = NULL;
     size_t cbEncryptedData = 0;

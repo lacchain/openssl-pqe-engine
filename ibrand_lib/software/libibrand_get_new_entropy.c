@@ -56,9 +56,7 @@ static bool GetNewEntropyFromFile(struct ibrand_context *context, char *szIBData
 {
     FILE * fIBDatafile = NULL;
     char * szLockfilePath = szStorageLockfilePath; // "/tmp";
-    size_t filesize;
     size_t bytesToRead;
-    size_t bytesRead;
     bool   success = false;
 
     bytesToRead = inBufLen;
@@ -67,6 +65,9 @@ static bool GetNewEntropyFromFile(struct ibrand_context *context, char *szIBData
 
     for(;;) // Not a real loop - just an exitable code block
     {
+        size_t bytesRead;
+        size_t filesize;
+
         // Open the file
         fIBDatafile = fopen(szIBDatafilename,"rb");
         if (fIBDatafile == NULL)
