@@ -20,9 +20,8 @@
 
 tIB_INSTANCEDATA *cfgInitConfig (void)
 {
-    tIB_INSTANCEDATA *pIBRand = NULL;
+    tIB_INSTANCEDATA *pIBRand;
 
-#if (USE_CONFIG==CONFIG_JSON)
     int rc;
     // =========================================================================
     // Create instance storage
@@ -30,7 +29,7 @@ tIB_INSTANCEDATA *cfgInitConfig (void)
     pIBRand = malloc(sizeof(tIB_INSTANCEDATA));
     if (!pIBRand)
     {
-        fprintf(stderr, "FATAL: Failed to allocate memory for local storage. Aborting.");
+        fprintf(stderr, "[ibrand_lib] FATAL: Failed to allocate memory for local storage. Aborting.");
         return NULL;
     }
     memset(pIBRand, 0, sizeof(tIB_INSTANCEDATA));
@@ -44,7 +43,7 @@ tIB_INSTANCEDATA *cfgInitConfig (void)
     }
     if (strlen(pIBRand->szConfigFilename) == 0)
     {
-        fprintf(stderr, "FATAL: Configuration not specified, neither on commandline nor via an environment variable.\n");
+        fprintf(stderr, "[ibrand_lib] FATAL: Configuration not specified, neither on commandline nor via an environment variable.\n");
         free(pIBRand);
         return NULL;
     }
@@ -54,33 +53,32 @@ tIB_INSTANCEDATA *cfgInitConfig (void)
     rc = cfgReadConfig(pIBRand->szConfigFilename, pIBRand);
     if (rc != 0)
     {
-        fprintf(stderr, "FATAL: Configuration error. rc=%d\n", rc);
+        fprintf(stderr, "[ibrand_lib] FATAL: Configuration error. rc=%d\n", rc);
         app_tracef("FATAL: Configuration error. Aborting. rc=%d", rc);
         app_trace_closelog();
         free(pIBRand);
         return NULL;
     }
-    // if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CONFIG))
-    // {
-    //     cfgPrintConfig(pIBRand);
-    // }
+
+    //if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CONFIG))
+    //{
+    //    cfgPrintConfig(pIBRand);
+    //}
 
     //ShMem_SetBackingFilename (pIBRand->cfg.shMemBackingFilename); // char[128] // "shmem_ibrand01" e.g. /dev/shm/shmem_ibrand01
     //ShMem_SetStorageSize     (pIBRand->cfg.shMemStorageSize    ); // long      // (100*1024)
     //ShMem_SetSemaphoreName   (pIBRand->cfg.shMemSemaphoreName  ); // char[16]  // "sem_ibrand01"
 
-#endif // (USE_CONFIG==CONFIG_JSON)
     return pIBRand;
 }
 
 
-#if (USE_CONFIG==CONFIG_JSON)
 ////////////////////////////////////////////////////////////////////////////////
 // Config Top Level Functions
 ////////////////////////////////////////////////////////////////////////////////
 static bool __ParseJsonConfig(const char *szJsonConfig, tIB_INSTANCEDATA *pIBRand)
 {
-    JSONObject *json2 = NULL;
+    JSONObject *json2;
     const int localConfigTracing = false;
 
     json2 = my_parseJSON(szJsonConfig);
@@ -93,7 +91,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_INSTANCEDATA *pIBRan
     for (int ii=0; ii<json2->count; ii++)
     {
         if (localConfigTracing)
-            app_tracef("DEBUG: Found json item[%d] %s=%s\r\n", ii, json2->pairs[ii].key, (json2->pairs[ii].type == JSON_STRING)?(json2->pairs[ii].value->stringValue):"[JSON object]");
+            app_tracef("DEBUG: Found json item[%d] %s=%s\n", ii, json2->pairs[ii].key, (json2->pairs[ii].type == JSON_STRING)?(json2->pairs[ii].value->stringValue):"[JSON object]");
 
         if (strcmp(json2->pairs[ii].key,"AuthSettings") == 0 && json2->pairs[ii].type == JSON_OBJECT)
         {
@@ -102,7 +100,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_INSTANCEDATA *pIBRan
             for (int jj=0; jj<childJson->count; jj++)
             {
                 if (localConfigTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\r\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
+                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
                 {
@@ -117,7 +115,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_INSTANCEDATA *pIBRan
             for (int jj=0; jj<childJson->count; jj++)
             {
                 if (localConfigTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\r\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
+                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
                 {
@@ -132,7 +130,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_INSTANCEDATA *pIBRan
             for (int jj=0; jj<childJson->count; jj++)
             {
                 if (localConfigTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\r\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
+                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
                 {
@@ -184,7 +182,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_INSTANCEDATA *pIBRan
             for (int jj=0; jj<childJson->count; jj++)
             {
                 if (localConfigTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\r\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
+                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
                 {
@@ -226,7 +224,7 @@ int cfgReadConfig(char *szConfigFilename, tIB_INSTANCEDATA *pIBRand)
 
     return 0;
 }
-#endif // USE_CONFIG
+
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -240,14 +238,14 @@ char *cfgGetValue(char *szEnvVariableWithFilename, char *szKey)
     szConfigfilePath = getenv(szEnvVariableWithFilename);
     if (!szConfigfilePath)
     {
-        printf("ERROR: Cannot find environment variable: %s\n", szEnvVariableWithFilename);
+        fprintf(stderr, "ERROR: Cannot find environment variable: %s\n", szEnvVariableWithFilename);
         return NULL;
     }
 
     fConfFile = fopen(szConfigfilePath, "rt");
     if (fConfFile == NULL)
     {
-        printf("ERROR: Cannot open config file: %s\n", szConfigfilePath);
+        fprintf(stderr, "ERROR: Cannot open config file: %s\n", szConfigfilePath);
         return NULL;
     }
 
@@ -283,14 +281,14 @@ char *cfgGetValue(char *szEnvVariableWithFilename, char *szKey)
         strncpy(key, line, pos-line);
         strncpy(val, pos+1, line+len-offset-pos);
 
-        //printf("INFO: Found Key:Value pair:  %s:%s\n", key, val);
+        //fprintf(stderr, "INFO: Found Key:Value pair:  %s:%s\n", key, val);
 
         if (strcmp(key, szKey) == 0)
         {
             szRetVal = malloc(strlen(val+1));
             if (!szRetVal)
             {
-                printf("ERROR: Out of memory\n");
+                fprintf(stderr, "ERROR: Out of memory\n");
                 fclose(fConfFile);
                 return NULL;
             }
@@ -300,7 +298,7 @@ char *cfgGetValue(char *szEnvVariableWithFilename, char *szKey)
     }
     if (!szRetVal)
     {
-        printf("ERROR: Cannot find config key: %s\n", szKey);
+        fprintf(stderr, "ERROR: Cannot find config key: %s\n", szKey);
     }
     fclose(fConfFile);
     return szRetVal;
@@ -309,28 +307,7 @@ char *cfgGetValue(char *szEnvVariableWithFilename, char *szKey)
 
 void cfgGetDatafilename(char *pIBDatafilename, size_t cbIBDatafilename, tIB_INSTANCEDATA *pIBRand)
 {
-#if (USE_CONFIG==CONFIG_HARDCODED)
-    my_strlcpy(szIBDatafilename, "/var/lib/ibrand/ibrand_data.bin", cbIBDatafilename);
-#elif (USE_CONFIG==CONFIG_SIMPLE)
-    // STORAGETYPE=FILE
-    // STORAGEFILENAME=/var/lib/ibrand/ibrand_data.bin
-    // STORAGEHIGHWATERMARK=1038336
-    // STORAGELOWWATERMARK=102400
-
-    char *mallocedStorageFilename = cfgGetValue("IBRAND_CONF","STORAGEFILENAME");
-    if (!mallocedStorageFilename)
-    {
-        my_strlcpy(pIBDatafilename, "/var/lib/ibrand/ibrand_data.bin", cbIBDatafilename);
-        return;
-    }
-    my_strlcpy(pIBDatafilename, mallocedStorageFilename, cbIBDatafilename);
-    free(mallocedStorageFilename);
-
-#elif (USE_CONFIG==CONFIG_JSON)
     my_strlcpy(pIBDatafilename, pIBRand->cfg.szStorageFilename, cbIBDatafilename);
-#else
-    my_strlcpy(pIBDatafilename, "/var/lib/ibrand/ibrand_data.bin", cbIBDatafilename);
-#endif // USE_CONFIG
 }
 
 void cfgPrintConfig(tIB_INSTANCEDATA *pIBRand)

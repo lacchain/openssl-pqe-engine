@@ -30,10 +30,14 @@
 
 #include "../PQCrypto-LWEKE/src/api_frodo640.h"
 
+#include "my_utils.h"
+
 #include "ibrand_service.h"
 #include "ibrand_service_utils.h"
 #include "ibrand_service_config.h"
 #include "ibrand_service_datastore.h"
+
+//#define FORCE_ALL_LOGGING_ON
 
 #define SYSTEM_NAME    "FrodoKEM-640"
 #define crypto_kem_keypair            crypto_kem_keypair_Frodo640
@@ -52,8 +56,6 @@
 #if LIBCURL_VERSION_NUM < 0x070c03
 #error "ERROR - Requires libcurl of 7.12.3 or greater"
 #endif
-
-#define RUN_AS_DAEMON
 
 typedef enum tagSERVICE_STATE
 {
@@ -78,12 +80,58 @@ typedef enum tagSERVICE_STATE
 #define HTTP_RESP_KEMKEYPAIREXPIRED      (498) // TokenExpiredOrInvalid 498
 #define HTTP_RESP_SHAREDSECRETEXPIRED    (498) // TokenExpiredOrInvalid 498
 
+
+//#define KAT_KNOWN_ANSWER_TESTING
+
+static const int localDebugTracing = false;
+
 /////////////////////////////////////
 // Forward declarations
 /////////////////////////////////////
 static int DecryptAndStoreKemSecretKey(tIB_INSTANCEDATA *pIBRand);
 static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand);
 static int ImportKemSecretKeyFromClientSetupOOBFile(tIB_INSTANCEDATA *pIBRand);
+
+#ifdef KAT_KNOWN_ANSWER_TESTING
+///////////////////////////////////////////////////////
+// KAT - Known Answer Test
+// For info: A 16 byte shared secret of "CambridgeQuantum" translates to "Q2FtYnJpZGdlUXVhbnR1bQ==" in Base64.
+///////////////////////////////////////////////////////
+static void KatDataAppend(tLSTRING *pDest, int destOffset, int numBytesToAppend)
+{
+    //const char *pSrc = "The Quick Brown Fox Jumped Over The Lazy Dog. ";
+    const char *pSrc = "CambridgeQuantumComputingLimited"; // Convenient 32 bytes
+    //const char *pSrc = "UpcomingMildAutumnTimeBirdcageQt"; // Anagram of the above
+    size_t cbSrc = strlen(pSrc);
+
+    while (numBytesToAppend > 0)
+    {
+        int bytesToCopy = my_minimum(cbSrc, numBytesToAppend);
+        memcpy(pDest->pData + destOffset, pSrc, bytesToCopy);
+        pDest->cbData += bytesToCopy;
+        numBytesToAppend -= bytesToCopy;
+    }
+}
+
+static bool KatDataVerify(tLSTRING *pActualData, size_t expectedLength, char *szTitle)
+{
+    tLSTRING expectedData;
+    expectedData.pData = malloc(expectedLength);
+    expectedData.cbData = 0;
+    KatDataAppend(&expectedData, 0, expectedLength);
+    if (pActualData->cbData != expectedLength)
+    {
+        app_tracef("WARNING: PassthroughTesting failed. %s length mismatch: actual:%u vs expected:%u", szTitle, pActualData->cbData, expectedLength);
+        return false;
+    }
+    if (memcmp(pActualData->pData, expectedData.pData, expectedLength) != 0)
+    {
+        app_tracef("WARNING: PassthroughTesting failed. %s content mismatch", szTitle);
+        return false;
+    }
+    return true;
+}
+#endif // KAT_KNOWN_ANSWER_TESTING
 
 //-----------------------------------------------------------------------
 // ReceiveDataHandler_login
@@ -395,7 +443,7 @@ static int DecryptAndStoreKemSecretKey(tIB_INSTANCEDATA *pIBRand)
     rc = AESDecryptBytes(rawEncryptedKey, decodeSize, (uint8_t *)pIBRand->symmetricSharedSecret.pData, pIBRand->symmetricSharedSecret.cbData, 32 /*saltsize*/, &pDecryptedData, &cbDecryptedData);
     if (rc)
     {
-        printf("AESDecryptBytes failed with rc=%d\n", rc);
+        fprintf(stderr, "AESDecryptBytes failed with rc=%d\n", rc);
     }
     pIBRand->ourKemSecretKey.pData = (char *)pDecryptedData;
     pIBRand->ourKemSecretKey.cbData = cbDecryptedData;
@@ -407,6 +455,12 @@ static int DecryptAndStoreKemSecretKey(tIB_INSTANCEDATA *pIBRand)
         app_tracef("ERROR: Failed to save KEM secret key to file \"%s\"", pIBRand->cfg.ourKemSecretKeyFilename);
         return rc;
     }
+
+#ifdef KAT_KNOWN_ANSWER_TESTING
+    size_t expectedLength = 9616; // Size of Frodo KEM private key
+    // TODO: Extend to support alogorithms other than just Frodo
+    KatDataVerify(&(pIBRand->ourKemSecretKey), expectedLength, "KemSecretKey");
+#endif // KAT_KNOWN_ANSWER_TESTING
 
     //dumpToFile("/home/jgilmore/dev/dump_KemSecretKey_D_raw.txt", (unsigned char *)pIBRand->ourKemSecretKey.pData, pIBRand->ourKemSecretKey.cbData);
     app_tracef("INFO: KEM key stored successfully (%lu bytes)", pIBRand->ourKemSecretKey.cbData);
@@ -494,6 +548,11 @@ static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
     // We will set the size once we know it has completed
     pIBRand->symmetricSharedSecret.cbData = CRYPTO_BYTES;
 
+#ifdef KAT_KNOWN_ANSWER_TESTING
+    size_t expectedLength = CRYPTO_BYTES; // Size of the SharedSecret
+    KatDataVerify(&(pIBRand->symmetricSharedSecret), expectedLength, "SharedSecret");
+#endif // KAT_KNOWN_ANSWER_TESTING
+
     //dumpToFile("/home/jgilmore/dev/dump_SharedSecret_D_raw.txt", (unsigned char *)pIBRand->symmetricSharedSecret.pData, pIBRand->symmetricSharedSecret.cbData);
     app_tracef("INFO: SharedSecret stored successfully (%lu bytes)", pIBRand->symmetricSharedSecret.cbData);
 
@@ -529,22 +588,22 @@ int authenticateUser(tIB_INSTANCEDATA *pIBRand)
     }
 
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pIBRand->cfg.szAuthUrl);
-#define FORCE_USE_OF_NON_IRONBRIDGE_RNG_ENGINE
-#ifdef FORCE_USE_OF_NON_IRONBRIDGE_RNG_ENGINE
-    // Anything except ourselves.
-    // Ideally: RAND_set_rand_engine(NULL)
-    //curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, "dynamic");
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
-        app_tracef("INFO: Force use of alternate OpenSSL RNG engine");
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, "rdrand");
-    //curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, NULL);
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
-        app_tracef("INFO: CURLOPT_SSLENGINE_DEFAULT");
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE_DEFAULT, 1L);
-#endif // FORCE_USE_OF_NON_IRONBRIDGE_RNG_ENGINE
 
-    //if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
-    //    app_tracef("INFO: Construct HTTP Headers");
+
+    {
+        // FORCE_USE_OF_NON_IRONBRIDGE_RNG_ENGINE
+        // Anything except ourselves.
+        // Ideally: RAND_set_rand_engine(NULL)
+        //curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, "dynamic");
+        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
+            app_tracef("INFO: Force use of alternate OpenSSL RNG engine");
+        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, "rdrand");
+        //curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, NULL);
+        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
+            app_tracef("INFO: CURLOPT_SSLENGINE_DEFAULT");
+        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE_DEFAULT, 1L);
+    }
+
     /* Pass our list of custom made headers */
     struct curl_slist *headers = NULL;
     headers = curl_slist_append ( headers, "Content-Type: application/json" );
@@ -569,39 +628,24 @@ int authenticateUser(tIB_INSTANCEDATA *pIBRand)
 
     if (strcmp(pIBRand->cfg.szAuthType, "CLIENT_CERT") == 0)
     {
-#if 0
-    INFO: Details of new client: {"clientCertName":"jgtestsrv1.com","clientCertSerialNumber":"42619BCC1CD78D32F18F0E40BC232452FCBBCA90","countryCode":"GB","smsNumber":"+447711221555","email":"me@home.com","keyparts":"2","kemAlgorithm":"222"}
-    INFO: Sending NewClient request to https://jgtestsrv1.com/api/setupclient
-    INFO: Client Setup Successful
-    {
-      "clientCertName":"jgtestsrv1.com",
-      "clientCertSerialNumber":"42619BCC1CD78D32F18F0E40BC232452FCBBCA90",
-      "countryCode":"GB",
-      "smsNumber":"+447711221555",
-      "email":"me@home.com",
-      "keyparts":"2",
-      "kemAlgorithm":"222"
-    }
-    ironbridge_clientsetup_OOB.json
-#endif
 
-#if 0
-* In windows, Open Certificate Manager
-* Export cert, with private key to a pfx file e.g. MYDOMAIN.pfx
-* openssl pkcs12 -in MYDOMAIN.pfx -clcerts -nokeys -out MYDOMAIN.crt
-* openssl x509   -in MYDOMAIN.crt                  -out MYDOMAIN.pem
-* openssl pkcs12 -in MYDOMAIN.pfx -nocerts         -out MYDOMAIN-encrypted.key
-* openssl rsa    -in MYDOMAIN-encrypted.key        -out MYDOMAIN.key
-
-For example...
-echo Create PEM file from PFX file:
-openssl pkcs12 -in dev_ironbridgeapi_export_with_pvtkey_aes256sha256.pfx -clcerts -nokeys -out dev_ironbridgeapi_com.crt
-openssl x509   -in dev_ironbridgeapi_com.crt                                              -out dev_ironbridgeapi_com.pem
-
-echo Create KEY file from PFX file:
-openssl pkcs12 -in dev_ironbridgeapi_export_with_pvtkey_aes256sha256.pfx -nocerts         -out dev_ironbridgeapi_com.key
-openssl rsa    -in dev_ironbridgeapi_com.key                                              -out dev_ironbridgeapi_com-decrypted.key
-#endif
+        /***********************************************************************
+        * In windows, Open Certificate Manager
+        * Export cert, with private key to a pfx file e.g. MYDOMAIN.pfx
+        *   openssl pkcs12 -in MYDOMAIN.pfx -clcerts -nokeys -out MYDOMAIN.crt
+        *   openssl x509   -in MYDOMAIN.crt                  -out MYDOMAIN.pem
+        *   openssl pkcs12 -in MYDOMAIN.pfx -nocerts         -out MYDOMAIN-encrypted.key
+        *   openssl rsa    -in MYDOMAIN-encrypted.key        -out MYDOMAIN.key
+        *
+        * For example...
+        *   echo Create PEM file from PFX file:
+        *   openssl pkcs12 -in dev_ironbridgeapi_export_with_pvtkey_aes256sha256.pfx -clcerts -nokeys -out dev_ironbridgeapi_com.crt
+        *   openssl x509   -in dev_ironbridgeapi_com.crt                                              -out dev_ironbridgeapi_com.pem
+        *
+        *   echo Create KEY file from PFX file:
+        *   openssl pkcs12 -in dev_ironbridgeapi_export_with_pvtkey_aes256sha256.pfx -nocerts         -out dev_ironbridgeapi_com.key
+        *   openssl rsa    -in dev_ironbridgeapi_com.key                                              -out dev_ironbridgeapi_com-decrypted.key
+        ***********************************************************************/
 
         // Add the client certificate to our headers
         //curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLCERT, "/etc/ssl/certs/client_cert.pem"); // Load the certificate
@@ -1109,25 +1153,6 @@ static bool prepareSRNGBytes(tIB_INSTANCEDATA *pIBRand)
     if (pIBRand->symmetricSharedSecret.pData==NULL)
     {
         app_tracef("WARNING: Shared Secret not found");
-#if 0
-        // Now that we are running in a state machine, this should not be needed - BEGIN
-        if (pIBRand->encapsulatedSharedSecret.pData==NULL)
-        {
-            // No keys found
-            app_tracef("ERROR: No SharedSecret available to decryption SRNG response");
-            return false; // todo cleanup
-        }
-        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
-            app_tracef("INFO: Decapsulating SharedSecret");
-        int rc = DecapsulateAndStoreSharedSecret(pIBRand);
-        if (rc != 0)
-        {
-            app_tracef("ERROR: KEM decapsulation failed with rc=%d", rc);
-            return false; // todo cleanup
-        }
-        // Now that we are running in a state machine, this should not be needed - END
-#endif
-        // But still need to capture it's absence, Justin Case.
     }
 
 #define USE_PBKDF2
@@ -1139,7 +1164,7 @@ static bool prepareSRNGBytes(tIB_INSTANCEDATA *pIBRand)
     rc = AESDecryptBytes(pEncryptedData, cbEncryptedData, (uint8_t *)pIBRand->symmetricSharedSecret.pData, pIBRand->symmetricSharedSecret.cbData, 32, &pDecryptedData, &cbDecryptedData);
     if (rc)
     {
-        printf("AESDecryptBytes failed with rc=%d\n", rc);
+        fprintf(stderr, "ERROR: AESDecryptBytes failed with rc=%d\n", rc);
     }
     pIBRand->ResultantData.pData = (char *)pDecryptedData;
     pIBRand->ResultantData.cbData = cbDecryptedData;
@@ -1189,6 +1214,12 @@ static bool prepareSRNGBytes(tIB_INSTANCEDATA *pIBRand)
         app_tracef("WARNING: Only RAW format is supported for SRNG. Discarding %u bytes.", pIBRand->ResultantData.cbData);
         return false; // todo cleanup
     }
+
+#ifdef KAT_KNOWN_ANSWER_TESTING
+    size_t expectedLength = pIBRand->ResultantData.cbData; // TODO: Use the Size of the SRNG Request
+    KatDataVerify(&(pIBRand->ResultantData), expectedLength, "SRNG");
+#endif // KAT_KNOWN_ANSWER_TESTING
+
     return true;
 }
 
@@ -1336,8 +1367,8 @@ int DoSimpleAuthentication(tIB_INSTANCEDATA *pIBRand)
         app_tracef("INFO: pRealToken = [%s]", pIBRand->pRealToken);
     }
 
-    //fprintf(stderr, "DEBUG: Token.pData=[%s]\n", pIBRand->Token.pData);
-    //fprintf(stderr, "DEBUG: pRealToken=[%s]\n", pIBRand->pRealToken);
+    //fprintf(stderr, "[ibrand-service] DEBUG: Token.pData=[%s]\n", pIBRand->Token.pData);
+    //fprintf(stderr, "[ibrand-service] DEBUG: pRealToken=[%s]\n", pIBRand->pRealToken);
 
     pIBRand->fAuthenticated = TRUE;
     return 0;
@@ -1543,10 +1574,8 @@ int ReadOurKemPrivateKey(tIB_INSTANCEDATA *pIBRand, size_t secretKeyBytes)
 int main(int argc, char * argv[])
 {
     // Our process ID and Session ID
-#ifdef RUN_AS_DAEMON
     pid_t processId = {0};
     pid_t sessionId = {0};
-#endif // RUN_AS_DAEMON
     int rc;
     tIB_INSTANCEDATA *pIBRand;
 
@@ -1557,7 +1586,7 @@ int main(int argc, char * argv[])
     pIBRand = malloc(sizeof(tIB_INSTANCEDATA));
     if (!pIBRand)
     {
-        fprintf(stderr, "FATAL: Failed to allocate memory for local storage. Aborting.");
+        fprintf(stderr, "[ibrand-service] FATAL: Failed to allocate memory for local storage. Aborting.");
         exit(EXIT_FAILURE);
     }
     memset(pIBRand, 0, sizeof(tIB_INSTANCEDATA));
@@ -1586,7 +1615,7 @@ int main(int argc, char * argv[])
 
     if (strlen(pIBRand->szConfigFilename) == 0)
     {
-        fprintf(stderr, "FATAL: Configuration not specified, neither on commandline nor via an environment variable.\n");
+        fprintf(stderr, "[ibrand-service] FATAL: Configuration not specified, neither on commandline nor via an environment variable.\n");
         fprintf(stderr, "USAGE: ibrand_service [-f <ConfigFilename>]\n");
         fprintf(stderr, "       If <ConfigFilename> is NOT specified on the command line,\n");
         fprintf(stderr, "       then it must be specified in envar \"IBRAND_CONF\".\n");
@@ -1594,11 +1623,7 @@ int main(int argc, char * argv[])
         exit(EXIT_FAILURE);
     }
 
-#ifdef RUN_AS_DAEMON
     app_trace_openlog("ibrand_service", LOG_PID, LOG_DAEMON);
-#else // RUN_AS_DAEMON
-    app_trace_openlog("ibrand_service", LOG_PID|LOG_CONS|LOG_PERROR, LOG_USER );
-#endif // RUN_AS_DAEMON
 
     app_tracef("===ibrand_service==================================================================================================");
 
@@ -1606,7 +1631,7 @@ int main(int argc, char * argv[])
     rc = ReadConfig(pIBRand->szConfigFilename, &(pIBRand->cfg), CRYPTO_SECRETKEYBYTES, CRYPTO_PUBLICKEYBYTES);
     if (rc != 0)
     {
-        fprintf(stderr, "FATAL: Configuration error. rc=%d\n", rc);
+        fprintf(stderr, "[ibrand-service] FATAL: Configuration error. rc=%d\n", rc);
         app_tracef("FATAL: Configuration error. Aborting. rc=%d", rc);
         app_trace_closelog();
         free(pIBRand);
@@ -1622,12 +1647,11 @@ int main(int argc, char * argv[])
 #endif // FORCE_ALL_LOGGING_ON
 
 
-#ifdef RUN_AS_DAEMON
     // Fork off the parent process
     processId = fork();
     if (processId < 0)
     {
-        fprintf(stderr, "FATAL: Failed to create child process\n");
+        fprintf(stderr, "[ibrand-service] FATAL: Failed to create child process\n");
         app_tracef("FATAL: Failed to create child process. Aborting.");
         app_trace_closelog();
         free(pIBRand);
@@ -1639,7 +1663,7 @@ int main(int argc, char * argv[])
         /////////////////////////////////////////
         // We are the parent process
         /////////////////////////////////////////
-        fprintf(stdout, "INFO: IBRand Service started successfully (pid:%u)\n", processId);
+        fprintf(stdout, "[ibrand-service] INFO: IBRand Service started successfully (pid:%u)\n", processId);
         if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
             app_tracef("INFO: IBRand Service started successfully (pid:%u)", processId);
         app_trace_closelog();
@@ -1680,7 +1704,6 @@ int main(int argc, char * argv[])
         exit(EXIT_FAILURE);
     }
 
-//#define FORCE_ALL_LOGGING_ON
 #ifdef FORCE_ALL_LOGGING_ON
     // Leave the standard file descriptors open
 #else // FORCE_ALL_LOGGING_ON
@@ -1689,10 +1712,6 @@ int main(int argc, char * argv[])
     close(STDOUT_FILENO);
     close(STDERR_FILENO);
 #endif // FORCE_ALL_LOGGING_ON
-
-#else // RUN_AS_DAEMON
-    app_tracef("INFO: CQC IronBridge IBRand Process Started Successfully ====================");
-#endif // RUN_AS_DAEMON
 
     // =========================================================================
     // Daemon-specific initialization
@@ -1724,7 +1743,7 @@ int main(int argc, char * argv[])
     pIBRand->ResultantData.cbData = 0;
     pIBRand->isPaused = false;
 
-    app_tracef("DEBUG: Calling dataStore_Initialise");
+    if (localDebugTracing) app_tracef("DEBUG: Calling dataStore_Initialise");
     if (!dataStore_Initialise(pIBRand))
     {
         // Log the failure
@@ -1737,6 +1756,7 @@ int main(int argc, char * argv[])
     tSERVICESTATE currentState = STATE_START;
     bool continueInMainLoop = true;
     bool printProgressToSyslog = true;
+    bool printSleepMessageToSyslog = true;
     // The Big Loop
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: Enter State machine");
     while (continueInMainLoop)
@@ -1765,7 +1785,7 @@ int main(int argc, char * argv[])
                 rc = ReadOurKemPrivateKey(pIBRand, CRYPTO_SECRETKEYBYTES);
                 if (rc != 0)
                 {
-                    fprintf(stderr, "FATAL: Configuration error. rc=%d\n", rc);
+                    fprintf(stderr, "[ibrand-service] FATAL: Configuration error. rc=%d\n", rc);
                     app_tracef("FATAL: Configuration error. Aborting. rc=%d", rc);
                     app_trace_closelog();
                     free(pIBRand);
@@ -1777,7 +1797,7 @@ int main(int argc, char * argv[])
                 // rc = ReadTheirSigningPublicKey(pIBRand, CRYPTO_PUBLICKEYBYTES);
                 // if (rc != 0)
                 // {
-                //     fprintf(stderr, "FATAL: Configuration error. rc=%d\n", rc);
+                //     fprintf(stderr, "[ibrand-service] FATAL: Configuration error. rc=%d\n", rc);
                 //     app_tracef("FATAL: Configuration error. Aborting. rc=%d", rc);
                 //     app_trace_closelog();
                 //     free(pIBRand);
@@ -1799,14 +1819,9 @@ int main(int argc, char * argv[])
                 rc = InitialiseCurl(pIBRand);
                 if (rc != 0)
                 {
-#ifdef RUN_AS_DAEMON
                     app_tracef("ERROR: InitialiseCurl failed with rc=%d. Will retry initialisation in %d seconds", rc, pIBRand->cfg.authRetryDelay);
                     sleep(pIBRand->cfg.authRetryDelay);
                     currentState = STATE_INITIALISECURL;
-#else // RUN_AS_DAEMON
-                    app_tracef("ERROR: InitialiseCurl failed with rc=%d. Aborting.", rc);
-                    currentState = STATE_SHUTDOWN;
-#endif // RUN_AS_DAEMON
                     continue;
                 }
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CURL))
@@ -1829,14 +1844,9 @@ int main(int argc, char * argv[])
                 {
                     numberOfAuthFailures++;
                     numberOfConsecutiveAuthFailures++;
-    #ifdef RUN_AS_DAEMON
                     app_tracef("ERROR: DoAuthentication failed with rc=%d. Will retry in %d seconds", rc, pIBRand->cfg.authRetryDelay);
                     sleep(pIBRand->cfg.authRetryDelay);
                     currentState = STATE_AUTHENTICATE;
-    #else // RUN_AS_DAEMON
-                    app_tracef("ERROR: DoAuthentication failed with rc=%d. Aborting.", rc);
-                    currentState = STATE_SHUTDOWN;
-    #endif // RUN_AS_DAEMON
                     continue;
                 }
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
@@ -1855,14 +1865,9 @@ int main(int argc, char * argv[])
                 {
                     numberOfAuthFailures++;
                     numberOfConsecutiveAuthFailures++;
-#ifdef RUN_AS_DAEMON
                     app_tracef("ERROR: getNewKemKeyPair failed with rc=%d. Will retry in %d seconds", rc, pIBRand->cfg.authRetryDelay);
                     sleep(pIBRand->cfg.authRetryDelay);
                     currentState = STATE_GETNEWKEMKEYPAIR;
-#else // RUN_AS_DAEMON
-                    app_tracef("ERROR: getNewKemKeyPair failed with rc=%d. Aborting.", rc);
-                    currentState = STATE_SHUTDOWN;
-#endif // RUN_AS_DAEMON
                     continue;
                 }
                 currentState = STATE_DECRYPTKEMSECRETKEY;
@@ -1883,14 +1888,9 @@ int main(int argc, char * argv[])
                 {
                     numberOfAuthFailures++;
                     numberOfConsecutiveAuthFailures++;
-#ifdef RUN_AS_DAEMON
                     app_tracef("ERROR: Decryption of KEM secret key failed with rc=%d. Will retry in %d seconds", rc, pIBRand->cfg.authRetryDelay);
                     sleep(pIBRand->cfg.authRetryDelay);
                     currentState = STATE_DECAPSULATESHAREDSECRET;
-#else // RUN_AS_DAEMON
-                    app_tracef("ERROR: Decryption of KEM secret key failed with rc=%d. Aborting.", rc);
-                    currentState = STATE_SHUTDOWN;
-#endif // RUN_AS_DAEMON
                     continue;
                 }
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
@@ -1914,14 +1914,9 @@ int main(int argc, char * argv[])
                 {
                     numberOfAuthFailures++;
                     numberOfConsecutiveAuthFailures++;
-#ifdef RUN_AS_DAEMON
                     app_tracef("ERROR: DoRequestSharedSecret failed with rc=%d. Will retry in %d seconds", rc, pIBRand->cfg.authRetryDelay);
                     sleep(pIBRand->cfg.authRetryDelay);
                     currentState = STATE_GETNEWSHAREDSECRET;
-#else // RUN_AS_DAEMON
-                    app_tracef("ERROR: DoRequestSharedSecret failed with rc=%d. Aborting.", rc);
-                    currentState = STATE_SHUTDOWN;
-#endif // RUN_AS_DAEMON
                     continue;
                 }
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
@@ -1944,14 +1939,9 @@ int main(int argc, char * argv[])
                 {
                     numberOfAuthFailures++;
                     numberOfConsecutiveAuthFailures++;
-#ifdef RUN_AS_DAEMON
                     app_tracef("ERROR: KEM decapsulation failed with rc=%d. Will retry in %d seconds", rc, pIBRand->cfg.authRetryDelay);
                     sleep(pIBRand->cfg.authRetryDelay);
                     currentState = STATE_DECAPSULATESHAREDSECRET;
-#else // RUN_AS_DAEMON
-                    app_tracef("ERROR: KEM decapsulation failed with rc=%d. Aborting.", rc);
-                    currentState = STATE_SHUTDOWN;
-#endif // RUN_AS_DAEMON
                     continue;
                 }
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
@@ -1965,7 +1955,7 @@ int main(int argc, char * argv[])
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: STATE_CHECKIFRANDOMNESSISREQUIRED");
                 // Hysteresis
                 pIBRand->datastoreFilesize = dataStore_GetCurrentWaterLevel(pIBRand);
-                //app_tracef("DEBUG: Filesize=%d", pIBRand->datastoreFilesize);
+                //if (localDebugTracing) app_tracef("DEBUG: Filesize=%d", pIBRand->datastoreFilesize);
                 if (pIBRand->datastoreFilesize < 0) // File not found
                 {
                     app_tracef("INFO: dataStore not found. Starting retrieval.", pIBRand->cfg.retrievalRetryDelay);
@@ -1998,16 +1988,23 @@ int main(int argc, char * argv[])
                     // Fall through to sleep
                 }
                 // Wait for a short while, and then try again
-                if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
-                    app_tracef("INFO: Idle. Sleeping for %d seconds", pIBRand->cfg.idleDelay);
+                if (printSleepMessageToSyslog)
+                {
+                    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
+                    {
+                        app_tracef("INFO: Idle. Sleeping. Checking water level every %d seconds", pIBRand->cfg.idleDelay);
+                    }
+                    printSleepMessageToSyslog = false;
+                }
                 sleep(pIBRand->cfg.idleDelay);
-                printProgressToSyslog = true;
+                printProgressToSyslog = false;
                 currentState = STATE_CHECKIFRANDOMNESSISREQUIRED;
                 break;
 
             case STATE_GETSOMERANDOMNESS:
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: STATE_GETSOMERANDOMNESS");
                 printProgressToSyslog = true;
+                printSleepMessageToSyslog = true;
                 // Get SharedSecret
                 if (pIBRand->symmetricSharedSecret.pData == NULL)
                 {

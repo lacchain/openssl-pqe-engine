@@ -21,14 +21,11 @@
 static const int kEngineOk = 1;
 static const int kEngineFail = 0;
 
+static const int localDebugTracing = false;
+
 ///////////////////
 // Configuration
 ///////////////////
-
-static const int kIBRandMultiplier = 1;
-static const char *kIBRandSerial = NULL;
-static const bool kKeccak = true;
-static const bool kDebug = false;
 
 ////////////////////////////////
 // Ring buffer implementation
@@ -100,7 +97,7 @@ static size_t RingBufferWrite(RingBuffer *buffer, size_t num_bytes, const uint8_
     num_bytes -= bytes_write;
   }
 
-  size_t bytes_write = MIN(num_bytes, kRingBufferSize - (buffer->w_ptr - buffer->r_ptr));
+  size_t bytes_write = MIN(num_bytes, (size_t)(kRingBufferSize - (buffer->w_ptr - buffer->r_ptr)));
   memcpy(buffer->w_ptr, input, bytes_write);
   buffer->w_ptr += bytes_write;
   if ((buffer->w_ptr - buffer->buffer) == sizeof(buffer->buffer))
@@ -127,10 +124,10 @@ static int IBRandEngineStateInit(IBRandEngineState *engine_state)
 {
   memset(engine_state, 0, sizeof(*engine_state));
   RingBufferInit(&engine_state->ring_buffer);
-  engine_state->status = initIBRand(&engine_state->trng_context, (char *)kIBRandSerial, kKeccak, kDebug);
+  engine_state->status = initIBRand(&engine_state->trng_context);
   if (!engine_state->status)
   {
-    fprintf(stderr, "ERROR: initIBRand initialization error: %s\n", engine_state->trng_context.message ? engine_state->trng_context.message : "unknown");
+    fprintf(stderr, "[ibrand_openssl] ERROR: initIBRand initialization error: %s\n", engine_state->trng_context.message ? engine_state->trng_context.message : "unknown");
   }
 
   return engine_state->status;
@@ -143,30 +140,37 @@ static int Bytes(unsigned char *buf, int num)
   unsigned char *w_ptr = buf;
   while ((num > 0) && (engine_state.status == kEngineOk))
   {
+    //if (localDebugTracing) fprintf(stderr, "[ibrand_openssl] DEBUG: (Bytes) Requested from RingBuffer: %u\n", num);
+
     size_t bytes_read = RingBufferRead(&engine_state.ring_buffer, num, w_ptr);
     w_ptr += bytes_read;
     num -= bytes_read;
+    //if (localDebugTracing) fprintf(stderr, "[ibrand_openssl] DEBUG: (Bytes) RingBufferRead - AcquiredFromRingBuffer=%lu. StillNeeded=%u\n", bytes_read, num);
 
     if (num > 0)
     {
-      // Need more RNG bytes.
+      // Need more RNG bytes - restock ring buffer, and then try again
       uint8_t rand_buffer[BUFLEN];
-      size_t rand_bytes = readData(&engine_state.trng_context, rand_buffer, !kKeccak, kIBRandMultiplier);
-      if (engine_state.trng_context.errorFlag)
+      if (localDebugTracing) fprintf(stderr, "[ibrand_openssl] DEBUG: (Bytes) restock RingBuffer...\n");
+      size_t rand_bytes = readData(&engine_state.trng_context, rand_buffer, BUFLEN);
+      if (engine_state.trng_context.errorCode)
       {
-        fprintf(stderr, "ERROR: %s\n", engine_state.trng_context.message ? engine_state.trng_context.message : "unknown");
+        fprintf(stderr, "[ibrand_openssl] ERROR: errorCode=%d, msg=%s\n", engine_state.trng_context.errorCode, engine_state.trng_context.message ? engine_state.trng_context.message : "unknown");
         engine_state.status = kEngineFail;
+        engine_state.trng_context.errorCode = 0;
         break;
       }
       size_t bytes_written = RingBufferWrite(&engine_state.ring_buffer, rand_bytes, rand_buffer);
       if (bytes_written != rand_bytes)
       {
-        fprintf(stderr, "ERROR: Invalid ibrand engine buffer state\n");
+        fprintf(stderr, "[ibrand_openssl] ERROR: Invalid ibrand engine buffer state\n");
         engine_state.status = kEngineFail;
         break;
       }
+      if (localDebugTracing) fprintf(stderr, "[ibrand_openssl] DEBUG: (Bytes) RingBuffer restocked with %lu bytes. Try again...\n", (unsigned long)bytes_written);
     }
   }
+  //if (localDebugTracing) fprintf(stderr, "[ibrand_openssl] DEBUG: ----------------------------------------------------------------------------\n");
   return engine_state.status;
 }
 
@@ -190,16 +194,16 @@ int ibrand_bind(ENGINE *engine, const char *id)
       ENGINE_set_name(engine, kEngineName) != kEngineOk ||
       ENGINE_set_RAND(engine, &rand_method) != kEngineOk)
   {
-    fprintf(stderr, "ERROR: ibrand_lib: Binding failed\n");
+    fprintf(stderr, "[ibrand_openssl] ERROR: ibrand_lib: Binding failed\n");
     return 0;
   }
 
   if (IBRandEngineStateInit(&engine_state) != kEngineOk)
   {
-    exit(-1);
+    exit(355);
   }
 
-  //fprintf(stderr, "INFO: IBRand engine loaded.\n");
+  //fprintf(stderr, "[ibrand_openssl] INFO: IBRand engine loaded.\n");
   return kEngineOk;
 }
 

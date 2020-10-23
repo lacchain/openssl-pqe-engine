@@ -195,7 +195,7 @@ int ReadConfig(char *szConfigFilename, tIB_CONFIGDATA *pIBConfig, size_t secretK
 ////////////////////////////////////////////////////////////////////////////////
 static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfig)
 {
-    JSONObject *json2 = NULL;
+    JSONObject *json2;
     const int localConfigTracing = false;
 
     json2 = my_parseJSON(szJsonConfig);
@@ -208,7 +208,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
     for (int ii=0; ii<json2->count; ii++)
     {
         if (localConfigTracing)
-            app_tracef("DEBUG: Found json item[%d] %s=%s\r\n", ii, json2->pairs[ii].key, (json2->pairs[ii].type == JSON_STRING)?(json2->pairs[ii].value->stringValue):"[JSON object]");
+            app_tracef("DEBUG: Found json item[%d] %s=%s\n", ii, json2->pairs[ii].key, (json2->pairs[ii].type == JSON_STRING)?(json2->pairs[ii].value->stringValue):"[JSON object]");
 
         if (strcmp(json2->pairs[ii].key,"AuthSettings") == 0 && json2->pairs[ii].type == JSON_OBJECT)
         {
@@ -217,7 +217,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
             for (int jj=0; jj<childJson->count; jj++)
             {
                 if (localConfigTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\r\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
+                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
                 {
@@ -263,7 +263,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
             for (int jj=0; jj<childJson->count; jj++)
             {
                 if (localConfigTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\r\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
+                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
                 {
@@ -293,7 +293,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
             for (int jj=0; jj<childJson->count; jj++)
             {
                 if (localConfigTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\r\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
+                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
                 {
@@ -319,7 +319,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
             for (int jj=0; jj<childJson->count; jj++)
             {
                 if (localConfigTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\r\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
+                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
                 {
@@ -375,7 +375,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
             for (int jj=0; jj<childJson->count; jj++)
             {
                 if (localConfigTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\r\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
+                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
                 {
@@ -472,7 +472,7 @@ void PrintConfig(tIB_CONFIGDATA *pIBConfig)
 
 static bool __ParseJsonOOBData(const char *szJsonString, tIB_OOBDATA *pOobData)
 {
-    JSONObject *json2 = NULL;
+    JSONObject *json2;
     const int localConfigTracing = false;
 
     json2 = my_parseJSON(szJsonString);
@@ -485,7 +485,7 @@ static bool __ParseJsonOOBData(const char *szJsonString, tIB_OOBDATA *pOobData)
     for (int ii=0; ii<json2->count; ii++)
     {
         if (localConfigTracing)
-            app_tracef("DEBUG: Found json item[%d] %s=%s\r\n", ii, json2->pairs[ii].key, (json2->pairs[ii].type == JSON_STRING)?(json2->pairs[ii].value->stringValue):"[JSON object]");
+            app_tracef("DEBUG: Found json item[%d] %s=%s\n", ii, json2->pairs[ii].key, (json2->pairs[ii].type == JSON_STRING)?(json2->pairs[ii].value->stringValue):"[JSON object]");
 
         if (json2->pairs[ii].type == JSON_STRING)
         {
@@ -572,7 +572,7 @@ int GetBinaryDataFromOOBFile(char *szSrcFilename, tLSTRING *pDestBinaryData)
     //   "checkSum": "39776"
     // }
     tIB_OOBDATA *pOobData = (tIB_OOBDATA *)malloc(sizeof(tIB_OOBDATA));
-    if (!szJsonString)
+    if (!pOobData)
     {
         app_tracef("ERROR: Failed to allocate %u bytes for OOB Data", sizeof(tIB_OOBDATA));
         return 2083;

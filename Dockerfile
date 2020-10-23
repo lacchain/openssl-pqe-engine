@@ -30,7 +30,6 @@ FROM debian:testing-slim as runner
 RUN apt-get update && apt-get install --no-install-recommends -yV \
     openssl \
     ca-certificates \
-    libftdi1 \
     libcurl4 \
     rsyslog \
     curl \

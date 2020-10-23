@@ -177,52 +177,52 @@ bool PBKDF2_KAT_verification(void)
     pActualResult = (unsigned char *) malloc(sizeof(unsigned char)*KEK_KEY_LEN);
     if (!pActualResult)
     {
-        fprintf(stderr, "malloc failure\n");
+        fprintf(stderr, "[ibrand-service] ERROR: malloc failure\n");
         return false;
     }
 
-    printf("Password: %s\n", password_value);
-    printf("Iterations: %u\n", numberOfIterations);
-    printf("Salt: ");
+    fprintf(stderr, "Password: %s\n", password_value);
+    fprintf(stderr, "Iterations: %d\n", numberOfIterations);
+    fprintf(stderr, "Salt: ");
     for(i=0;i<sizeof(salt_value);i++)
     {
-        printf("%02x", salt_value[i]);
+        fprintf(stderr, "%02x", salt_value[i]);
     }
-    printf("\n");
+    fprintf(stderr, "\n");
 
     rc = PKCS5_PBKDF2_HMAC_SHA1(password_value, strlen(password_value), salt_value, sizeof(salt_value), numberOfIterations, KEK_KEY_LEN, pActualResult);
     if ( rc == 0 )
     {
-        fprintf(stderr, "PKCS5_PBKDF2_HMAC_SHA1 failed\n");
+        fprintf(stderr, "[ibrand-service] ERROR: PKCS5_PBKDF2_HMAC_SHA1 failed\n");
         free(pActualResult);
         return false;
     }
 
     errorsFound = false;
-    printf("ExpectedResult: ");
+    fprintf(stderr, "ExpectedResult: ");
     for (int ii=0;ii<KEK_KEY_LEN;ii++)
     {
-        printf("%02X", expectedResult[ii]);
+        fprintf(stderr, "%02X", expectedResult[ii]);
     }
-    printf("\n");
-    printf("  ActualResult: ");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "  ActualResult: ");
     for (int ii=0;ii<KEK_KEY_LEN;ii++)
     {
-        printf("%02X", pActualResult[ii]);
+        fprintf(stderr, "%02X", pActualResult[ii]);
         if (pActualResult[ii] != expectedResult[ii])
         {
             errorsFound = true;
         }
     }
-    printf("\n");
+    fprintf(stderr, "\n");
 
     if (errorsFound)
     {
-        fprintf(stderr, "PKCS5_PBKDF2_HMAC_SHA1 Failed\n");
+        fprintf(stderr, "[ibrand-service] ERROR: PKCS5_PBKDF2_HMAC_SHA1 Failed\n");
     }
     else
     {
-        fprintf(stdout, "PKCS5_PBKDF2_HMAC_SHA1 Successful\n");
+        fprintf(stdout, "[ibrand-service] INFO: PKCS5_PBKDF2_HMAC_SHA1 Successful\n");
     }
 
     free(pActualResult);
