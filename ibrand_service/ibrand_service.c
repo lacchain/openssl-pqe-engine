@@ -1166,25 +1166,6 @@ static bool prepareSRNGBytes(tIB_INSTANCEDATA *pIBRand)
     if (pIBRand->symmetricSharedSecret.pData==NULL)
     {
         app_tracef("WARNING: Shared Secret not found");
-#if 0
-        // Now that we are running in a state machine, this should not be needed - BEGIN
-        if (pIBRand->encapsulatedSharedSecret.pData==NULL)
-        {
-            // No keys found
-            app_tracef("ERROR: No SharedSecret available to decryption SRNG response");
-            return false; // todo cleanup
-        }
-        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
-            app_tracef("INFO: Decapsulating SharedSecret");
-        int rc = DecapsulateAndStoreSharedSecret(pIBRand);
-        if (rc != 0)
-        {
-            app_tracef("ERROR: KEM decapsulation failed with rc=%d", rc);
-            return false; // todo cleanup
-        }
-        // Now that we are running in a state machine, this should not be needed - END
-#endif
-        // But still need to capture it's absence, Justin Case.
     }
 
 #define USE_PBKDF2

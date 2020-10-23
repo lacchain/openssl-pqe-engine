@@ -240,18 +240,6 @@ bool my_fileExists(const char *szFilename)
 /*�                                                         �*/
 /*+---------------------------------------------------------+*/
 {
-#if 0
-    FILE *f;
-
-    f = fopen(szFilename, "rb");
-    if ( f == NULL )
-    {
-       return false;
-    }
-
-    fclose(f);
-    return true;
-#else
     if (access(szFilename, F_OK) != -1) // From unistd.h
     {
         // File exists
@@ -259,7 +247,6 @@ bool my_fileExists(const char *szFilename)
     }
     // File does not exist
     return false;
-#endif
 }
 
 
