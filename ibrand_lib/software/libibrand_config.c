@@ -22,7 +22,6 @@ tIB_INSTANCEDATA *cfgInitConfig (void)
 {
     tIB_INSTANCEDATA *pIBRand;
 
-#if (USE_CONFIG==CONFIG_JSON)
     int rc;
     // =========================================================================
     // Create instance storage
@@ -70,12 +69,10 @@ tIB_INSTANCEDATA *cfgInitConfig (void)
     //ShMem_SetStorageSize     (pIBRand->cfg.shMemStorageSize    ); // long      // (100*1024)
     //ShMem_SetSemaphoreName   (pIBRand->cfg.shMemSemaphoreName  ); // char[16]  // "sem_ibrand01"
 
-#endif // (USE_CONFIG==CONFIG_JSON)
     return pIBRand;
 }
 
 
-#if (USE_CONFIG==CONFIG_JSON)
 ////////////////////////////////////////////////////////////////////////////////
 // Config Top Level Functions
 ////////////////////////////////////////////////////////////////////////////////
@@ -227,7 +224,7 @@ int cfgReadConfig(char *szConfigFilename, tIB_INSTANCEDATA *pIBRand)
 
     return 0;
 }
-#endif // USE_CONFIG
+
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -310,28 +307,7 @@ char *cfgGetValue(char *szEnvVariableWithFilename, char *szKey)
 
 void cfgGetDatafilename(char *pIBDatafilename, size_t cbIBDatafilename, tIB_INSTANCEDATA *pIBRand)
 {
-#if (USE_CONFIG==CONFIG_HARDCODED)
-    my_strlcpy(szIBDatafilename, "/var/lib/ibrand/ibrand_data.bin", cbIBDatafilename);
-#elif (USE_CONFIG==CONFIG_SIMPLE)
-    // STORAGETYPE=FILE
-    // STORAGEFILENAME=/var/lib/ibrand/ibrand_data.bin
-    // STORAGEHIGHWATERMARK=1038336
-    // STORAGELOWWATERMARK=102400
-
-    char *mallocedStorageFilename = cfgGetValue("IBRAND_CONF","STORAGEFILENAME");
-    if (!mallocedStorageFilename)
-    {
-        my_strlcpy(pIBDatafilename, "/var/lib/ibrand/ibrand_data.bin", cbIBDatafilename);
-        return;
-    }
-    my_strlcpy(pIBDatafilename, mallocedStorageFilename, cbIBDatafilename);
-    free(mallocedStorageFilename);
-
-#elif (USE_CONFIG==CONFIG_JSON)
     my_strlcpy(pIBDatafilename, pIBRand->cfg.szStorageFilename, cbIBDatafilename);
-#else
-    my_strlcpy(pIBDatafilename, "/var/lib/ibrand/ibrand_data.bin", cbIBDatafilename);
-#endif // USE_CONFIG
 }
 
 void cfgPrintConfig(tIB_INSTANCEDATA *pIBRand)
