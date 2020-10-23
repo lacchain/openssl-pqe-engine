@@ -357,7 +357,7 @@ static bool __ShMem_CheckIntegrity(const char *memptr)
             app_tracef("ERROR: ShMem Integrity check failed - Invalid Waterlevel [Sig=0x%4.4X, Ver=0x%4.4X, Siz=%lu, Lev=%ld]", pShMemHeader->signature, pShMemHeader->version, pShMemHeader->tankSize, pShMemHeader->waterLevel);
             return false;
         }
-        if (pShMemHeader->waterLevel >= (int32_t)pShMemHeader->tankSize)
+        if (pShMemHeader->waterLevel > (int32_t)pShMemHeader->tankSize)
         {
             app_tracef("ERROR: ShMem Integrity check failed - Waterlevel overflow [Sig=0x%4.4X, Ver=0x%4.4X, Siz=%lu, Lev=%ld]", pShMemHeader->signature, pShMemHeader->version, pShMemHeader->tankSize, pShMemHeader->waterLevel);
             return false;

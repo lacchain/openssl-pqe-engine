@@ -116,7 +116,7 @@ int my_readSimpleConfigFileStr(FILE *hConfigFile, const char *szKey, char *pDest
     int found = false;
     char *pLine;
 
-    if (!hConfigFile  || !szKey || !pDest || cbDest <= 0)
+    if (!hConfigFile  || !szKey || !pDest || cbDest == 0)
     {
         //fprintf(stderr, "ERROR: Parameter error\n");
        return 6004;
