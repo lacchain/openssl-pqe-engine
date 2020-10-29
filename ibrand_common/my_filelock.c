@@ -27,7 +27,7 @@
 #include "my_logging.h"
 #include "my_filelock.h"
 
-static local_log(int loglevel, const char *formatStr, ...)
+static int local_log(int loglevel, const char *formatStr, ...)
 {
 #define SPRINTF_TRACE_BUFSIZE 4096
     va_list va;
@@ -48,7 +48,7 @@ static local_log(int loglevel, const char *formatStr, ...)
     }
     app_traceln(pBuf);
 
-    if (loglevel & 0x01) fprintf(stderr, pBuf);
+    if (loglevel & 0x01) fprintf(stderr, "%s", pBuf);
     if (loglevel & 0x02) app_tracef(pBuf);
 
     va_end(va);

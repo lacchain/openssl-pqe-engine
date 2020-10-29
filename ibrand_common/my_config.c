@@ -24,6 +24,7 @@
 
 #include "my_utils.h"
 #include "my_config.h"
+#include "my_logging.h"
 
 int my_getFilenameFromEnvVar(const char *szConfigEnvVar, char **pszFilename)
 {
