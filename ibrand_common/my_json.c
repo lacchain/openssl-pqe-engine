@@ -548,7 +548,6 @@ static JSONObject * _parseJSON(const char * str, int *pOffset)
                 if (prevToken != JSON_KEYVALUESEPARATOR)
                 {
                     app_tracef("ERROR: Error parsing JSON string - Unexpected '%c' after '%c'\n", *str, prevToken);
-                    while(true);
                     return NULL;
                 }
                 prevToken = JSON_STARTOFVALUESTRING;
@@ -567,7 +566,6 @@ static JSONObject * _parseJSON(const char * str, int *pOffset)
                 if (prevToken != JSON_STARTOFVALUESTRING)
                 {
                     app_tracef("ERROR: Error parsing JSON string - Unexpected '%c' after '%c'\n", *str, prevToken);
-                    while(true);
                     return NULL;
                 }
                 prevToken = JSON_ENDOFVALUESTRING;
@@ -595,7 +593,6 @@ static JSONObject * _parseJSON(const char * str, int *pOffset)
             if (prevToken != JSON_ENDOFOBJECT && prevToken != JSON_ENDOFVALUESTRING)
             {
                 app_tracef("ERROR: Error parsing JSON string - Unexpected '%c' after '%c'\n", *str, prevToken);
-                while(true);
                 return NULL;
             }
             prevToken = JSON_PAIRDELIMITER;
@@ -617,7 +614,6 @@ static JSONObject * _parseJSON(const char * str, int *pOffset)
             if (prevToken != JSON_ENDOFOBJECT && prevToken != JSON_ENDOFVALUESTRING)
             {
                 app_tracef("ERROR: Error parsing JSON string - Unexpected '%c' after '%c'\n", *str, prevToken);
-                while(true);
                 return NULL;
             }
             prevToken = JSON_ENDOFOBJECT;
@@ -644,7 +640,6 @@ static JSONObject * _parseJSON(const char * str, int *pOffset)
     if (prevToken != JSON_ENDOFOBJECT)
     {
         app_tracef("ERROR: Error parsing JSON string - Unexpected EOT after '%c'\n", prevToken);
-        while(true);
         return NULL;
     }
     prevToken = JSON_ENDOFTEXT; // Arbitrary character to indicate the End Of Text
