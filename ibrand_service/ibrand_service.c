@@ -596,7 +596,7 @@ int authenticateUser(tIB_INSTANCEDATA *pIBRand)
         curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE_DEFAULT, 1L);
     }
 
-    /* Pass our list of custom made headers */
+    // Pass our list of custom made headers
     struct curl_slist *headers = NULL;
     headers = curl_slist_append ( headers, "Content-Type: application/json" );
     headers = curl_slist_append ( headers, "Authorization: Bearer" );
@@ -621,23 +621,23 @@ int authenticateUser(tIB_INSTANCEDATA *pIBRand)
     if (strcmp(pIBRand->cfg.szAuthType, "CLIENT_CERT") == 0)
     {
 
-        /***********************************************************************
-        * In windows, Open Certificate Manager
-        * Export cert, with private key to a pfx file e.g. MYDOMAIN.pfx
-        *   openssl pkcs12 -in MYDOMAIN.pfx -clcerts -nokeys -out MYDOMAIN.crt
-        *   openssl x509   -in MYDOMAIN.crt                  -out MYDOMAIN.pem
-        *   openssl pkcs12 -in MYDOMAIN.pfx -nocerts         -out MYDOMAIN-encrypted.key
-        *   openssl rsa    -in MYDOMAIN-encrypted.key        -out MYDOMAIN.key
-        *
-        * For example...
-        *   echo Create PEM file from PFX file:
-        *   openssl pkcs12 -in dev_ironbridgeapi_export_with_pvtkey_aes256sha256.pfx -clcerts -nokeys -out dev_ironbridgeapi_com.crt
-        *   openssl x509   -in dev_ironbridgeapi_com.crt                                              -out dev_ironbridgeapi_com.pem
-        *
-        *   echo Create KEY file from PFX file:
-        *   openssl pkcs12 -in dev_ironbridgeapi_export_with_pvtkey_aes256sha256.pfx -nocerts         -out dev_ironbridgeapi_com.key
-        *   openssl rsa    -in dev_ironbridgeapi_com.key                                              -out dev_ironbridgeapi_com-decrypted.key
-        ***********************************************************************/
+        // ***********************************************************************
+        // In windows, Open Certificate Manager
+        // Export cert, with private key to a pfx file e.g. MYDOMAIN.pfx
+        //   openssl pkcs12 -in MYDOMAIN.pfx -clcerts -nokeys -out MYDOMAIN.crt
+        //   openssl x509   -in MYDOMAIN.crt                  -out MYDOMAIN.pem
+        //   openssl pkcs12 -in MYDOMAIN.pfx -nocerts         -out MYDOMAIN-encrypted.key
+        //   openssl rsa    -in MYDOMAIN-encrypted.key        -out MYDOMAIN.key
+        //
+        // For example...
+        //   echo Create PEM file from PFX file:
+        //   openssl pkcs12 -in dev_ironbridgeapi_export_with_pvtkey_aes256sha256.pfx -clcerts -nokeys -out dev_ironbridgeapi_com.crt
+        //   openssl x509   -in dev_ironbridgeapi_com.crt                                              -out dev_ironbridgeapi_com.pem
+        //
+        //   echo Create KEY file from PFX file:
+        //   openssl pkcs12 -in dev_ironbridgeapi_export_with_pvtkey_aes256sha256.pfx -nocerts         -out dev_ironbridgeapi_com.key
+        //   openssl rsa    -in dev_ironbridgeapi_com.key                                              -out dev_ironbridgeapi_com-decrypted.key
+        // **********************************************************************/
 
         // Add the client certificate to our headers
         //curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLCERT, "/etc/ssl/certs/client_cert.pem"); // Load the certificate
@@ -674,7 +674,7 @@ int authenticateUser(tIB_INSTANCEDATA *pIBRand)
         app_tracef("INFO: Connecting to \"%s\" with \"%s\"", pIBRand->cfg.szAuthUrl, bodyData);
     }
 
-    /* Do it */
+    // Do it
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
     {
         app_tracef("INFO: Sending \"%s\"", pIBRand->cfg.szAuthUrl );
@@ -710,7 +710,7 @@ int authenticateUser(tIB_INSTANCEDATA *pIBRand)
         app_tracef("INFO: authenticateUser() Token = [%s]"            , pIBRand->Token.pData);
     }
 
-    curl_slist_free_all(headers); /* free custom header list */
+    curl_slist_free_all(headers); // Free custom header list
     app_tracef("INFO: Authentication successful: (\"%s\", \"%s\")", pIBRand->cfg.szAuthUrl, pIBRand->cfg.szUsername);
     return 0;
 }
@@ -745,7 +745,7 @@ int getRandomBytes(tIB_INSTANCEDATA *pIBRand)
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPGET, TRUE );
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pUrl);
 
-    /* Pass our list of custom made headers */
+    // Pass our list of custom made headers
     struct curl_slist *headers = NULL;
     headers = curl_slist_append ( headers, "Content-Type: application/json" );
     headers = curl_slist_append ( headers, "Accept: application/json, text/plain, */*" );
@@ -800,7 +800,7 @@ int getRandomBytes(tIB_INSTANCEDATA *pIBRand)
     //    app_tracef("INFO: %s ResultantData = [%*.*s]", szEndpoint, pIBRand->ResultantData.cbData, pIBRand->ResultantData.cbData, pIBRand->ResultantData.pData);
     //}
 
-    curl_slist_free_all(headers); /* free custom header list */
+    curl_slist_free_all(headers); // Free custom header list
     free(pAuthHeader);
     free(pUrl);
 
@@ -831,7 +831,7 @@ int getNewKemKeyPair(tIB_INSTANCEDATA *pIBRand)
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPGET, TRUE );
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pUrl);
 
-    /* Pass our list of custom made headers */
+    // Pass our list of custom made headers
     struct curl_slist *headers = NULL;
     headers = curl_slist_append ( headers, "Content-Type: application/json" );
     headers = curl_slist_append ( headers, "Accept: application/json, text/plain, */*" );
@@ -879,7 +879,7 @@ int getNewKemKeyPair(tIB_INSTANCEDATA *pIBRand)
     if (curlResultCode != CURLE_OK)
     {
         app_tracef("ERROR: reqkeypair perform failed: [%s]", curl_easy_strerror(curlResultCode));
-        curl_slist_free_all(headers); /* free custom header list */
+        curl_slist_free_all(headers); // Free custom header list
         free(pAuthHeader);
         free(pUrl);
         return 2242;
@@ -892,13 +892,13 @@ int getNewKemKeyPair(tIB_INSTANCEDATA *pIBRand)
 
     if (httpResponseCode == HTTP_RESP_SHAREDSECRETEXPIRED)
     {
-        curl_slist_free_all(headers); /* free custom header list */
+        curl_slist_free_all(headers); // Free custom header list
         free(pAuthHeader);
         free(pUrl);
         return ERC_OopsSharedSecretExpired;
     }
 
-    curl_slist_free_all(headers); /* free custom header list */
+    curl_slist_free_all(headers); // Free custom header list
     free(pAuthHeader);
     free(pUrl);
     return 0;
@@ -925,7 +925,7 @@ int getSecureRNGSharedSecret(tIB_INSTANCEDATA *pIBRand)
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPGET, TRUE );
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pUrl);
 
-    /* Pass our list of custom made headers */
+    // Pass our list of custom made headers
     struct curl_slist *headers = NULL;
     headers = curl_slist_append ( headers, "Content-Type: application/json" );
     headers = curl_slist_append ( headers, "Accept: application/json, text/plain, */*" );
@@ -973,7 +973,7 @@ int getSecureRNGSharedSecret(tIB_INSTANCEDATA *pIBRand)
     if (curlResultCode != CURLE_OK)
     {
         app_tracef("ERROR: sharedsecret perform failed: [%s]", curl_easy_strerror(curlResultCode));
-        curl_slist_free_all(headers); /* free custom header list */
+        curl_slist_free_all(headers); // Free custom header list
         free(pAuthHeader);
         free(pUrl);
         return 2242;
@@ -986,13 +986,13 @@ int getSecureRNGSharedSecret(tIB_INSTANCEDATA *pIBRand)
 
     if (httpResponseCode == HTTP_RESP_KEMKEYPAIREXPIRED)
     {
-        curl_slist_free_all(headers); /* free custom header list */
+        curl_slist_free_all(headers); // Free custom header list
         free(pAuthHeader);
         free(pUrl);
         return ERC_OopsKemKeyPairExpired;
     }
 
-    curl_slist_free_all(headers); /* free custom header list */
+    curl_slist_free_all(headers); // Free custom header list
     free(pAuthHeader);
     free(pUrl);
     return 0;
@@ -1011,10 +1011,8 @@ static bool prepareRNGBytes(tIB_INSTANCEDATA *pIBRand)
     {
         // Curl_base64_decode() - Given a base64 string at src, decode it and return
         // an allocated memory in the *outptr. Returns the length of the decoded data.
-        //*pcbData = Curl_base64_decode(p, (unsigned char **)ppData)
+        // *pcbData = Curl_base64_decode(p, (unsigned char **)ppData)
         // *ppData will, and must, be freed by the caller
-
-        //dumpToFile("/home/jgilmore/dev/dump_Data_A_base64_encrypted_data.txt", p, n);
 
         //app_tracef("INFO: sharedsecret ResultantData[%u] = [%*.*s]", pIBRand->ResultantData.cbData, pIBRand->ResultantData.cbData, pIBRand->ResultantData.cbData, pIBRand->ResultantData.pData);
         char * pOriginalData  = pIBRand->ResultantData.pData;
@@ -1032,15 +1030,6 @@ static bool prepareRNGBytes(tIB_INSTANCEDATA *pIBRand)
             pDecodeData = pOriginalData;
             cbDecodeData = cbOriginalData;
         }
-
-        // Debugging Begin
-        {
-            //char *p = pDecodeData;
-            //size_t n = cbDecodeData;
-            //dumpToFile("/home/jgilmore/dev/dump_Data_A_base64_encrypted_data.txt", (unsigned char *)p, n);
-            //app_trace_hexall("DEBUG: base64 encoded data:", p, n);
-        }
-        // Debugging End
 
         pIBRand->ResultantData.pData = (char *)base64_decode(pDecodeData, cbDecodeData, (size_t *)&(pIBRand->ResultantData.cbData));
         if (!pIBRand->ResultantData.pData)
@@ -1109,11 +1098,9 @@ static bool prepareSRNGBytes(tIB_INSTANCEDATA *pIBRand)
     ///////////////////////////////////
     char * pOriginalData  = pIBRand->ResultantData.pData;
     size_t cbOriginalData = pIBRand->ResultantData.cbData;
+    char * pDecodeData    = pOriginalData;
+    size_t cbDecodeData   = cbOriginalData;
 
-    //dumpToFile("/home/jgilmore/dev/dump_SRNG_A_quoted_base64_encrypted_data.txt", (unsigned char *)pIBRand->ResultantData.pData, pIBRand->ResultantData.cbData);
-
-    char * pDecodeData = pOriginalData;
-    size_t cbDecodeData = cbOriginalData;
     if (pOriginalData[0] == '"' && pOriginalData[cbOriginalData-1] == '"')
     {
         pDecodeData = pOriginalData + 1;
@@ -1576,7 +1563,7 @@ int main(int argc, char * argv[])
     if (!pIBRand)
     {
         app_tracef("[ibrand-service] FATAL: Failed to allocate memory for local storage. Aborting.");
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
     memset(pIBRand, 0, sizeof(tIB_INSTANCEDATA));
 
@@ -1609,7 +1596,7 @@ int main(int argc, char * argv[])
         fprintf(stdout, "       If <ConfigFilename> is NOT specified on the command line,\n");
         fprintf(stdout, "       then it must be specified in envar \"IBRAND_CONF\".\n");
         free(pIBRand);
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     app_trace_set_destination(false, false, true); // (toConsole, toLogFile; toSyslog)
@@ -1624,7 +1611,7 @@ int main(int argc, char * argv[])
         app_tracef("FATAL: Configuration error. Aborting. rc=%d", rc);
         app_trace_closelog();
         free(pIBRand);
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
 #ifdef FORCE_ALL_LOGGING_ON
@@ -1643,7 +1630,7 @@ int main(int argc, char * argv[])
         app_tracef("FATAL: Failed to create child process. Aborting.");
         app_trace_closelog();
         free(pIBRand);
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
     // If we got a good pid, then we can exit the parent process.
     if (processId > 0)
@@ -1655,7 +1642,7 @@ int main(int argc, char * argv[])
         if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
             app_tracef("INFO: IBRand Service started successfully (pid:%u)", processId);
         app_trace_closelog();
-        exit(EXIT_SUCCESS);
+        return EXIT_SUCCESS;
     }
 
     /////////////////////////////////////////
@@ -1679,7 +1666,7 @@ int main(int argc, char * argv[])
         // Log the failure
         app_trace_closelog();
         free(pIBRand);
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     // Change the current working directory
@@ -1689,7 +1676,7 @@ int main(int argc, char * argv[])
         app_tracef("FATAL: Chdir failed. Aborting");
         app_trace_closelog();
         free(pIBRand);
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
 #ifdef FORCE_ALL_LOGGING_ON
@@ -1738,7 +1725,7 @@ int main(int argc, char * argv[])
         app_tracef("FATAL: Failed to initialise datastore. Aborting");
         app_trace_closelog();
         free(pIBRand);
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     tSERVICESTATE currentState = STATE_START;
@@ -1776,7 +1763,7 @@ int main(int argc, char * argv[])
                     app_tracef("FATAL: Configuration error. Aborting. rc=%d", rc);
                     app_trace_closelog();
                     free(pIBRand);
-                    exit(EXIT_FAILURE);
+                    return EXIT_FAILURE;
                 }
 
                 // pIBRand->theirSigningPublicKey.pData  = NULL;
@@ -1784,11 +1771,10 @@ int main(int argc, char * argv[])
                 // rc = ReadTheirSigningPublicKey(pIBRand, CRYPTO_PUBLICKEYBYTES);
                 // if (rc != 0)
                 // {
-                //     fprintf(stderr, "[ibrand-service] FATAL: Configuration error. rc=%d\n", rc);
                 //     app_tracef("FATAL: Configuration error. Aborting. rc=%d", rc);
                 //     app_trace_closelog();
                 //     free(pIBRand);
-                //     exit(EXIT_FAILURE);
+                //     return EXIT_FAILURE;
                 // }
 
                 currentState = STATE_INITIALISECURL;
@@ -2091,5 +2077,5 @@ int main(int argc, char * argv[])
 
     app_tracef("WARNING: Terminating Service");
     app_trace_closelog();
-    exit(EXIT_SUCCESS);
+    return EXIT_SUCCESS;
 }

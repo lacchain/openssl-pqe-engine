@@ -18,57 +18,65 @@ static uint32_t inmFillWatermark;
 static struct rand_pool_info *inmPoolInfo;
 
 // Find the entropy pool size.
-static uint32_t readNumberFromFile(char *fileName)
+static bool readNumberFromFile(char *fileName, uint32_t *pValue)
 {
     FILE *file = fopen(fileName, "r");
-    if(file == NULL)
+    if (file == NULL)
     {
         app_tracef("[ibrand_lib] FATAL: Unable to open %s\n", fileName);
-        exit(455);
+        return false;
     }
 
     uint32_t value = 0u;
     char c;
-    while( ((c = getc(file)) != EOF) && ('0' <= c) && (c <= '9') )
+    while ( ((c = getc(file)) != EOF) && ('0' <= c) && (c <= '9') )
     {
         value *= 10;
         value += c - '0';
     }
     fclose(file);
-    return value;
+    *pValue = value;
+    return true;
 }
 
 // Open /dev/random
-void inmWriteEntropyStart(uint32_t bufLen, bool debug)
+bool inmWriteEntropyStart(uint32_t bufLen, bool debug)
 {
+    bool rc;
     pfd.events = POLLOUT;
 
     //pfd.fd = open("/dev/random", O_WRONLY);
     pfd.fd = open("/dev/random", O_RDWR);
-    if(pfd.fd < 0)
+    if (pfd.fd < 0)
     {
         app_tracef("[ibrand_lib] FATAL: Unable to open /dev/random\n");
-        exit(456);
+        return false;
     }
 
     inmPoolInfo = calloc(1, sizeof(struct rand_pool_info) + bufLen);
-    if(inmPoolInfo == NULL)
+    if (inmPoolInfo == NULL)
     {
         app_tracef("[ibrand_lib] FATAL: Unable to allocate memory\n");
-        exit(457);
+        return false;
     }
 
-    inmFillWatermark = readNumberFromFile(FILL_PROC_FILENAME);
+    rc = readNumberFromFile(FILL_PROC_FILENAME, &inmFillWatermark);
+    if (!rc)
+    {
         app_tracef("[ibrand_lib] FATAL: readNumberFromFile failed\n");
-    if(debug)
+        return false;
+    }
+
+    if (debug)
     {
         app_tracef("Entropy pool size:%u, fill watermark:%u\n", readNumberFromFile(SIZE_PROC_FILENAME), inmFillWatermark);
     }
+    return true;
 }
 
 void inmWriteEntropyEnd()
 {
-    free( inmPoolInfo );
+    free(inmPoolInfo);
 }
 
 // Block until either the entropy pool has room, or 1 minute has passed.

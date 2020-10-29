@@ -39,7 +39,7 @@ bool initIBRand(struct ibrand_context *context)
     if (!pIBRand)
     {
         app_tracef("FATAL: Failed to initialise config. Aborting.\n");
-        exit(EXIT_FAILURE);
+        return false;
     }
 
     return true;

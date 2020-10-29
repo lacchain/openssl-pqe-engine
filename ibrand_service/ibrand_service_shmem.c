@@ -223,13 +223,14 @@ static bool __ShMem_DoActivity(tSHMEM_ACTIVITY whichActivity, void *pUserData)
                     sem_post(semptr);
                     munmap(memptr, __shMemSizeInBytes); // Unmap the storage
                     close(fd);
-                    //return false;
-                    exit(555);
+                    return false;
                 }
             }
 
             // Get what we came for...
+            if (localDebugTracing) app_tracef("DEBUG: [RO] Calling shMemCallBackFn(memptr=%p, pUserData=%p)", memptr, pUserData);
             shMemCallBackFn(memptr, pUserData);
+            if (localDebugTracing) app_tracef("DEBUG: [RO] Back from shMemCallBackFn(memptr=%p, pUserData=%p)", memptr, pUserData);
 
             if (checkIntegrity == AFTER_CALLBACK || checkIntegrity == BEFORE_AND_AFTER_CALLBACK)
             {
@@ -241,8 +242,7 @@ static bool __ShMem_DoActivity(tSHMEM_ACTIVITY whichActivity, void *pUserData)
                     sem_post(semptr);
                     munmap(memptr, __shMemSizeInBytes); // Unmap the storage
                     close(fd);
-                    //return false;
-                    exit(556);
+                    return false;
                 }
             }
 
@@ -265,8 +265,7 @@ static bool __ShMem_DoActivity(tSHMEM_ACTIVITY whichActivity, void *pUserData)
                 sem_post(semptr);
                 munmap(memptr, __shMemSizeInBytes); // Unmap the storage
                 close(fd);
-                //return false;
-                exit(557);
+                return false;
             }
         }
 
@@ -285,8 +284,7 @@ static bool __ShMem_DoActivity(tSHMEM_ACTIVITY whichActivity, void *pUserData)
                 sem_post(semptr);
                 munmap(memptr, __shMemSizeInBytes); // Unmap the storage
                 close(fd);
-                //return false;
-                exit(558);
+                return false;
             }
         }
 

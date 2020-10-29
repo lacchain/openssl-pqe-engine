@@ -13,15 +13,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
+
+#include "my_utilslib.h"
 
 #ifndef MIN
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 #endif
 
-static const int kEngineOk = 1;
-static const int kEngineFail = 0;
+static const int ENGINE_STATUS_OK = 1;
+static const int ENGINE_STATUS_NG = 0;
 
-static const int localDebugTracing = false;
+static const int localDebugTracing = true;
 
 ///////////////////
 // Configuration
@@ -31,11 +34,12 @@ static const int localDebugTracing = false;
 // Ring buffer implementation
 ////////////////////////////////
 
-#define kRingBufferSize (2u * BUFLEN) // So that we do not waste RNG bytes.
+#define RING_BUFFER_SIZE (2u * BUFLEN) // So that we do not waste RNG bytes.
+#define RING_BUFFER_REPLENISH_SIZE (BUFLEN)
 
 typedef struct
 {
-  uint8_t buffer[kRingBufferSize];
+  uint8_t buffer[RING_BUFFER_SIZE];
   uint8_t *r_ptr;
   uint8_t *w_ptr;
 } RingBuffer;
@@ -53,7 +57,7 @@ static size_t RingBufferRead(RingBuffer *buffer, size_t num_bytes, uint8_t *outp
 
   if (buffer->r_ptr > buffer->w_ptr)
   {
-    size_t bytes_in_front = kRingBufferSize - (buffer->r_ptr - buffer->buffer);
+    size_t bytes_in_front = RING_BUFFER_SIZE - (buffer->r_ptr - buffer->buffer);
     size_t bytes_read = MIN(num_bytes, bytes_in_front);
     memcpy(output, buffer->r_ptr, bytes_read);
     if (bytes_read < bytes_in_front)
@@ -84,7 +88,7 @@ static size_t RingBufferWrite(RingBuffer *buffer, size_t num_bytes, const uint8_
 
   if (buffer->w_ptr > buffer->r_ptr)
   {
-    size_t free_bytes_in_front = kRingBufferSize - (buffer->w_ptr - buffer->buffer);
+    size_t free_bytes_in_front = RING_BUFFER_SIZE - (buffer->w_ptr - buffer->buffer);
     size_t bytes_write = MIN(num_bytes, free_bytes_in_front);
     memcpy(buffer->w_ptr, input, bytes_write);
     if (bytes_write < num_bytes)
@@ -97,7 +101,7 @@ static size_t RingBufferWrite(RingBuffer *buffer, size_t num_bytes, const uint8_
     num_bytes -= bytes_write;
   }
 
-  size_t bytes_write = MIN(num_bytes, (size_t)(kRingBufferSize - (buffer->w_ptr - buffer->r_ptr)));
+  size_t bytes_write = MIN(num_bytes, (size_t)(RING_BUFFER_SIZE - (buffer->w_ptr - buffer->r_ptr)));
   memcpy(buffer->w_ptr, input, bytes_write);
   buffer->w_ptr += bytes_write;
   if ((buffer->w_ptr - buffer->buffer) == sizeof(buffer->buffer))
@@ -113,52 +117,55 @@ static size_t RingBufferWrite(RingBuffer *buffer, size_t num_bytes, const uint8_
 // Engine implementation
 ///////////////////////////
 
-typedef struct
+typedef struct tagENGINESTATE
 {
   struct ibrand_context trng_context;
   RingBuffer ring_buffer;
   int status;
-} IBRandEngineState;
+} tENGINESTATE;
 
-static int IBRandEngineStateInit(IBRandEngineState *engine_state)
+static int IBRandEngineStateInit(tENGINESTATE *engine_state)
 {
   app_trace_set_destination(false, false, true); // (toConsole, toLogFile; toSyslog)
   app_trace_openlog(NULL, LOG_PID, LOG_USER );
+
   memset(engine_state, 0, sizeof(*engine_state));
   RingBufferInit(&engine_state->ring_buffer);
   engine_state->status = initIBRand(&engine_state->trng_context);
   if (!engine_state->status)
   {
-    fprintf(stderr, "[ibrand_openssl] ERROR: initIBRand initialization error: %s\n", engine_state->trng_context.message ? engine_state->trng_context.message : "unknown");
+    app_tracef("ERROR: initIBRand initialization error: %s", engine_state->trng_context.message ? engine_state->trng_context.message : "unknown");
   }
 
   return engine_state->status;
 }
 
-static IBRandEngineState engine_state;
+static tENGINESTATE engine_state = {0};
+
 
 static int Bytes(unsigned char *buf, int num)
 {
-  unsigned char *w_ptr = buf;
-  while ((num > 0) && (engine_state.status == kEngineOk))
-  {
-    //if (localDebugTracing) fprintf(stderr, "[ibrand_openssl] DEBUG: (Bytes) Requested from RingBuffer: %u\n", num);
 
+  UNUSED_VAR(localDebugTracing);
+
+  unsigned char *w_ptr = buf;
+  while ((num > 0) && (engine_state.status == ENGINE_STATUS_OK))
+  {
     size_t bytes_read = RingBufferRead(&engine_state.ring_buffer, num, w_ptr);
     w_ptr += bytes_read;
     num -= bytes_read;
-    //if (localDebugTracing) fprintf(stderr, "[ibrand_openssl] DEBUG: (Bytes) RingBufferRead - AcquiredFromRingBuffer=%lu. StillNeeded=%u\n", bytes_read, num);
+    //if (localDebugTracing) app_tracef("DEBUG: RingBufferRead Supplied=%lu. ShortFall=%u", bytes_read, bytesStillRequired);
 
     if (num > 0)
     {
       // Need more RNG bytes - restock ring buffer, and then try again
-      uint8_t rand_buffer[BUFLEN];
-      if (localDebugTracing) fprintf(stderr, "[ibrand_openssl] DEBUG: (Bytes) restock RingBuffer...\n");
-      size_t rand_bytes = readData(&engine_state.trng_context, rand_buffer, BUFLEN);
+      uint8_t rand_buffer[RING_BUFFER_REPLENISH_SIZE];
+      //if (localDebugTracing) app_tracef("DEBUG: Replenish RingBuffer from shmem(%d)", shMemRequestBytes);
+      size_t rand_bytes = readData(&engine_state.trng_context, rand_buffer, RING_BUFFER_REPLENISH_SIZE);
       if (engine_state.trng_context.errorCode)
       {
         app_tracef("ERROR: readData failed: errorCode=%d, msg=%s", engine_state.trng_context.errorCode, engine_state.trng_context.message ? engine_state.trng_context.message : "unknown");
-        engine_state.status = kEngineFail;
+        engine_state.status = ENGINE_STATUS_NG;
         engine_state.trng_context.errorCode = 0;
         break;
       }
@@ -166,7 +173,7 @@ static int Bytes(unsigned char *buf, int num)
       if (bytes_written != rand_bytes)
       {
         app_tracef("ERROR: Invalid ibrand engine buffer state");
-        engine_state.status = kEngineFail;
+        engine_state.status = ENGINE_STATUS_NG;
         break;
       }
       //if (localDebugTracing) app_tracef("DEBUG: RingBuffer replenished with %lu bytes. Try again...", (unsigned long)bytes_written);
@@ -193,21 +200,24 @@ int ibrand_bind(ENGINE *engine, const char *id)
 
   (void)id; // Unused variable
 
+  if (localDebugTracing) app_tracef("INFO: ibrand_bind()");
+
   if (ENGINE_set_id(engine, kEngineId) != kEngineOk ||
       ENGINE_set_name(engine, kEngineName) != kEngineOk ||
       ENGINE_set_RAND(engine, &rand_method) != kEngineOk)
   {
-    fprintf(stderr, "[ibrand_openssl] ERROR: ibrand_lib: Binding failed\n");
-    return 0;
+    app_tracef("ERROR: ibrand_lib: Binding failed");
+    return ENGINE_STATUS_NG;
   }
 
-  if (IBRandEngineStateInit(&engine_state) != kEngineOk)
+  if (IBRandEngineStateInit(&engine_state) != ENGINE_STATUS_OK)
   {
-    exit(355);
+    app_tracef("ERROR: IBRandEngineStateInit failed");
+    return ENGINE_STATUS_NG;
   }
 
-  //fprintf(stderr, "[ibrand_openssl] INFO: IBRand engine loaded.\n");
-  return kEngineOk;
+  if (localDebugTracing) app_tracef("INFO: ibrand_bind() OK");
+  return ENGINE_STATUS_OK;
 }
 
 IMPLEMENT_DYNAMIC_BIND_FN(ibrand_bind)
