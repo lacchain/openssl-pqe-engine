@@ -143,20 +143,22 @@ static int IBRandEngineStateInit(tENGINESTATE *engine_state)
 static tENGINESTATE engine_state = {0};
 
 
-static int Bytes(unsigned char *buf, int num)
+static int GetRngMaterial(unsigned char *buf, int num)
 {
+  unsigned long bytesStillRequired = num;
 
   UNUSED_VAR(localDebugTracing);
 
   unsigned char *w_ptr = buf;
-  while ((num > 0) && (engine_state.status == ENGINE_STATUS_OK))
+  while ((bytesStillRequired > 0) && (engine_state.status == ENGINE_STATUS_OK))
   {
-    size_t bytes_read = RingBufferRead(&engine_state.ring_buffer, num, w_ptr);
+    size_t bytes_read = RingBufferRead(&engine_state.ring_buffer, bytesStillRequired, w_ptr);
     w_ptr += bytes_read;
-    num -= bytes_read;
+    bytesStillRequired -= bytes_read;
     //if (localDebugTracing) app_tracef("DEBUG: RingBufferRead Supplied=%lu. ShortFall=%u", bytes_read, bytesStillRequired);
 
-    if (num > 0)
+    // Has the request been satisfied, or do we still have a requirement?
+    if (bytesStillRequired > 0)
     {
       // Need more RNG bytes - restock ring buffer, and then try again
       uint8_t rand_buffer[RING_BUFFER_REPLENISH_SIZE];
@@ -184,27 +186,47 @@ static int Bytes(unsigned char *buf, int num)
   return engine_state.status;
 }
 
-static int Status(void)
+static int cb_GetRngMaterial(unsigned char *buf, int num)
+{
+  if (localDebugTracing) app_tracef("INFO: cb_GetRngMaterial(%d)", num);
+  return GetRngMaterial(buf, num);
+}
+
+static int cb_GetPseudoRandMaterial(unsigned char *buf, int num)
+{
+  if (localDebugTracing) app_tracef("INFO: cb_GetPseudoRandMaterial(%d)", num);
+  return GetRngMaterial(buf, num);
+}
+
+
+static int cb_Status(void)
 {
     return engine_state.status;
 }
 
-int ibrand_bind(ENGINE *engine, const char *id)
+static void cb_Cleanup(void)
 {
-  static const char kEngineId[] = "ibrand";
-  static const char kEngineName[] = "IronBridge SRNG rand engine";
+  if (localDebugTracing) app_tracef("INFO: cb_Cleanup()");
+}
 
-  static RAND_METHOD rand_method = {NULL,   &Bytes, NULL, NULL,
-                                    &Bytes, // No 'pseudo'.
-                                    &Status};
+int ibrand_bind(ENGINE *pEngine, const char *pID)
+{
+  static const char ENGINE_ID[]   = "ibrand";
+  static const char ENGINE_NAME[] = "CQC IronBridge SRNG rand engine";
 
-  (void)id; // Unused variable
+  static RAND_METHOD engineCallbackFunctions = {NULL,                      // int (*seed) (const void *buf, int num);
+                                                &cb_GetRngMaterial,        // int (*bytes) (unsigned char *buf, int num);
+                                                &cb_Cleanup,               // void (*cleanup) (void);
+                                                NULL,                      // int (*add) (const void *buf, int num, double randomness);
+                                                &cb_GetPseudoRandMaterial, // int (*pseudorand) (unsigned char *buf, int num);   -- No 'pseudo'.
+                                                &cb_Status};               // int (*status) (void);
+  (void)pID; // Unused variable
 
   if (localDebugTracing) app_tracef("INFO: ibrand_bind()");
 
-  if (ENGINE_set_id(engine, kEngineId) != kEngineOk ||
-      ENGINE_set_name(engine, kEngineName) != kEngineOk ||
-      ENGINE_set_RAND(engine, &rand_method) != kEngineOk)
+  if (ENGINE_set_id  (pEngine, ENGINE_ID               ) != ENGINE_STATUS_OK ||
+      ENGINE_set_name(pEngine, ENGINE_NAME             ) != ENGINE_STATUS_OK ||
+      ENGINE_set_RAND(pEngine, &engineCallbackFunctions) != ENGINE_STATUS_OK)
   {
     app_tracef("ERROR: ibrand_lib: Binding failed");
     return ENGINE_STATUS_NG;
