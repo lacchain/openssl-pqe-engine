@@ -162,8 +162,14 @@ static int GetRngMaterial(unsigned char *buf, int num)
     {
       // Need more RNG bytes - restock ring buffer, and then try again
       uint8_t rand_buffer[RING_BUFFER_REPLENISH_SIZE];
+
+      // Due to the frequency of the bind call, we were wasting a lot of material each time the ring buffer was being initialised.
+      // Changed to request only the number of bytes we need, iso always retrieving RING_BUFFER_REPLENISH_SIZE.
+      // (If this proves effective, it may make the RingBuffer redundant).
+      unsigned long shMemRequestBytes = MIN(bytesStillRequired, (int)RING_BUFFER_REPLENISH_SIZE); // was RING_BUFFER_REPLENISH_SIZE
+
       //if (localDebugTracing) app_tracef("DEBUG: Replenish RingBuffer from shmem(%d)", shMemRequestBytes);
-      size_t rand_bytes = readData(&engine_state.trng_context, rand_buffer, RING_BUFFER_REPLENISH_SIZE);
+      size_t rand_bytes = readData(&engine_state.trng_context, rand_buffer, shMemRequestBytes);
       if (engine_state.trng_context.errorCode)
       {
         app_tracef("ERROR: readData failed: errorCode=%d, msg=%s", engine_state.trng_context.errorCode, engine_state.trng_context.message ? engine_state.trng_context.message : "unknown");
