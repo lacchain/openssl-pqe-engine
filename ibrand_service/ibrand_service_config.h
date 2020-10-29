@@ -15,11 +15,6 @@
 #include "my_utilslib.h"
 #include "ibrand_service_utils.h"
 
-#define CONFIG_HARDCODED 1
-#define CONFIG_SIMPLE    2
-#define CONFIG_JSON      3
-#define USE_CONFIG CONFIG_JSON
-
 #define DBGBIT_STATUS   0
 #define DBGBIT_CONFIG   1
 #define DBGBIT_PROGRESS 2
