@@ -545,7 +545,6 @@ static void shMemCallBackFn_Retrieve(char * memptr, void *userptr)
 {
     tSHMEMHEADER *pShMemHeader = (tSHMEMHEADER *)memptr;
     char *pShMemData = memptr + sizeof(tSHMEMHEADER);
-    unsigned long availableStorage;
     unsigned long bytesToRead;
 
     //if (localDebugTracing) app_tracef("DEBUG: shMemCallBackFn_Retrieve");
@@ -556,8 +555,8 @@ static void shMemCallBackFn_Retrieve(char * memptr, void *userptr)
         return;
     }
 
-    availableStorage = pShMemHeader->tankSize - pShMemHeader->waterLevel;
-    bytesToRead = my_minimum(pRetrievedData->cbData, availableStorage);
+    bytesToRead = my_minimum(pRetrievedData->cbData, pShMemHeader->waterLevel);
+    if (localDebugTracing) app_tracef("DEBUG: shMemCallBackFn_Retrieve requested=%lu, available=%lu, supplied=%lu", (unsigned long)(pRetrievedData->cbData), pShMemHeader->waterLevel, bytesToRead);
 
     // Get a copy of the data from the dataStore.
     // TODO: Change to FIFO. Currently LIFO - not ideal, but ok for PoC
