@@ -10,8 +10,8 @@ JSON:{
     "AUTHURL":"https://ironbridgeapi.com/api/login",
     "AUTHUSER":"notused1",
     "AUTHPSWD":"notused2",
-    "AUTHSSLCERTFILE":"/etc/ssl/certs/client.ironbridgeapi.com.crt.pem",
     "AUTHSSLCERTTYPE":"PEM",
+    "AUTHSSLCERTFILE":"/etc/ssl/certs/client.ironbridgeapi.com.crt.pem",
     "AUTHSSLKEYFILE":"/etc/ssl/private/client.ironbridgeapi.com.key.pem",
     "AUTHRETRYDELAY":"5"
   },
@@ -30,14 +30,15 @@ JSON:{
   "StorageSettings":
   {
     "STORAGETYPE":"SHMEM",
-    "STORAGEDATAFORMAT":"RAW",
-    "STORAGEFILENAME":"/var/lib/ibrand/ibrand_data.bin",
-    "STORAGELOCKFILEPATH":"/tmp",
+    "FILE_DATAFORMAT":"RAW",
+    "FILE_FILENAME":"/var/lib/ibrand/ibrand_data.bin",
+    "FILE_LOCKFILEPATH":"/tmp",
+    "FILE_HIGHWATERMARK":"20480",
+    "FILE_LOWWATERMARK":"5120",
     "SHMEM_BACKINGFILENAME":"shmem_ibrand01",
-    "SHMEM_STORAGESIZE":"20480",
     "SHMEM_SEMAPHORENAME":"sem_ibrand01",
-    "STORAGEHIGHWATERMARK":"20480",
-    "STORAGELOWWATERMARK":"5120",
+    "SHMEM_STORAGESIZE":"20480",
+    "SHMEM_LOWWATERMARK":"5120",
     "IDLEDELAY":"3"
   }
 }

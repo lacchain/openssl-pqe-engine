@@ -88,14 +88,15 @@ JSON:{\n\
   "StorageSettings":\n\
   {\n\
     "STORAGETYPE":"SHMEM",\n\
-    "STORAGEDATAFORMAT":"RAW",\n\
-    "STORAGEFILENAME":"/ibrand_data.bin",\n\
-    "STORAGELOCKFILEPATH":"/tmp",\n\
+    "FILE_DATAFORMAT":"RAW",\n\
+    "FILE_FILENAME":"/ibrand_data.bin",\n\
+    "FILE_LOCKFILEPATH":"/tmp",\n\
+    "FILE_HIGHWATERMARK":"20480",\n\
+    "FILE_LOWWATERMARK":"5120",\n\
     "SHMEM_BACKINGFILENAME":"shmem_ibrand01",\n\
-    "SHMEM_STORAGESIZE":"20480",\n\
     "SHMEM_SEMAPHORENAME":"sem_ibrand01",\n\
-    "STORAGEHIGHWATERMARK":"20480",\n\
-    "STORAGELOWWATERMARK":"5120",\n\
+    "SHMEM_STORAGESIZE":"20480",\n\
+    "SHMEM_LOWWATERMARK":"5120",\n\
     "IDLEDELAY":"3"\n\
   }\n\
 }\n\

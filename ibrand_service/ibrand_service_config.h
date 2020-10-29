@@ -47,12 +47,14 @@ typedef struct tagIB_CONFIGDATA
     char          szStorageDataFormat[16];          // RAW, BASE64, HEX
     char          szStorageFilename[_MAX_PATH];     // "/var/lib/ibrand/ibrand_data.bin"
     char          szStorageLockfilePath[_MAX_PATH]; // "/tmp"
-    char          shMemBackingFilename[_MAX_PATH];  // "shmem_ibrand01" // e.g. /dev/shm/shmem_ibrand01
-    long          shMemStorageSize;                 // (100*1024)
-    char          shMemSemaphoreName[16];           // "sem_ibrand01"
     long          storageHighWaterMark;             // 1038336 // 1MB
     long          storageLowWaterMark;              // 102400  // 100KB
-    int           idleDelay;
+    char          shMemBackingFilename[_MAX_PATH];  // "shmem_ibrand01" // e.g. /dev/shm/shmem_ibrand01
+    char          shMemSemaphoreName[16];           // "sem_ibrand01"
+    long          shMemStorageSize;                 // (100*1024)
+    long          shMemLowWaterMark;                // 102400  // 100KB
+    int           idleDelay;                        // seconds, e.g. 2
+
     size_t        secretKeyBytes;
     size_t        publicKeyBytes;
     // SRNG Config

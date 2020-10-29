@@ -134,39 +134,43 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_INSTANCEDATA *pIBRan
                     {
                         my_strlcpy(pIBRand->cfg.szStorageType, childJson->pairs[jj].value->stringValue, sizeof(pIBRand->cfg.szStorageType));
                     }
-                    else if (strcmp(childJson->pairs[jj].key,"STORAGEDATAFORMAT")==0)
+
+                    else if (strcmp(childJson->pairs[jj].key,"FILE_DATAFORMAT")==0)
                     {
                         my_strlcpy(pIBRand->cfg.szStorageDataFormat, childJson->pairs[jj].value->stringValue, sizeof(pIBRand->cfg.szStorageDataFormat));
                     }
-                    else if (strcmp(childJson->pairs[jj].key,"STORAGEFILENAME")==0)
+                    else if (strcmp(childJson->pairs[jj].key,"FILE_FILENAME")==0)
                     {
                         my_strlcpy(pIBRand->cfg.szStorageFilename, childJson->pairs[jj].value->stringValue, sizeof(pIBRand->cfg.szStorageFilename));
                     }
-                    else if (strcmp(childJson->pairs[jj].key,"STORAGELOCKFILEPATH")==0)
+                    else if (strcmp(childJson->pairs[jj].key,"FILE_LOCKFILEPATH")==0)
                     {
                         my_strlcpy(pIBRand->cfg.szStorageLockfilePath, childJson->pairs[jj].value->stringValue, sizeof(pIBRand->cfg.szStorageLockfilePath));
+                    }
+                    else if (strcmp(childJson->pairs[jj].key,"FILE_HIGHWATERMARK")==0)
+                    {
+                        pIBRand->cfg.storageHighWaterMark = atoi(childJson->pairs[jj].value->stringValue);
+                    }
+                    else if (strcmp(childJson->pairs[jj].key,"FILE_LOWWATERMARK")==0)
+                    {
+                        pIBRand->cfg.storageLowWaterMark = atoi(childJson->pairs[jj].value->stringValue);
                     }
 
                     else if (strcmp(childJson->pairs[jj].key,"SHMEM_BACKINGFILENAME")==0)
                     {
                         my_strlcpy(pIBRand->cfg.shMemBackingFilename, childJson->pairs[jj].value->stringValue, sizeof(pIBRand->cfg.shMemBackingFilename));
                     }
-                    else if (strcmp(childJson->pairs[jj].key,"SHMEM_STORAGESIZE")==0)
-                    {
-                        pIBRand->cfg.shMemStorageSize = atoi(childJson->pairs[jj].value->stringValue);
-                    }
                     else if (strcmp(childJson->pairs[jj].key,"SHMEM_SEMAPHORENAME")==0)
                     {
                         my_strlcpy(pIBRand->cfg.shMemSemaphoreName, childJson->pairs[jj].value->stringValue, sizeof(pIBRand->cfg.shMemSemaphoreName));
                     }
-
-                    else if (strcmp(childJson->pairs[jj].key,"STORAGEHIGHWATERMARK")==0)
+                    else if (strcmp(childJson->pairs[jj].key,"SHMEM_STORAGESIZE")==0)
                     {
-                        pIBRand->cfg.storageHighWaterMark = atoi(childJson->pairs[jj].value->stringValue);
+                        pIBRand->cfg.shMemStorageSize = atoi(childJson->pairs[jj].value->stringValue);
                     }
-                    else if (strcmp(childJson->pairs[jj].key,"STORAGELOWWATERMARK")==0)
+                    else if (strcmp(childJson->pairs[jj].key,"SHMEM_LOWWATERMARK")==0)
                     {
-                        pIBRand->cfg.storageLowWaterMark = atoi(childJson->pairs[jj].value->stringValue);
+                        pIBRand->cfg.shMemLowWaterMark = atoi(childJson->pairs[jj].value->stringValue);
                     }
                 }
             }

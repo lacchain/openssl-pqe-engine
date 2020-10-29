@@ -52,7 +52,7 @@ static char *                __shMemBackingFilename    = "shmem_ibrand01"; // e.
 static unsigned long         __shMemSizeInBytes        = sizeof(tSHMEMHEADER) + (100*1024);
 static char *                __shMemSemaphoreName      = "sem_ibrand01";
 
-static const int localShMemTracing = false;
+static const int localDebugTracing = false;
 
 // Forward declarations
 static bool __ShMem_CheckIntegrity(const char *memptr);

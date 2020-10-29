@@ -199,40 +199,45 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
                     {
                         my_strlcpy(pIBConfig->szStorageType, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szStorageType));
                     }
-                    else if (strcmp(childJson->pairs[jj].key,"STORAGEDATAFORMAT")==0)
+
+                    else if (strcmp(childJson->pairs[jj].key,"FILE_DATAFORMAT")==0)
                     {
                         my_strlcpy(pIBConfig->szStorageDataFormat, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szStorageDataFormat));
                     }
-                    else if (strcmp(childJson->pairs[jj].key,"STORAGEFILENAME")==0)
+                    else if (strcmp(childJson->pairs[jj].key,"FILE_FILENAME")==0)
                     {
                         my_strlcpy(pIBConfig->szStorageFilename, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szStorageFilename));
                     }
-                    else if (strcmp(childJson->pairs[jj].key,"STORAGELOCKFILEPATH")==0)
+                    else if (strcmp(childJson->pairs[jj].key,"FILE_LOCKFILEPATH")==0)
                     {
                         my_strlcpy(pIBConfig->szStorageLockfilePath, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szStorageLockfilePath));
+                    }
+                    else if (strcmp(childJson->pairs[jj].key,"FILE_HIGHWATERMARK")==0)
+                    {
+                        pIBConfig->storageHighWaterMark = atoi(childJson->pairs[jj].value->stringValue);
+                    }
+                    else if (strcmp(childJson->pairs[jj].key,"FILE_LOWWATERMARK")==0)
+                    {
+                        pIBConfig->storageLowWaterMark = atoi(childJson->pairs[jj].value->stringValue);
                     }
 
                     else if (strcmp(childJson->pairs[jj].key,"SHMEM_BACKINGFILENAME")==0)
                     {
                         my_strlcpy(pIBConfig->shMemBackingFilename, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->shMemBackingFilename));
                     }
-                    else if (strcmp(childJson->pairs[jj].key,"SHMEM_STORAGESIZE")==0)
-                    {
-                        pIBConfig->shMemStorageSize = atoi(childJson->pairs[jj].value->stringValue);
-                    }
                     else if (strcmp(childJson->pairs[jj].key,"SHMEM_SEMAPHORENAME")==0)
                     {
                         my_strlcpy(pIBConfig->shMemSemaphoreName, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->shMemSemaphoreName));
                     }
+                    else if (strcmp(childJson->pairs[jj].key,"SHMEM_STORAGESIZE")==0)
+                    {
+                        pIBConfig->shMemStorageSize = atoi(childJson->pairs[jj].value->stringValue);
+                    }
+                    else if (strcmp(childJson->pairs[jj].key,"SHMEM_LOWWATERMARK")==0)
+                    {
+                        pIBConfig->shMemLowWaterMark = atoi(childJson->pairs[jj].value->stringValue);
+                    }
 
-                    else if (strcmp(childJson->pairs[jj].key,"STORAGEHIGHWATERMARK")==0)
-                    {
-                        pIBConfig->storageHighWaterMark = atoi(childJson->pairs[jj].value->stringValue);
-                    }
-                    else if (strcmp(childJson->pairs[jj].key,"STORAGELOWWATERMARK")==0)
-                    {
-                        pIBConfig->storageLowWaterMark = atoi(childJson->pairs[jj].value->stringValue);
-                    }
                     else if (strcmp(childJson->pairs[jj].key,"IDLEDELAY")==0)
                     {
                         pIBConfig->idleDelay = atoi(childJson->pairs[jj].value->stringValue);
@@ -299,9 +304,6 @@ int ReadConfig(char *szConfigFilename, tIB_CONFIGDATA *pIBConfig, size_t secretK
 
     return 0;
 }
-
-#endif // USE_CONFIG
-
 
 void PrintConfig(tIB_CONFIGDATA *pIBConfig)
 {

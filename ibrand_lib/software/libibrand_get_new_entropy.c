@@ -11,9 +11,6 @@
 #include <sys/types.h>
 #include <syslog.h>
 
-#include "libibrand_globals.h"
-#include "libibrand_private.h"
-
 #include "my_utilslib.h"
 #include "ibrand_service_shmem.h"
 #include "libibrand_config.h"
@@ -24,6 +21,8 @@ static const int localDebugTracing = false;
 
 static bool GetNewEntropyFromFile(struct ibrand_context *context, char *szIBDatafilename, char *szStorageLockfilePath, uint8_t *inBuf, size_t inBufLen);
 static bool GetNewEntropyFromSharedMemory(struct ibrand_context *context, uint8_t *inBuf, size_t inBufLen);
+
+
 
 bool GetNewEntropy(struct ibrand_context *context, tIB_INSTANCEDATA *pIBRand, uint8_t *inBuf, size_t inBufLen)
 {
@@ -55,7 +54,7 @@ static bool GetNewEntropyFromFile(struct ibrand_context *context, char *szIBData
 
     my_waitForFileLock(szLockfilePath, szIBDatafilename, FILELOCK_LOGLEVEL);
 
-    for(;;) // Not a real loop - just an exitable code block
+    do // Not a real loop - just an exitable code block
     {
         size_t bytesRead;
         size_t filesize;
@@ -107,8 +106,7 @@ static bool GetNewEntropyFromFile(struct ibrand_context *context, char *szIBData
             break;
         }
         success = true;
-        break;
-    }
+    } while (false);
 
     if (fIBDatafile)
     {
