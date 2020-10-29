@@ -467,6 +467,11 @@ static void shMemCallBackFn_Write(char * memptr, void *userptr)
     bytesToWrite = my_minimum(pDataToStore->cbData, availableStorage);
     memcpy(pShMemData + pShMemHeader->waterLevel, pDataToStore->pData, bytesToWrite);
     pShMemHeader->waterLevel += bytesToWrite;
+    if ((uint32_t)pShMemHeader->waterLevel > pShMemHeader->tankSize)
+    {
+        app_tracef("ERROR: Tank overflow");
+        return;
+    }
 }
 
 bool ShMem_AppendToDataStore(char *pData, size_t cbData)
