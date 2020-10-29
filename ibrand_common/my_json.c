@@ -37,8 +37,7 @@
 #include <string.h>
 
 #include "my_utils.h"
-//#include "my_logging.h"
-//#include "my_debug.h"
+#include "my_logging.h"
 #include "my_json.h"
 
 //#define DEBUG_MALLOC_USAGE

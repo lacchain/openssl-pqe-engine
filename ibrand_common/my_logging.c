@@ -49,7 +49,6 @@ typedef struct tagAPPTRACECONFIG
 
 static tAPPTRACECONFIG _gAppTraceConfig = {"/var/lib/unknown", "unknown_component.log", false, false, true};
 
-static const char *app_trace_get_logfilename(const char *szFilename);
 
 ///////////////////////////////////////////////////////////////////////////////
 // Logging Functions
