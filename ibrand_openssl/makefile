@@ -1,4 +1,4 @@
-CC = @gcc
+CC = gcc
 CFLAGS = -fPIC -Wall -Wextra -O2 -L/usr/local/lib/ -I ../ibrand_lib/software
 LDFLAGS = -shared -lcrypto -librand -L/usr/local/lib/
 RM = rm -f
@@ -14,7 +14,6 @@ else
         else
 		ifeq ($(UNAME_S),Darwin)
 			TARGET_LIB =$(TARGET_NAME).dylib
-			CFLAGS += -I/usr/local/Cellar/libftdi/1.4/include/libftdi1/
 		else
 			$(error Unknown platform $(UNAME_S))
 		endif
@@ -29,11 +28,11 @@ all: ${TARGET_LIB}
 	@echo --- $@ Done
 
 $(TARGET_LIB): $(OBJS)
-	$(CC) -o $@ $^ ${LDFLAGS}
+	@$(CC) -o $@ $^ ${LDFLAGS}
 	@echo --- $@ Done
 
 $(SRCS:.c=.d):%.d:%.c
-	$(CC) $(CFLAGS) -MM $< >$@
+	@$(CC) $(CFLAGS) -MM $< >$@
 	@echo --- $@ Done
 
 include $(SRCS:.c=.d)
