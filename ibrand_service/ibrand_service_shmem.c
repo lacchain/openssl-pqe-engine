@@ -46,11 +46,14 @@ typedef enum eSHMEM_ACTIVITY
 } tSHMEM_ACTIVITY;
 static const char *ACTIVITY_NAMES[4] = {"CREATE","WRITE","GETINFO","SHMEM_RETRIEVE"};
 
+#define DEFAULT_TANK_SIZE (100*1024)
+#define SEMAPHORE_NAME_SIZE (16)
+
 // Local Vars
-static const unsigned int    __shMemAccessPermissions  = 0666; // 0644;
-static char *                __shMemBackingFilename    = "shmem_ibrand01"; // e.g. /dev/shm/shmem_ibrand01
-static unsigned long         __shMemSizeInBytes        = sizeof(tSHMEMHEADER) + (100*1024);
-static char *                __shMemSemaphoreName      = "sem_ibrand01";
+static const unsigned int    __shMemAccessPermissions = 0666;                 // or 0644
+static char                  __shMemBackingFilename[_MAX_PATH] = {0};         // Typically "shmem_ibrand01" e.g. /dev/shm/shmem_ibrand01
+static unsigned long         __shMemSizeInBytes = 0;                          // Typically sizeof(tSHMEMHEADER) + DEFAULT_TANK_SIZE; // See SHMEM_STORAGESIZE, pIBConfig->shMemStorageSize, ShMem_SetStorageSize
+static char                  __shMemSemaphoreName[SEMAPHORE_NAME_SIZE] = {0}; // Typically "sem_ibrand01"
 
 static const int localDebugTracing = false;
 
@@ -76,6 +79,22 @@ static bool __ShMem_DoActivity(tSHMEM_ACTIVITY whichActivity, void *pUserData)
     enum {BEFORE_CALLBACK=0, AFTER_CALLBACK=1, BEFORE_AND_AFTER_CALLBACK=2} checkIntegrity;
     void (*shMemCallBackFn)(char *memptr, void *userptr);
     int timeToSleep;
+
+    if (strlen(__shMemBackingFilename) == 0)
+    {
+        app_tracef("ERROR: SharedMemory Backing Filename not configured");
+        return false;
+    }
+    if (__shMemSizeInBytes <= sizeof(tSHMEMHEADER))
+    {
+        app_tracef("ERROR: SharedMemory size not configured");
+        return false;
+    }
+    if (strlen(__shMemSemaphoreName) == 0)
+    {
+        app_tracef("ERROR: SharedMemory Semaphone name not configured");
+        return false;
+    }
 
     switch (whichActivity)
     {
@@ -388,25 +407,22 @@ static void __ShMem_PrintStats(const char *memptr, tSHMEM_ACTIVITY currentActivi
 
 void ShMem_SetBackingFilename(char *szBackingFilename)
 {
-    // default = "shmem_ibrand01"; // e.g. /dev/shm/shmem_ibrand01
     if (szBackingFilename && strlen(szBackingFilename))
     {
         strcpy(__shMemBackingFilename, szBackingFilename);
     }
 }
 
-void ShMem_SetStorageSize(size_t sizeOfDataStore)
+void ShMem_SetStorageSize(size_t tankSize)
 {
-    // default = (100*1024)
-    if (sizeOfDataStore)
+    if (tankSize)
     {
-        __shMemSizeInBytes = sizeof(tSHMEMHEADER) + sizeOfDataStore;
+        __shMemSizeInBytes = sizeof(tSHMEMHEADER) + tankSize;
     }
 }
 
 void ShMem_SetSemaphoreName(char *szSemaphoreName)
 {
-    // default = "sem_ibrand01"
     if (szSemaphoreName && strlen(szSemaphoreName))
     {
         strcpy(__shMemSemaphoreName, szSemaphoreName);
@@ -483,14 +499,14 @@ bool ShMem_GetInfo(tSHMEMHEADER *pShCopyOfMemHeader)
 long ShMem_GetCurrentWaterLevel(void)
 {
     tSHMEMHEADER shMemCopyOfHeader;
-    long currentWaterLevel = -1;
+    long waterLevel = -1;
 
     memset(&shMemCopyOfHeader, 0, sizeof(tSHMEMHEADER));
     if (ShMem_GetInfo(&shMemCopyOfHeader))
     {
-        currentWaterLevel = shMemCopyOfHeader.waterLevel;
+        waterLevel = shMemCopyOfHeader.waterLevel;
     }
-    return currentWaterLevel;
+    return waterLevel;
 }
 
 long ShMem_GetTankSize(void)

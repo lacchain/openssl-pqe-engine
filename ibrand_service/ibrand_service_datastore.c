@@ -54,7 +54,6 @@ long dataStore_GetAvailableStorage(tIB_INSTANCEDATA *pIBRand)
     if (strcmp(pIBRand->cfg.szStorageType,"FILE")==0)
     {
         availableStorage = pIBRand->cfg.storageHighWaterMark - my_getFilesize(pIBRand->cfg.szStorageFilename);
-        //if (localDebugTracing) app_tracef("DEBUG: Filename=\"%s\", currentWaterLevel=%d", pIBRand->szStorageFilename, availableStorage);
     }
     else if (strcmp(pIBRand->cfg.szStorageType,"SHMEM")==0)
     {
@@ -75,9 +74,9 @@ bool dataStore_Initialise(tIB_INSTANCEDATA *pIBRand)
     }
     else if (strcmp(pIBRand->cfg.szStorageType,"SHMEM")==0)
     {
-        //ShMem_SetBackingFilename (pIBRand->cfg.shMemBackingFilename); // char[128] // "shmem_ibrand01" e.g. /dev/shm/shmem_ibrand01
-        //ShMem_SetStorageSize     (pIBRand->cfg.shMemStorageSize    );  // long      // (100*1024)
-        //ShMem_SetSemaphoreName   (pIBRand->cfg.shMemSemaphoreName  ); // char[16]  // "sem_ibrand01"
+        ShMem_SetBackingFilename (pIBRand->cfg.shMemBackingFilename); // char[128] // "shmem_ibrand01" e.g. /dev/shm/shmem_ibrand01
+        ShMem_SetStorageSize     (pIBRand->cfg.shMemStorageSize    );  // long      // (100*1024)
+        ShMem_SetSemaphoreName   (pIBRand->cfg.shMemSemaphoreName  ); // char[16]  // "sem_ibrand01"
 
         if (localDebugTracing) app_tracef("DEBUG: Calling ShMem_CreateDataStore");
         if (!ShMem_CreateDataStore())
@@ -89,10 +88,10 @@ bool dataStore_Initialise(tIB_INSTANCEDATA *pIBRand)
 }
 
 static unsigned int __dataStore_AppendToFile(char *pData,
-                                    size_t cbData,
-                                    char *szStorageFilename,
-                                    char *szStorageLockfilePath,
-                                    char *szStorageDataFormat)
+                                             size_t cbData,
+                                             char *szStorageFilename,
+                                             char *szStorageLockfilePath,
+                                             char *szStorageDataFormat)
 {
     //if (localDebugTracing) app_tracef("__dataStore_AppendToFile (%u:%s)\n", cbData, pData);
     FILE *f;
