@@ -561,10 +561,16 @@ static void shMemCallBackFn_Retrieve(char * memptr, void *userptr)
     // Get a copy of the data from the dataStore.
     // TODO: Change to FIFO. Currently LIFO - not ideal, but ok for PoC
     memcpy(pRetrievedData->pData, pShMemData + pShMemHeader->waterLevel - bytesToRead, bytesToRead);
+
+//#define PERFORMANCE_TESTING_DO_NOT_ADVANCE_SHMEM_PTR
+#ifdef PERFORMANCE_TESTING_DO_NOT_ADVANCE_SHMEM_PTR
+        app_tracef("DEBUG: PERFORMANCE_TESTING_DO_NOT_ADVANCE_SHMEM_PTR");
+#else
     // Destroy the original
     memset(pShMemData + pShMemHeader->waterLevel - bytesToRead, 0xFF, bytesToRead);
     // Adjust the waterlevel (and write pointer)
     pShMemHeader->waterLevel -= bytesToRead;
+#endif
     // Comminicate back to the caller the number of bytes actually retrieved.
     pRetrievedData->cbData = bytesToRead;
 }
