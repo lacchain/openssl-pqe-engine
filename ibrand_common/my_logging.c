@@ -24,22 +24,32 @@
 #include <syslog.h>
 #include <libgen.h>
 
-
 #include "my_utils.h"
 #include "my_logging.h"
 
 //#define MK_WIN_EMUL
-int OUTPUT_TO_CONSOLE_ENABLED = 0;
+#define OUTPUT_TO_CONSOLE_ENABLED
 #define OUTPUT_TO_LOGFILE_ENABLED
 #define OUTPUT_TO_SYSLOG_ENABLED
 #define ALSO_LOG_INTERNAL_ERRORS
 
+#ifdef OUTPUT_TO_SYSLOG_ENABLED
+#include <syslog.h>
+#endif
 
-#ifndef OUTPUT_TO_SYSLOG_ENABLED
-static char DEFAULTLOGFILEPATH[_MAX_PATH] = {"/var/lib/unknown"};
-static char DEFAULTLOGFILENAME[_MAX_PATH] = {"unknown_component.log"};
-#endif // OUTPUT_TO_SYSLOG_ENABLED
 
+typedef struct tagAPPTRACECONFIG
+{
+    char logFilePath[_MAX_PATH];
+    char logFilename[_MAX_PATH];
+    bool logToConsole;
+    bool logToLogfile;
+    bool logToSyslog;
+} tAPPTRACECONFIG;
+
+static tAPPTRACECONFIG _gAppTraceConfig = {"/var/lib/unknown", "unknown_component.log", false, false, true};
+
+static const char *app_trace_get_logfilename(const char *szFilename);
 
 ///////////////////////////////////////////////////////////////////////////////
 // Logging Functions
@@ -171,7 +181,7 @@ void app_trace_hex(const char *pHeader, const char *pData, int cbData)
   pTemp = (char *)malloc(malloc_size);
   if (pTemp)
   {
-    app_trace_zstring(FormatData(pTemp, pHeader, (unsigned char *)pData, cbData, ALL_IN_BASIC_HEX));
+    app_traceln(FormatData(pTemp, pHeader, (unsigned char *)pData, cbData, ALL_IN_BASIC_HEX));
     app_timer_delay(10);
     free(pTemp);
   }
@@ -179,15 +189,15 @@ void app_trace_hex(const char *pHeader, const char *pData, int cbData)
   {
     char tempStr[20];
 #ifdef ALSO_LOG_INTERNAL_ERRORS
-    app_trace_zstring_nocrlf("ERROR: Cannot display data do due malloc failure: ==>\"");
+    app_trace("ERROR: Cannot display data do due malloc failure: ==>\"");
 #else
-    app_trace_zstring_nocrlf("Data ==>\"");
+    app_trace("Data ==>\"");
 #endif
-    app_trace_zstring_nocrlf(pHeader);
-    app_trace_zstring_nocrlf("\", ");
+    app_trace(pHeader);
+    app_trace("\", ");
     sprintf(tempStr, "%d bytes", cbData);
-    app_trace_zstring_nocrlf(tempStr);
-    app_trace_zstring("<==");
+    app_trace(tempStr);
+    app_traceln("<==");
     app_timer_delay(10);
   }
 }
@@ -197,10 +207,6 @@ void app_trace_hexall(const char *pHeader, const unsigned char *pData, unsigned 
   char *pTemp;
   size_t malloc_size;
 
-  //if (cbData<0)
-  //  return;
-
-  //
   // "<=="
   malloc_size =   (pHeader?strlen(pHeader):0) +       // Space for "%s"
                 + (pHeader?(6+5+2):0) +               // Space for " (len=%d) "
@@ -212,7 +218,7 @@ void app_trace_hexall(const char *pHeader, const unsigned char *pData, unsigned 
   pTemp = (char *)malloc(malloc_size);
   if (pTemp)
   {
-    app_trace_zstring(FormatData(pTemp, pHeader, (unsigned char *)pData, cbData, ALL_IN_BASIC_HEX)); // NB FALSE <=========== ALL chars in hex
+    app_traceln(FormatData(pTemp, pHeader, (unsigned char *)pData, cbData, ALL_IN_BASIC_HEX)); // NB FALSE <=========== ALL chars in hex
     app_timer_delay(10);
     free(pTemp);
   }
@@ -220,20 +226,20 @@ void app_trace_hexall(const char *pHeader, const unsigned char *pData, unsigned 
   {
     char tempStr[20];
 #ifdef ALSO_LOG_INTERNAL_ERRORS
-    app_trace_zstring_nocrlf("ERROR: Cannot display data do due malloc failure: ==>\"");
+    app_trace("ERROR: Cannot display data do due malloc failure: ==>\"");
 #else
-    app_trace_zstring_nocrlf("Data ==>\"");
+    app_trace("Data ==>\"");
 #endif
-    app_trace_zstring_nocrlf(pHeader);
-    app_trace_zstring_nocrlf("\", ");
+    app_trace(pHeader);
+    app_trace("\", ");
     sprintf(tempStr, "%u bytes", cbData);
-    app_trace_zstring_nocrlf(tempStr);
-    app_trace_zstring("<==");
+    app_trace(tempStr);
+    app_traceln("<==");
     app_timer_delay(10);
   }
 }
-#ifdef OUTPUT_TO_LOGFILE_ENABLED
 
+#ifdef OUTPUT_TO_LOGFILE_ENABLED
 #ifdef INCLUDE_WINDOWS_TYPE_FUNCTIONS
 static const char * WinGetEnv(const char * name)
 {
@@ -248,55 +254,104 @@ static const char * WinGetEnv(const char * name)
         return 0;
     }
 }
-#endif
-
-#ifdef OUTPUT_TO_SYSLOG_ENABLED
-#include <syslog.h>
-
-//void closelog(void);
-//void openlog(const char *ident, int logopt, int facility);
-//int setlogmask(int maskpri);
-//void syslog(int priority, const char *message, ... /* arguments */);
+#endif // INCLUDE_WINDOWS_TYPE_FUNCTIONS
+#endif // OUTPUT_TO_LOGFILE_ENABLED
 
 void app_trace_openlog(const char *ident, int logopt, int facility)
 {
+#ifdef OUTPUT_TO_SYSLOG_ENABLED
+   // void openlog(const char *ident, int logopt, int facility);
    // e.g. logopt  : LOG_PID | LOG_CONS | LOG_PERROR
    //      facility: LOG_DAEMON or LOG_USER
    openlog(ident, logopt, facility);
+#endif
 }
+
 void app_trace_closelog(void)
 {
+#ifdef OUTPUT_TO_SYSLOG_ENABLED
    closelog();
+#endif
 }
+
 static void appendToLogfile(const char *szString, bool emitCrLf)
 {
+#ifdef OUTPUT_TO_SYSLOG_ENABLED
+  if (_gAppTraceConfig.logToSyslog)
+  {
+    // void syslog(int priority, const char *message, ... );
     syslog(LOG_ERR, "%s%s", szString, emitCrLf?"\n":"");
     // LOG_EMERG, LOG_ALERT, LOG_CRIT, LOG_ERR, LOG_WARNING, LOG_NOTICE, LOG_INFO and LOG_DEBUG
+  }
+#endif
+
+#ifdef OUTPUT_TO_LOGFILE_ENABLED
+    if (_gAppTraceConfig.logToLogfile)
+    {
+        FILE *fLogfile;
+        const char *pszLogFilename;
+        static int bInitialised = FALSE;
+
+        // We'll open and close every time for now, to aid debugging...
+        pszLogFilename = app_trace_get_logfilename(_gAppTraceConfig.logFilename);
+        if (!bInitialised)
+        {
+            fprintf(stderr, "Appending to Logfile: \"%s\"\n",pszLogFilename);
+        }
+        fLogfile = fopen(pszLogFilename, "at");
+        if (!fLogfile)
+        {
+            fLogfile = fopen(pszLogFilename, "wt");
+        }
+        if (!fLogfile)
+        {
+            if (errno == EACCES) // 13
+                fprintf(stderr, "FATAL: Error opening Logfile: \"%s\". errno=EACCES(13,Permission denied). Terminating.\n",pszLogFilename);
+            else
+                fprintf(stderr, "FATAL: Error opening Logfile: \"%s\". errno=%d. Terminating.\n",pszLogFilename, errno);
+            return;
+        }
+        bInitialised = TRUE;
+
+        fwrite(szString,1,strlen(szString),fLogfile);
+        if (emitCrLf)
+        {
+            fwrite(EOL,1,strlen(EOL),fLogfile);
+        }
+        fclose(fLogfile);
+    }
+#endif // OUTPUT_TO_LOGFILE_ENABLED
 }
 
-#else // OUTPUT_TO_SYSLOG_ENABLED
-
-void app_trace_openlog(const char *ident, int logopt, int facility)
+void app_trace_set_destination(bool toConsole, bool toLogfile, bool toSyslog)
 {
-}
-void app_trace_closelog(void)
-{
+#ifdef OUTPUT_TO_CONSOLE_ENABLED
+    _gAppTraceConfig.logToConsole = toConsole;
+#endif
+#ifdef OUTPUT_TO_LOGFILE_ENABLED
+    _gAppTraceConfig.logToLogfile = toLogfile;
+#endif
+#ifdef OUTPUT_TO_SYSLOG_ENABLED
+    _gAppTraceConfig.logToSyslog = toSyslog;
+#endif
 }
 
-void setLogFilename(const char *szPath, const char *szFilename)
+void app_trace_set_logfilename(const char *szPath, const char *szFilename)
 {
-    strcpy(DEFAULTLOGFILEPATH, szPath);     // e.g. "/var/lib/<projectname>";
-    strcpy(DEFAULTLOGFILENAME, szFilename); // e.g. "<projectname>_<component>.log"};
+#ifdef OUTPUT_TO_LOGFILE_ENABLED
+    strcpy(_gAppTraceConfig.logFilePath, szPath);     // e.g. "/var/lib/<projectname>";
+    strcpy(_gAppTraceConfig.logFilename, szFilename); // e.g. "<projectname>_<component>.log"};
+#endif
 }
 
-static const char *getLogFilename(const char *szFilename)
+const char *app_trace_get_logfilename(const char *szFilename)
 {
     static char szLogFilename[_MAX_PATH];
 #ifdef INCLUDE_WINDOWS_TYPE_FUNCTIONS
     const char *szTempPath = WinGetEnv("TEMP");
     strcpy(szLogFilename, szTempPath?szTempPath:"C:\\");
 #else
-    strcpy(szLogFilename, DEFAULTLOGFILEPATH);
+    strcpy(szLogFilename, _gAppTraceConfig.logFilePath);
 #endif
     if (szLogFilename[strlen(szLogFilename)] != PATHSEPARATOR)
         strcat(szLogFilename, PATHSEPARATORSTR);
@@ -304,84 +359,43 @@ static const char *getLogFilename(const char *szFilename)
     return szLogFilename;
 }
 
-static void appendToLogfile(const char *szString, bool emitCrLf)
-{
-    FILE *fLogfile;
-    const char *pszLogFilename;
-    static int bInitialised = FALSE;
-
-    // We'll open and close every time for now, to aid debugging...
-    pszLogFilename = getLogFilename(DEFAULTLOGFILENAME);
-    if (!bInitialised)
-    {
-        fprintf(stderr, "Appending to Logfile: \"%s\"\n",pszLogFilename);
-    }
-    fLogfile = fopen(pszLogFilename, "at");
-    if (!fLogfile)
-    {
-        fLogfile = fopen(pszLogFilename, "wt");
-    }
-    if (!fLogfile)
-    {
-        if (errno == EACCES) // 13
-            fprintf(stderr, "FATAL: Error opening Logfile: \"%s\". errno=EACCES(13,Permission denied). Terminating.\n",pszLogFilename);
-        else
-            fprintf(stderr, "FATAL: Error opening Logfile: \"%s\". errno=%d. Terminating.\n",pszLogFilename, errno);
-
-        exit(155);
-        return;
-    }
-    bInitialised = TRUE;
-
-    fwrite(szString,1,strlen(szString),fLogfile);
-    if (emitCrLf)
-    {
-        fwrite(EOL,1,strlen(EOL),fLogfile);
-    }
-    fclose(fLogfile);
-}
-#endif // OUTPUT_TO_SYSLOG_ENABLED
-#endif // OUTPUT_TO_LOGFILE_ENABLED
-
+#ifdef OUTPUT_TO_CONSOLE_ENABLED
 static void OutputDebugStringA(const char *szString)
 {
     int n;
-    if (OUTPUT_TO_CONSOLE_ENABLED)
+    if (_gAppTraceConfig.logToConsole)
     {
         //printf(szString);
         n = write(STDERR_FILENO, szString, strlen(szString));
     }
     UNUSED_PARAM(n);
 }
+#endif // OUTPUT_TO_CONSOLE_ENABLED
 
-void app_trace_zstring(const char *szString)
+static void __app_trace(const char *szString, bool emitCrLf)
 {
     //TRACE ("msg=%s, int=%d\n", (LPCTSTR)sMsg, i);
     //OutputDebugString (LPCTSTR szMessage)
-    //app_trace(szMessage);
+    //app_traceln(szMessage);
 
+#ifdef OUTPUT_TO_CONSOLE_ENABLED
     OutputDebugStringA(szString);
-    OutputDebugStringA(EOL);
+    if (emitCrLf)
+        OutputDebugStringA(EOL);
+#endif // OUTPUT_TO_CONSOLE_ENABLED
 
-#ifdef OUTPUT_TO_LOGFILE_ENABLED
-    // Append this to our log file
-    appendToLogfile(szString, true);
-#endif
+    // Append this to our log file or syslog, if enabled
+    appendToLogfile(szString, emitCrLf);
 }
 
-void app_trace_zstring_nocrlf(const char *szString)
+void app_traceln(const char *szString)
 {
-    OutputDebugStringA(szString);
-
-#ifdef OUTPUT_TO_LOGFILE_ENABLED
-    // Append this to our log file
-    appendToLogfile(szString, false);
-#endif
+    __app_trace(szString, true);
 }
 
 void app_trace(const char *szString)
 {
-    app_trace_zstring(szString);
+    __app_trace(szString, false);
 }
 
 int app_tracef(const char *formatStr, ...)
@@ -403,7 +417,7 @@ int app_tracef(const char *formatStr, ...)
         free(pBuf);
         return -1;
     }
-    app_trace_zstring(pBuf);
+    app_traceln(pBuf);
     va_end(va);
     free(pBuf);
     return rc;
@@ -458,15 +472,9 @@ int my_getToken(const char *pSrcData, char *pDstField, int nFieldNum, int nDstFi
     if (pSrcData[i] == 0)
       break;
 
-    // JG: Why do we remove embedded spaces?
-    // It is quite possible that an apn or username or password could
-    // have embedded spaces.
-    // I removed this condition and added a TrimLeading and TrimTrailing instead.
-    //if ((pSrcData[i] != ' ') && (pSrcData[i] != '[') && (pSrcData[i] != ']'))
-    {
-      pDstField[j] = pSrcData[i];
-      j++;
-    }
+    pDstField[j] = pSrcData[i];
+    j++;
+
     i++;
     // Check if field is too big to fit on passed parameter. If it is,
     // crop returned field to its max length.
@@ -480,15 +488,12 @@ int my_getToken(const char *pSrcData, char *pDstField, int nFieldNum, int nDstFi
   if (j<=0)
   {
 #ifdef ALSO_LOG_INTERNAL_ERRORS
-    app_trace_zstring("TRACE: GetToken found token with zero length");
+    app_traceln("TRACE: GetToken found token with zero length");
     app_timer_delay(10);
 #endif
     return FALSE;
   }
 
-  // JG: Added these TrimLeading and TrimTrailing instead
-  // the previous code above which remeved all embedded spaces and
-  // square braces.
   my_trimLeading(pDstField," [");
   my_trimTrailing(pDstField," ]");
 
@@ -502,7 +507,7 @@ int my_getToken(const char *pSrcData, char *pDstField, int nFieldNum, int nDstFi
   return TRUE;
 }
 
-void dumpToFile(const char *szFilename, const unsigned char *p, size_t n)
+void my_dumpToFile(const char *szFilename, const unsigned char *p, size_t n)
 {
     app_tracef("Dumping %d bytes to %s", n, szFilename);
     FILE *f = fopen(szFilename, "wb");

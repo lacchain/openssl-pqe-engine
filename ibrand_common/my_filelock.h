@@ -15,6 +15,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 // File Locking Functions
 ///////////////////////////////////////////////////////////////////////////////
+
+#define FILELOCK_LOGLEVEL 0x00  // 0x00 is disabled, 0x01 is stdout, 0x02 is syslog
+
 extern void my_waitForFileLock(char *szLockFilePath, char *szFilename, int loglevel);
 extern void my_releaseFileLock(char *szLockFilePath, char *szFilename, int loglevel);
 

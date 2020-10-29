@@ -68,7 +68,7 @@ int ValidateSettings(tIB_CONFIGDATA *pIBConfig)
 static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfig)
 {
     JSONObject *json2;
-    const int localConfigTracing = false;
+    const int localDebugTracing = false;
 
     json2 = my_parseJSON(szJsonConfig);
     if (!json2)
@@ -79,7 +79,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
 
     for (int ii=0; ii<json2->count; ii++)
     {
-        if (localConfigTracing)
+        if (localDebugTracing)
             app_tracef("DEBUG: Found json item[%d] %s=%s\n", ii, json2->pairs[ii].key, (json2->pairs[ii].type == JSON_STRING)?(json2->pairs[ii].value->stringValue):"[JSON object]");
 
         if (strcmp(json2->pairs[ii].key,"AuthSettings") == 0 && json2->pairs[ii].type == JSON_OBJECT)
@@ -88,7 +88,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
 
             for (int jj=0; jj<childJson->count; jj++)
             {
-                if (localConfigTracing)
+                if (localDebugTracing)
                     app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
@@ -134,7 +134,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
 
             for (int jj=0; jj<childJson->count; jj++)
             {
-                if (localConfigTracing)
+                if (localDebugTracing)
                     app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
@@ -164,7 +164,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
 
             for (int jj=0; jj<childJson->count; jj++)
             {
-                if (localConfigTracing)
+                if (localDebugTracing)
                     app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
@@ -190,7 +190,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
 
             for (int jj=0; jj<childJson->count; jj++)
             {
-                if (localConfigTracing)
+                if (localDebugTracing)
                     app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
@@ -246,7 +246,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
 
             for (int jj=0; jj<childJson->count; jj++)
             {
-                if (localConfigTracing)
+                if (localDebugTracing)
                     app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
@@ -331,11 +331,12 @@ void PrintConfig(tIB_CONFIGDATA *pIBConfig)
     app_tracef("szStorageDataFormat   =[%s]" , pIBConfig->szStorageDataFormat   ); // char[16]      // RAW, BASE64, HEX
     app_tracef("szStorageFilename     =[%s]" , pIBConfig->szStorageFilename     ); // char[128]     // "/var/lib/ibrand/ibrand_data.bin"
     app_tracef("szStorageLockfilePath =[%s]" , pIBConfig->szStorageLockfilePath ); // char[128]     // "/tmp"
-    app_tracef("shMemBackingFilename  =[%s]" , pIBConfig->shMemBackingFilename  ); // char[128]     // "shmem_ibrand01" e.g. /dev/shm/shmem_ibrand01
-    app_tracef("shMemStorageSize      =[%ld]", pIBConfig->shMemStorageSize      ); // long          // (100*1024)
-    app_tracef("shMemSemaphoreName    =[%s]" , pIBConfig->shMemSemaphoreName    ); // char[16]      // "sem_ibrand01"
     app_tracef("storageHighWaterMark  =[%ld]", pIBConfig->storageHighWaterMark  ); // long          // 1038336; // 1MB
     app_tracef("storageLowWaterMark   =[%ld]", pIBConfig->storageLowWaterMark   ); // long          // 102400; // 100KB
+    app_tracef("shMemBackingFilename  =[%s]" , pIBConfig->shMemBackingFilename  ); // char[128]     // "shmem_ibrand01" e.g. /dev/shm/shmem_ibrand01
+    app_tracef("shMemSemaphoreName    =[%s]" , pIBConfig->shMemSemaphoreName    ); // char[16]      // "sem_ibrand01"
+    app_tracef("shMemStorageSize      =[%ld]", pIBConfig->shMemStorageSize      ); // long          // (100*1024)
+    app_tracef("shMemLowWaterMark     =[%ld]", pIBConfig->shMemLowWaterMark     ); // long          // 102400; // 100KB
     app_tracef("idleDelay             =[%d]" , pIBConfig->idleDelay             ); // int           //
 
     app_tracef("secretKeyBytes        =[%u]" , pIBConfig->secretKeyBytes        );
@@ -345,7 +346,7 @@ void PrintConfig(tIB_CONFIGDATA *pIBConfig)
 static bool __ParseJsonOOBData(const char *szJsonString, tIB_OOBDATA *pOobData)
 {
     JSONObject *json2;
-    const int localConfigTracing = false;
+    const int localDebugTracing = false;
 
     json2 = my_parseJSON(szJsonString);
     if (!json2)
@@ -356,7 +357,7 @@ static bool __ParseJsonOOBData(const char *szJsonString, tIB_OOBDATA *pOobData)
 
     for (int ii=0; ii<json2->count; ii++)
     {
-        if (localConfigTracing)
+        if (localDebugTracing)
             app_tracef("DEBUG: Found json item[%d] %s=%s\n", ii, json2->pairs[ii].key, (json2->pairs[ii].type == JSON_STRING)?(json2->pairs[ii].value->stringValue):"[JSON object]");
 
         if (json2->pairs[ii].type == JSON_STRING)

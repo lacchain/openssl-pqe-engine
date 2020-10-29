@@ -122,6 +122,8 @@ typedef struct
 
 static int IBRandEngineStateInit(IBRandEngineState *engine_state)
 {
+  app_trace_set_destination(false, false, true); // (toConsole, toLogFile; toSyslog)
+  app_trace_openlog(NULL, LOG_PID, LOG_USER );
   memset(engine_state, 0, sizeof(*engine_state));
   RingBufferInit(&engine_state->ring_buffer);
   engine_state->status = initIBRand(&engine_state->trng_context);
@@ -155,7 +157,7 @@ static int Bytes(unsigned char *buf, int num)
       size_t rand_bytes = readData(&engine_state.trng_context, rand_buffer, BUFLEN);
       if (engine_state.trng_context.errorCode)
       {
-        fprintf(stderr, "[ibrand_openssl] ERROR: errorCode=%d, msg=%s\n", engine_state.trng_context.errorCode, engine_state.trng_context.message ? engine_state.trng_context.message : "unknown");
+        app_tracef("ERROR: readData failed: errorCode=%d, msg=%s", engine_state.trng_context.errorCode, engine_state.trng_context.message ? engine_state.trng_context.message : "unknown");
         engine_state.status = kEngineFail;
         engine_state.trng_context.errorCode = 0;
         break;
@@ -163,14 +165,15 @@ static int Bytes(unsigned char *buf, int num)
       size_t bytes_written = RingBufferWrite(&engine_state.ring_buffer, rand_bytes, rand_buffer);
       if (bytes_written != rand_bytes)
       {
-        fprintf(stderr, "[ibrand_openssl] ERROR: Invalid ibrand engine buffer state\n");
+        app_tracef("ERROR: Invalid ibrand engine buffer state");
         engine_state.status = kEngineFail;
         break;
       }
-      if (localDebugTracing) fprintf(stderr, "[ibrand_openssl] DEBUG: (Bytes) RingBuffer restocked with %lu bytes. Try again...\n", (unsigned long)bytes_written);
+      //if (localDebugTracing) app_tracef("DEBUG: RingBuffer replenished with %lu bytes. Try again...", (unsigned long)bytes_written);
     }
   }
-  //if (localDebugTracing) fprintf(stderr, "[ibrand_openssl] DEBUG: ----------------------------------------------------------------------------\n");
+  //if (localDebugTracing) app_tracef("DEBUG: Inbound openssl rand (requested:%d, supplied:%d) Done", requestBytes, requestBytes-bytesStillRequired);
+
   return engine_state.status;
 }
 

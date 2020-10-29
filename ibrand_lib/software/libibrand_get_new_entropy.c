@@ -29,8 +29,7 @@ bool GetNewEntropy(struct ibrand_context *context, tIB_INSTANCEDATA *pIBRand, ui
 {
     bool rc = false;
 
-    if (localDebugTracing)
-        app_tracef("DEBUG: GetNewEntropy inBufLen: %u", inBufLen);
+    //if (localDebugTracing) app_tracef("DEBUG: GetNewEntropy inBufLen: %u", inBufLen);
 
     if (strcmp(pIBRand->cfg.szStorageType, "FILE") == 0)
     {
@@ -130,7 +129,7 @@ static bool GetNewEntropyFromSharedMemory(struct ibrand_context *context, uint8_
     bytesToRead = inBufLen;
 
     if (localDebugTracing)
-        app_tracef("DEBUG: GetNewEntropyFromSharedMemory bytesToRead: %u", bytesToRead);
+        //if (localDebugTracing) app_tracef("DEBUG: GetNewEntropyFromSharedMemory [Attempt %d] -------------- <<<", numFailedReads);
 
     // Ensure that there is enough data
     waterLevel = ShMem_GetCurrentWaterLevel();

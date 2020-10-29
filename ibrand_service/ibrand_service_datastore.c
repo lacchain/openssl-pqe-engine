@@ -37,15 +37,13 @@ long dataStore_GetCurrentWaterLevel(tIB_INSTANCEDATA *pIBRand)
     if (strcmp(pIBRand->cfg.szStorageType,"FILE")==0)
     {
         currentWaterLevel = my_getFilesize(pIBRand->cfg.szStorageFilename);
-        //if (localDebugTracing) app_tracef("DEBUG: Filename=\"%s\", currentWaterLevel=%d", pIBRand->szStorageFilename, currentWaterLevel);
     }
     else if (strcmp(pIBRand->cfg.szStorageType,"SHMEM")==0)
     {
 
         currentWaterLevel = ShMem_GetCurrentWaterLevel();
-        //if (localDebugTracing) app_tracef("DEBUG: Filename=\"%s\", currentWaterLevel=%d", pIBRand->szStorageFilename, currentWaterLevel);
     }
-
+    if (localDebugTracing) app_tracef("DEBUG: Type=\"%s\", waterLevel=%d", pIBRand->cfg.szStorageType, waterLevel);
     return currentWaterLevel;
 }
 
@@ -62,7 +60,7 @@ long dataStore_GetAvailableStorage(tIB_INSTANCEDATA *pIBRand)
     {
 
         availableStorage = ShMem_GetAvailableStorage();
-        //if (localDebugTracing) app_tracef("DEBUG: Filename=\"%s\", currentWaterLevel=%d", pIBRand->szStorageFilename, availableStorage);
+    if (localDebugTracing) app_tracef("DEBUG: Type=\"%s\", lowWaterMark=%d", pIBRand->cfg.szStorageType, lowWaterMark);
     }
 
     return availableStorage;
@@ -96,7 +94,7 @@ static unsigned int __dataStore_AppendToFile(char *pData,
                                     char *szStorageLockfilePath,
                                     char *szStorageDataFormat)
 {
-    //if (localDebugTracing) fprintf(stdout, "[ibrand-service] %u:%s\n", pIBRand->ResultantData.cbData, pIBRand->ResultantData.pData);
+    //if (localDebugTracing) app_tracef("__dataStore_AppendToFile (%u:%s)\n", cbData, pData);
     FILE *f;
     unsigned int bytesWritten1 = 0;
     unsigned int bytesWritten2 = 0;
@@ -148,7 +146,7 @@ bool dataStore_Append(tIB_INSTANCEDATA *pIBRand)
     }
     else
     {
-        app_tracef("WARNING: Unsupported storage type \"%s\". Discarding %u bytes.", pIBRand->cfg.szStorageType, pIBRand->ResultantData.cbData);
+        app_tracef("WARNING: Unsupported storage type \"%s\". Discarding %u bytes.", pIBRand->cfg.szStorageType, pResultantData->cbData);
         return false;
     }
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))

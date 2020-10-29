@@ -409,13 +409,11 @@ static int DecryptAndStoreKemSecretKey(tIB_INSTANCEDATA *pIBRand)
 
     unsigned char *p = (unsigned char *)pIBRand->encryptedKemSecretKey.pData;
     size_t n = pIBRand->encryptedKemSecretKey.cbData;
-    //dumpToFile("/home/jgilmore/dev/dump_KemSecretKey_A_quoted_base64_encrypted_key.txt", p, n);
 
     //app_trace_hexall("DEBUG: base64 encoded encryptedKemSecretKey:", pIBRand->encryptedKemSecretKey.pData, pIBRand->encryptedKemSecretKey.cbData);
     if (p[0] == '"') {p++; n--;}
     if (p[n-1] == '"') {n--;}
     //app_trace_hexall("DEBUG: p:", p, n);
-    //dumpToFile("/home/jgilmore/dev/dump_KemSecretKey_B_base64_encrypted_key.txt", p, n);
 
     // base64_decode the encapsulate key
     size_t decodeSize = 0;
@@ -425,7 +423,6 @@ static int DecryptAndStoreKemSecretKey(tIB_INSTANCEDATA *pIBRand)
        app_tracef("WARNING: Failed to decode Base64 EncryptedKey");
        return 2103;
     }
-    //dumpToFile("/home/jgilmore/dev/dump_KemSecretKey_C_encrypted_key.txt", rawEncryptedKey, decodeSize);
 
     if (decodeSize != CRYPTO_CIPHERTEXTBYTES)
     {
@@ -443,7 +440,7 @@ static int DecryptAndStoreKemSecretKey(tIB_INSTANCEDATA *pIBRand)
     rc = AESDecryptBytes(rawEncryptedKey, decodeSize, (uint8_t *)pIBRand->symmetricSharedSecret.pData, pIBRand->symmetricSharedSecret.cbData, 32 /*saltsize*/, &pDecryptedData, &cbDecryptedData);
     if (rc)
     {
-        fprintf(stderr, "AESDecryptBytes failed with rc=%d\n", rc);
+        app_tracef("AESDecryptBytes failed with rc=%d\n", rc);
     }
     pIBRand->ourKemSecretKey.pData = (char *)pDecryptedData;
     pIBRand->ourKemSecretKey.cbData = cbDecryptedData;
@@ -462,7 +459,6 @@ static int DecryptAndStoreKemSecretKey(tIB_INSTANCEDATA *pIBRand)
     KatDataVerify(&(pIBRand->ourKemSecretKey), expectedLength, "KemSecretKey");
 #endif // KAT_KNOWN_ANSWER_TESTING
 
-    //dumpToFile("/home/jgilmore/dev/dump_KemSecretKey_D_raw.txt", (unsigned char *)pIBRand->ourKemSecretKey.pData, pIBRand->ourKemSecretKey.cbData);
     app_tracef("INFO: KEM key stored successfully (%lu bytes)", pIBRand->ourKemSecretKey.cbData);
 
     // Job done
@@ -505,13 +501,11 @@ static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
 
     unsigned char *p = (unsigned char *)pIBRand->encapsulatedSharedSecret.pData;
     size_t n = pIBRand->encapsulatedSharedSecret.cbData;
-    //dumpToFile("/home/jgilmore/dev/dump_SharedSecret_A_quoted_base64_encapsulated_key.txt", p, n);
 
     //app_trace_hexall("DEBUG: base64 encoded encapsulatedSharedSecret:", pIBRand->encapsulatedSharedSecret.pData, pIBRand->encapsulatedSharedSecret.cbData);
     if (p[0] == '"') {p++; n--;}
     if (p[n-1] == '"') {n--;}
     //app_trace_hexall("DEBUG: p:", p, n);
-    //dumpToFile("/home/jgilmore/dev/dump_SharedSecret_B_base64_encapsulated_key.txt", p, n);
 
     // base64_decode the encapsulate key
     size_t decodeSize = 0;
@@ -521,7 +515,6 @@ static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
        app_tracef("WARNING: Failed to decode Base64 EncapsulatedKey");
        return 2204;
     }
-    //dumpToFile("/home/jgilmore/dev/dump_SharedSecret_C_encapsulated_key.txt", rawEncapsulatedKey, decodeSize);
 
     if (decodeSize != CRYPTO_CIPHERTEXTBYTES)
     {
@@ -553,7 +546,6 @@ static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
     KatDataVerify(&(pIBRand->symmetricSharedSecret), expectedLength, "SharedSecret");
 #endif // KAT_KNOWN_ANSWER_TESTING
 
-    //dumpToFile("/home/jgilmore/dev/dump_SharedSecret_D_raw.txt", (unsigned char *)pIBRand->symmetricSharedSecret.pData, pIBRand->symmetricSharedSecret.cbData);
     app_tracef("INFO: SharedSecret stored successfully (%lu bytes)", pIBRand->symmetricSharedSecret.cbData);
 
     // Job done
@@ -1132,7 +1124,6 @@ static bool prepareSRNGBytes(tIB_INSTANCEDATA *pIBRand)
         pDecodeData = pOriginalData;
         cbDecodeData = cbOriginalData;
     }
-    //dumpToFile("/home/jgilmore/dev/dump_SRNG_B_base64_encrypted_data.txt", (unsigned char *)pDecodeData, cbDecodeData);
     size_t cbEncryptedData = 0;
     unsigned char *pEncryptedData = base64_decode(pDecodeData, cbDecodeData, &cbEncryptedData);
     if (!pEncryptedData)
@@ -1145,7 +1136,6 @@ static bool prepareSRNGBytes(tIB_INSTANCEDATA *pIBRand)
     pIBRand->ResultantData.pData = NULL;
     pIBRand->ResultantData.cbData = 0;
 
-    //dumpToFile("/home/jgilmore/dev/dump_SRNG_C_encrypted_data.txt", pEncryptedData, cbEncryptedData);
     ///////////////////////////////////
     // Decrypt the data...
     ///////////////////////////////////
@@ -1164,7 +1154,7 @@ static bool prepareSRNGBytes(tIB_INSTANCEDATA *pIBRand)
     rc = AESDecryptBytes(pEncryptedData, cbEncryptedData, (uint8_t *)pIBRand->symmetricSharedSecret.pData, pIBRand->symmetricSharedSecret.cbData, 32, &pDecryptedData, &cbDecryptedData);
     if (rc)
     {
-        fprintf(stderr, "ERROR: AESDecryptBytes failed with rc=%d\n", rc);
+        app_tracef("ERROR: AESDecryptBytes failed with rc=%d\n", rc);
     }
     pIBRand->ResultantData.pData = (char *)pDecryptedData;
     pIBRand->ResultantData.cbData = cbDecryptedData;
@@ -1206,7 +1196,6 @@ static bool prepareSRNGBytes(tIB_INSTANCEDATA *pIBRand)
     pIBRand->ResultantData.pData = (char *)pRawData;
     pIBRand->ResultantData.cbData = cbRawData;
 #endif
-    //dumpToFile("/home/jgilmore/dev/dump_SRNG_D_raw_data.txt", (uint8_t *)pIBRand->ResultantData.pData, (size_t)pIBRand->ResultantData.cbData);
 
     // The data is now raw data
     if (strcmp(pIBRand->cfg.szStorageDataFormat,"RAW")!=0)
@@ -1367,8 +1356,8 @@ int DoSimpleAuthentication(tIB_INSTANCEDATA *pIBRand)
         app_tracef("INFO: pRealToken = [%s]", pIBRand->pRealToken);
     }
 
-    //fprintf(stderr, "[ibrand-service] DEBUG: Token.pData=[%s]\n", pIBRand->Token.pData);
-    //fprintf(stderr, "[ibrand-service] DEBUG: pRealToken=[%s]\n", pIBRand->pRealToken);
+    //app_tracef("[ibrand-service] DEBUG: Token.pData=[%s]\n", pIBRand->Token.pData);
+    //app_tracef("[ibrand-service] DEBUG: pRealToken=[%s]\n", pIBRand->pRealToken);
 
     pIBRand->fAuthenticated = TRUE;
     return 0;
@@ -1586,7 +1575,7 @@ int main(int argc, char * argv[])
     pIBRand = malloc(sizeof(tIB_INSTANCEDATA));
     if (!pIBRand)
     {
-        fprintf(stderr, "[ibrand-service] FATAL: Failed to allocate memory for local storage. Aborting.");
+        app_tracef("[ibrand-service] FATAL: Failed to allocate memory for local storage. Aborting.");
         exit(EXIT_FAILURE);
     }
     memset(pIBRand, 0, sizeof(tIB_INSTANCEDATA));
@@ -1616,14 +1605,15 @@ int main(int argc, char * argv[])
     if (strlen(pIBRand->szConfigFilename) == 0)
     {
         fprintf(stderr, "[ibrand-service] FATAL: Configuration not specified, neither on commandline nor via an environment variable.\n");
-        fprintf(stderr, "USAGE: ibrand_service [-f <ConfigFilename>]\n");
-        fprintf(stderr, "       If <ConfigFilename> is NOT specified on the command line,\n");
-        fprintf(stderr, "       then it must be specified in envar \"IBRAND_CONF\".\n");
+        fprintf(stdout, "USAGE: ibrand_service [-f <ConfigFilename>]\n");
+        fprintf(stdout, "       If <ConfigFilename> is NOT specified on the command line,\n");
+        fprintf(stdout, "       then it must be specified in envar \"IBRAND_CONF\".\n");
         free(pIBRand);
         exit(EXIT_FAILURE);
     }
 
-    app_trace_openlog("ibrand_service", LOG_PID, LOG_DAEMON);
+    app_trace_set_destination(false, false, true); // (toConsole, toLogFile; toSyslog)
+    app_trace_openlog(NULL, LOG_PID, LOG_DAEMON);
 
     app_tracef("===ibrand_service==================================================================================================");
 
@@ -1631,7 +1621,6 @@ int main(int argc, char * argv[])
     rc = ReadConfig(pIBRand->szConfigFilename, &(pIBRand->cfg), CRYPTO_SECRETKEYBYTES, CRYPTO_PUBLICKEYBYTES);
     if (rc != 0)
     {
-        fprintf(stderr, "[ibrand-service] FATAL: Configuration error. rc=%d\n", rc);
         app_tracef("FATAL: Configuration error. Aborting. rc=%d", rc);
         app_trace_closelog();
         free(pIBRand);
@@ -1651,7 +1640,6 @@ int main(int argc, char * argv[])
     processId = fork();
     if (processId < 0)
     {
-        fprintf(stderr, "[ibrand-service] FATAL: Failed to create child process\n");
         app_tracef("FATAL: Failed to create child process. Aborting.");
         app_trace_closelog();
         free(pIBRand);
@@ -1785,7 +1773,6 @@ int main(int argc, char * argv[])
                 rc = ReadOurKemPrivateKey(pIBRand, CRYPTO_SECRETKEYBYTES);
                 if (rc != 0)
                 {
-                    fprintf(stderr, "[ibrand-service] FATAL: Configuration error. rc=%d\n", rc);
                     app_tracef("FATAL: Configuration error. Aborting. rc=%d", rc);
                     app_trace_closelog();
                     free(pIBRand);
@@ -1955,10 +1942,9 @@ int main(int argc, char * argv[])
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: STATE_CHECKIFRANDOMNESSISREQUIRED");
                 // Hysteresis
                 pIBRand->datastoreFilesize = dataStore_GetCurrentWaterLevel(pIBRand);
-                //if (localDebugTracing) app_tracef("DEBUG: Filesize=%d", pIBRand->datastoreFilesize);
                 if (pIBRand->datastoreFilesize < 0) // File not found
                 {
-                    app_tracef("INFO: dataStore not found. Starting retrieval.", pIBRand->cfg.retrievalRetryDelay);
+                    app_tracef("INFO: Starting initial retrieval");
                     currentState = STATE_GETSOMERANDOMNESS;
                     continue;
                 }
@@ -1966,7 +1952,7 @@ int main(int argc, char * argv[])
                 {
                     if (pIBRand->datastoreFilesize <= pIBRand->cfg.storageLowWaterMark) // Is it nearly empty
                     {
-                        app_tracef("INFO: Low water mark reached. Starting retrieval.", pIBRand->cfg.retrievalRetryDelay);
+                        app_tracef("INFO: Low water mark reached. Starting retrieval.");
                         pIBRand->isPaused = false;
                         currentState = STATE_GETSOMERANDOMNESS;
                         continue;

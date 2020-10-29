@@ -80,7 +80,7 @@ static bool __ShMem_DoActivity(tSHMEM_ACTIVITY whichActivity, void *pUserData)
     switch (whichActivity)
     {
         case SHMEM_CREATE:
-            if (localShMemTracing) app_tracef("DEBUG: SHMEM_CREATE");
+            if (localDebugTracing) app_tracef("DEBUG: SHMEM_CREATE");
             szAction = "CREATE";
             shm_oflags = O_RDWR | O_CREAT;
             //sem_open_oflags = O_CREAT | O_EXCL;  // Create the semaphore. Return error if it already exists.
@@ -93,7 +93,7 @@ static bool __ShMem_DoActivity(tSHMEM_ACTIVITY whichActivity, void *pUserData)
             break;
 
         case SHMEM_WRITE:
-            if (localShMemTracing) app_tracef("DEBUG: SHMEM_WRITE");
+            if (localDebugTracing) app_tracef("DEBUG: SHMEM_WRITE");
             szAction = "OPEN";
             shm_oflags = O_RDWR;
             sem_open_oflags = O_RDWR;  // Return error if the semaphore doesn't already exist
@@ -104,7 +104,7 @@ static bool __ShMem_DoActivity(tSHMEM_ACTIVITY whichActivity, void *pUserData)
             break;
 
         case SHMEM_RETRIEVE:
-            if (localShMemTracing) app_tracef("DEBUG: SHMEM_RETRIEVE");
+            if (localDebugTracing) app_tracef("DEBUG: SHMEM_RETRIEVE");
             szAction = "RETRIEVE";
             shm_oflags = O_RDWR;
             sem_open_oflags = O_RDWR;  // Return error if the semaphore doesn't already exist
@@ -116,7 +116,7 @@ static bool __ShMem_DoActivity(tSHMEM_ACTIVITY whichActivity, void *pUserData)
 
         case SHMEM_GETINFO:
         default:
-            if (localShMemTracing) app_tracef("DEBUG: SHMEM_GETINFO");
+            if (localDebugTracing) app_tracef("DEBUG: SHMEM_GETINFO");
             szAction = "GETINFO";
             shm_oflags = O_RDWR;      // Read only. The file must already exist.
             sem_open_oflags = O_RDWR;  // Return error if the semaphore doesn't already exist
@@ -127,7 +127,7 @@ static bool __ShMem_DoActivity(tSHMEM_ACTIVITY whichActivity, void *pUserData)
             break;
     }
 
-    //if (localShMemTracing) app_tracef("DEBUG: ShMem Open sharedMemory(/dev/shm/%s)", __shMemBackingFilename);
+    //if (localDebugTracing) app_tracef("DEBUG: ShMem Open sharedMemory(/dev/shm/%s)", __shMemBackingFilename);
     char tempstr[_MAX_PATH];
     strcpy(tempstr, "/");
     strcat(tempstr, __shMemBackingFilename);
@@ -142,7 +142,7 @@ static bool __ShMem_DoActivity(tSHMEM_ACTIVITY whichActivity, void *pUserData)
     {
         case SHMEM_CREATE:
         //case SHMEM_WRITE:
-            //if (localShMemTracing) app_tracef("DEBUG: ShMem Create/Write Calling Truncate(%d)", __shMemSizeInBytes);
+            //if (localDebugTracing) app_tracef("DEBUG: ShMem Create/Write Calling Truncate(%d)", __shMemSizeInBytes);
             // ftruncate() is not a part of the c99 standard, so either use the gnu99 standard or explicitly prototype the function:
             //   * use flags: gcc -Wall -c program.c -std=gnu99 (See makefile)
             //   * prototype: extern int ftruncate(int fd, off_t length);
@@ -176,7 +176,7 @@ static bool __ShMem_DoActivity(tSHMEM_ACTIVITY whichActivity, void *pUserData)
 
     __ShMem_PrintStats(memptr, whichActivity);
 
-    //if (localShMemTracing) app_tracef("DEBUG: Calling sem_open");
+    //if (localDebugTracing) app_tracef("DEBUG: Calling sem_open");
     // Before writing to it, we need exclusive access the the shared memory
     // Create a semaphore for mutual exclusion -  to lock the Shared memory
     sem_t* semptr = sem_open( __shMemSemaphoreName,
@@ -208,7 +208,7 @@ static bool __ShMem_DoActivity(tSHMEM_ACTIVITY whichActivity, void *pUserData)
         // The reader goes into a wait state until the writer increments the semaphore, whose initial value is 0:
 
         // Use semaphore as a mutex (lock) by waiting for writer to increment it
-        //if (localShMemTracing) app_tracef("DEBUG: Calling sem_wait");
+        //if (localDebugTracing) app_tracef("DEBUG: Calling sem_wait");
         if (!sem_wait(semptr))  // Wait until semaphore != 0
         {
             // Semaphore has been incremented
@@ -247,11 +247,11 @@ static bool __ShMem_DoActivity(tSHMEM_ACTIVITY whichActivity, void *pUserData)
             }
 
             // Release semaphore
-            //if (localShMemTracing) app_tracef("DEBUG: Calling sem_post");
+            //if (localDebugTracing) app_tracef("DEBUG: Calling sem_post");
             sem_post(semptr);
         }
     }
-    else
+    else // not readOnly
     {
         // sem_open() was successful
 
@@ -271,9 +271,9 @@ static bool __ShMem_DoActivity(tSHMEM_ACTIVITY whichActivity, void *pUserData)
         }
 
         // Do what we came to do...
-        if (localShMemTracing) app_tracef("DEBUG: Calling shMemCallBackFn(memptr=%p, pUserData=%p)", memptr, pUserData);
+        if (localDebugTracing) app_tracef("DEBUG: [RW] Calling shMemCallBackFn(memptr=%p, pUserData=%p)", memptr, pUserData);
         shMemCallBackFn(memptr, pUserData);
-        if (localShMemTracing) app_tracef("DEBUG: Back from shMemCallBackFn(memptr=%p, pUserData=%p)", memptr, pUserData);
+        if (localDebugTracing) app_tracef("DEBUG: [RW] Back from shMemCallBackFn(memptr=%p, pUserData=%p)", memptr, pUserData);
 
         if (checkIntegrity == AFTER_CALLBACK || checkIntegrity == BEFORE_AND_AFTER_CALLBACK)
         {
@@ -296,7 +296,7 @@ static bool __ShMem_DoActivity(tSHMEM_ACTIVITY whichActivity, void *pUserData)
         // thus barring further access to the shared memory.
 
         // Increment the semaphore so that others can have access to the shared memory
-        //if (localShMemTracing) app_tracef("DEBUG: Checking sem_post");
+        //if (localDebugTracing) app_tracef("DEBUG: Checking sem_post");
         if (sem_post(semptr) < 0)
         {
             app_tracef("ERROR: sem_post failed. errno=%d", errno);
@@ -305,7 +305,7 @@ static bool __ShMem_DoActivity(tSHMEM_ACTIVITY whichActivity, void *pUserData)
             close(fd);
             return false;
         }
-        //if (localShMemTracing) app_tracef("DEBUG: Checking sem_post");
+        //if (localDebugTracing) app_tracef("DEBUG: Checking sem_post");
     }
 
     if (timeToSleep > 0)
@@ -326,6 +326,7 @@ static bool __ShMem_DoActivity(tSHMEM_ACTIVITY whichActivity, void *pUserData)
     //     shm_unlink(tempstr); // Unlink from the backing file
     // }
 
+    //app_tracef("DEBUG: __ShMem_DoActivity - All good");
     return true;
 }
 
@@ -369,14 +370,14 @@ static void __ShMem_PrintStats(const char *memptr, tSHMEM_ACTIVITY currentActivi
 {
     const tSHMEMHEADER *pShMemHeader = (tSHMEMHEADER *)memptr;
 
-    if (localShMemTracing)
+    if (localDebugTracing)
     {
         // app_tracef("DEBUG: ShMem Stats %s [Ptr=%p, File=/dev/shm/%s, "
         //            "Sem=%s, Sig=0x%4.4X, Ver=0x%4.4X, Siz=%lu, Lev=%ld]",
         //            ACTIVITY_NAMES[currentActivity], memptr, __shMemBackingFilename,
         //            __shMemSemaphoreName, pShMemHeader->signature,
         //            pShMemHeader->version,  pShMemHeader->tankSize, pShMemHeader->waterLevel);
-        if (localShMemTracing) app_tracef("DEBUG: ShMem Stats %s [Sig=0x%4.4X, Ver=0x%4.4X, Siz=%lu, Lev=%ld]",
+        if (localDebugTracing) app_tracef("DEBUG: ShMem Stats %s [Sig=0x%4.4X, Ver=0x%4.4X, Siz=%lu, Lev=%ld]",
                    ACTIVITY_NAMES[currentActivity],
                    pShMemHeader->signature, pShMemHeader->version,
                    pShMemHeader->tankSize, pShMemHeader->waterLevel);
@@ -392,7 +393,6 @@ void ShMem_SetBackingFilename(char *szBackingFilename)
     // default = "shmem_ibrand01"; // e.g. /dev/shm/shmem_ibrand01
     if (szBackingFilename && strlen(szBackingFilename))
     {
-        //app_tracef("INFO: ShMem_SetBackingFilename from [%s] to [%s]", __shMemBackingFilename, szBackingFilename);
         strcpy(__shMemBackingFilename, szBackingFilename);
     }
 }
@@ -402,7 +402,6 @@ void ShMem_SetStorageSize(size_t sizeOfDataStore)
     // default = (100*1024)
     if (sizeOfDataStore)
     {
-        //app_tracef("INFO: ShMem_SetStorageSize from [%u] to [%u]", __shMemSizeInBytes - sizeof(tSHMEMHEADER), sizeOfDataStore);
         __shMemSizeInBytes = sizeof(tSHMEMHEADER) + sizeOfDataStore;
     }
 }
@@ -412,26 +411,22 @@ void ShMem_SetSemaphoreName(char *szSemaphoreName)
     // default = "sem_ibrand01"
     if (szSemaphoreName && strlen(szSemaphoreName))
     {
-        //app_tracef("INFO: ShMem_SetSemaphoreName from [%s] to [%s]", __shMemSemaphoreName, szSemaphoreName);
         strcpy(__shMemSemaphoreName, szSemaphoreName);
     }
 }
 
 static void shMemCallBackFn_Create(char * memptr, void *userptr)
 {
-        tSHMEMHEADER *pShMemHeader = (tSHMEMHEADER *)memptr;
-        char *pShMemData = memptr + sizeof(tSHMEMHEADER);
+    tSHMEMHEADER *pShMemHeader = (tSHMEMHEADER *)memptr;
+    char *pShMemData = memptr + sizeof(tSHMEMHEADER);
 
-        UNUSED_PARAM(userptr);
+    UNUSED_PARAM(userptr);
 
-        //if (localShMemTracing) app_tracef("DEBUG: shMemCallBackFn_Create");
-
-        memset(pShMemData, 0, __shMemSizeInBytes);
-        pShMemHeader->signature  = MAKEWORD(0x4A,0x47);
-        pShMemHeader->version    = MAKEWORD(0x01,0x00);
-        pShMemHeader->tankSize   = __shMemSizeInBytes - sizeof(tSHMEMHEADER);
-        pShMemHeader->waterLevel = 0;
-        //if (localShMemTracing) app_tracef("DEBUG: shMemCallBackFn_Create [Sig=0x%4.4X, Ver=0x%4.4X, Siz=%lu, Lev=%ld]", pShMemHeader->signature, pShMemHeader->version, pShMemHeader->tankSize, pShMemHeader->waterLevel);
+    memset(pShMemData, 0, __shMemSizeInBytes);
+    pShMemHeader->signature  = MAKEWORD(0x4A,0x47);
+    pShMemHeader->version    = MAKEWORD(0x01,0x00);
+    pShMemHeader->tankSize   = __shMemSizeInBytes - sizeof(tSHMEMHEADER);
+    pShMemHeader->waterLevel = 0;
 }
 
 bool ShMem_CreateDataStore(void)
@@ -446,7 +441,7 @@ static void shMemCallBackFn_Write(char * memptr, void *userptr)
     unsigned long availableStorage;
     unsigned long bytesToWrite;
 
-    //if (localShMemTracing) app_tracef("DEBUG: shMemCallBackFn_Write");
+    //if (localDebugTracing) app_tracef("DEBUG: shMemCallBackFn_Write");
     tLSTRING *pDataToStore = (tLSTRING *)userptr;
     if (!pDataToStore || !pShMemHeader)
     {
@@ -479,13 +474,6 @@ static void shMemCallBackFn_GetInfo(char * memptr, void *userptr)
         app_tracef("ERROR: shMemCallBackFn_GetInfo invalid ptr (%p, %p)", pShMemHeader, pShCopyOfMemHeader);
         return;
     }
-
-    if (localShMemTracing)
-    {
-        app_tracef("DEBUG: pShMemHeader[%p,%lu]", pShMemHeader, sizeof(tSHMEMHEADER));
-        app_trace_hex("ShMemHeader", (const char *)pShMemHeader, sizeof(tSHMEMHEADER));
-    }
-
     memcpy(pShCopyOfMemHeader, pShMemHeader, sizeof(tSHMEMHEADER));
 }
 
@@ -541,7 +529,7 @@ static void shMemCallBackFn_Retrieve(char * memptr, void *userptr)
     unsigned long availableStorage;
     unsigned long bytesToRead;
 
-    //if (localShMemTracing) app_tracef("DEBUG: shMemCallBackFn_Retrieve");
+    //if (localDebugTracing) app_tracef("DEBUG: shMemCallBackFn_Retrieve");
     tLSTRING *pRetrievedData = (tLSTRING *)userptr;
     if (!pRetrievedData || !pShMemHeader)
     {
@@ -569,14 +557,14 @@ int32_t ShMem_RetrieveFromDataStore(char *pData, size_t cbData)
     retrievedData.pData = pData;
     retrievedData.cbData = cbData;
 
-    if (localShMemTracing) app_tracef("DEBUG: ShMem_RetrieveFromDataStore Requested: %u", cbData);
+    if (localDebugTracing) app_tracef("DEBUG: ShMem_RetrieveFromDataStore Requested: %u", cbData);
     bool success = __ShMem_DoActivity(SHMEM_RETRIEVE, (void *)(&retrievedData));
     if (!success)
     {
         return -1;
     }
     // Return bytesRead (and removed)
-    if (localShMemTracing) app_tracef("DEBUG: ShMem_RetrieveFromDataStore Returning: %u", retrievedData.cbData);
+    if (localDebugTracing) app_tracef("DEBUG: ShMem_RetrieveFromDataStore Returning: %u", retrievedData.cbData);
     return retrievedData.cbData;
 }
 

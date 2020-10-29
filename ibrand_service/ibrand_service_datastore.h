@@ -13,15 +13,7 @@
 #define _INCLUDE_IBRAND_SERVICE_DATASTORE_H_
 
 #include "my_utilslib.h"
-#include "ibrand_service.h" // For FORCE_ALL_LOGGING_ON
 #include "ibrand_service_utils.h"
-
-//#ifdef FORCE_ALL_LOGGING_ON
-#ifdef FORCE_ALL_LOGGING_ON_____EXCEPT_THIS
-#define FILELOCK_LOGLEVEL 0x02  // 0x01 is stdout, 0x02 is syslog
-#else
-#define FILELOCK_LOGLEVEL 0x00  // 0x01 is stdout, 0x02 is syslog
-#endif
 
 extern bool dataStore_Initialise(tIB_INSTANCEDATA *pIBRand);
 extern long dataStore_GetCurrentWaterLevel(tIB_INSTANCEDATA *pIBRand);

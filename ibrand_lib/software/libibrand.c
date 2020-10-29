@@ -23,9 +23,7 @@
 #include "libibrand_get_new_entropy.h"
 #include "libibrand_config.h"
 
-#if (USE_CONFIG==CONFIG_JSON)
 tIB_INSTANCEDATA *pIBRand = NULL;
-#endif
 
 static const int localDebugTracing = false;
 
@@ -40,7 +38,7 @@ bool initIBRand(struct ibrand_context *context)
     pIBRand = cfgInitConfig();
     if (!pIBRand)
     {
-        fprintf(stderr, "[ibrand_lib] FATAL: Failed to initialise config. Aborting.\n");
+        app_tracef("FATAL: Failed to initialise config. Aborting.\n");
         exit(EXIT_FAILURE);
     }
 
@@ -110,7 +108,7 @@ uint32_t readData(struct ibrand_context *context, uint8_t *result, size_t result
         return 0;
     }
 
-    if (localDebugTracing) fprintf(stderr, "[ibrand_lib] DEBUG: readData Requested: %lu\n", (unsigned long)result_buffer_size);
+    if (localDebugTracing) app_tracef("DEBUG: readData Requested: %lu\n", (unsigned long)cbResult);
 
     fReadDataIsBusy++;
     rc = readData_Protected(context, result, result_buffer_size);
@@ -129,12 +127,11 @@ static uint32_t readData_Protected(struct ibrand_context *context, uint8_t *resu
     clock_gettime(CLOCK_REALTIME, &start);
 
     size_t bytesToGet = sizeof(inBuf);
-    if (localDebugTracing) fprintf(stderr, "[ibrand_lib] DEBUG: readData_Protected Requested: %lu\n", (unsigned long)bytesToGet );
 
     context->errorCode = 0;
     if (!GetNewEntropy(context, pIBRand, inBuf, bytesToGet))
     {
-        fprintf(stderr, "ERROR: GetNewEntropy failed. errorCode=%d: msg=%s\n", context->errorCode, context->message?context->message:"<No message supplied>");
+            app_tracef("ERROR: GetNewEntropy failed. errorCode=%d: msg=%s\n", context->errorCode, context->message?context->message:"<No message supplied>");
         return 0;
     }
 
@@ -146,7 +143,6 @@ static uint32_t readData_Protected(struct ibrand_context *context, uint8_t *resu
         // The maximum allowed time to perform the I/O operations was exceeded possibly causing reduced entropy.
         context->message = "ERROR: The time to acquire the data was exceeded resulting in possible reduced entropy.";
         context->errorCode = 13709;
-        fprintf(stderr, "%s - (max=%u, actual=%u)\n", context->message, MAX_MICROSEC_FOR_SAMPLES, elapsedTime_us );
         return 0;
     }
 
