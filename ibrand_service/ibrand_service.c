@@ -437,7 +437,8 @@ static int DecryptAndStoreKemSecretKey(tIB_INSTANCEDATA *pIBRand)
     unsigned char *pDecryptedData = NULL;
     size_t         cbDecryptedData = 0;
     int rc;
-    rc = AESDecryptBytes(rawEncryptedKey, decodeSize, (uint8_t *)pIBRand->symmetricSharedSecret.pData, pIBRand->symmetricSharedSecret.cbData, 32 /*saltsize*/, &pDecryptedData, &cbDecryptedData);
+#define SALTSIZE 32
+    rc = AESDecryptBytes(rawEncryptedKey, decodeSize, (uint8_t *)pIBRand->symmetricSharedSecret.pData, pIBRand->symmetricSharedSecret.cbData, SALTSIZE, &pDecryptedData, &cbDecryptedData);
     if (rc)
     {
         app_tracef("AESDecryptBytes failed with rc=%d\n", rc);
@@ -687,21 +688,21 @@ int authenticateUser(tIB_INSTANCEDATA *pIBRand)
       return 2212;
     }
 
-    pIBRand->code = 0;
+    long resultCode = 0;
     CURLcode curlResultCodeB;
-    curlResultCodeB = curl_easy_getinfo(pIBRand->hCurl, CURLINFO_HTTP_CONNECTCODE, &pIBRand->code);
-    if (!curlResultCodeB && pIBRand->code)
+    curlResultCodeB = curl_easy_getinfo(pIBRand->hCurl, CURLINFO_HTTP_CONNECTCODE, &resultCode);
+    if (!curlResultCodeB && resultCode)
     {
-        app_tracef("ERROR: authenticateUser: ResultCode=%03ld \"%s\"", pIBRand->code, curl_easy_strerror(pIBRand->code));
+        app_tracef("ERROR: authenticateUser: ResultCode=%03ld \"%s\"", resultCode, curl_easy_strerror(resultCode));
         return 2220;
     }
 
-    pIBRand->response_code = 0;
+    long response_code = 0;
     CURLcode  curlResultCodeC;
-    curlResultCodeC = curl_easy_getinfo(pIBRand->hCurl, CURLINFO_RESPONSE_CODE, &pIBRand->response_code);
-    if (!curlResultCodeC && (pIBRand->response_code != 200))
+    curlResultCodeC = curl_easy_getinfo(pIBRand->hCurl, CURLINFO_RESPONSE_CODE, &response_code);
+    if (!curlResultCodeC && (response_code != 200))
     {
-        app_tracef("ERROR: authenticateUser: HTTP Responcse Code=%ld", pIBRand->response_code);
+        app_tracef("ERROR: authenticateUser: HTTP Responcse Code=%ld", response_code);
         return 2221;
     }
 
@@ -1202,7 +1203,7 @@ static bool prepareSRNGBytes(tIB_INSTANCEDATA *pIBRand)
 //-----------------------------------------------------------------------
 // storeRandomBytes
 //-----------------------------------------------------------------------
-bool storeRandomBytes(tIB_INSTANCEDATA *pIBRand)
+static bool storeRandomBytes(tIB_INSTANCEDATA *pIBRand, tLSTRING *pResultantData)
 {
     int success;
 
@@ -1276,25 +1277,6 @@ int InitialiseCurl(tIB_INSTANCEDATA *pIBRand)
         //curl_easy_setopt(pIBRand->hCurl, CURLOPT_STDERR, fopen('/curl.txt', 'w+'));
 
         curl_easy_setopt(pIBRand->hCurl, CURLOPT_VERBOSE, 1L);
-        /*
-            typedef enum
-            {
-              CURLINFO_TEXT = 0,
-              CURLINFO_HEADER_IN,    // 1
-              CURLINFO_HEADER_OUT,   // 2
-              CURLINFO_DATA_IN,      // 3
-              CURLINFO_DATA_OUT,     // 4
-              CURLINFO_SSL_DATA_IN,  // 5
-              CURLINFO_SSL_DATA_OUT, // 6
-              CURLINFO_END
-            } tCURL_INFOTYPE;
-
-            int CurlDebugCallback(CURL *handle, tCURL_INFOTYPE type, char *data, size_t size, void *userptr)
-            {
-            }
-            CURLcode curl_easy_setopt(pIBRand->hCurl, CURLOPT_DEBUGFUNCTION, CurlDebugCallback);
-            CURLcode curl_easy_setopt(pIBRand->hCurl, CURLOPT_DEBUGDATA, pIBRand); // JG: Does this call exist - i.e. does CURLOPT_DEBUGFUNCTION have userdata?
-        */
     }
 
     pIBRand->fCurlInitialised = TRUE;
