@@ -1235,7 +1235,7 @@ bool storeRandomBytes(tIB_INSTANCEDATA *pIBRand)
         }
     } // RNG
 
-    success = dataStore_Append(pIBRand);
+    success = dataStore_Append(pIBRand, pResultantData);
     if (!success)
     {
         app_tracef("WARNING: Failed to append data to dataStore");
@@ -1252,7 +1252,7 @@ int InitialiseCurl(tIB_INSTANCEDATA *pIBRand)
     //////////////////////////////
     // Initialise libcurl
     //////////////////////////////
-    /* In windows, this will init the winsock stuff */
+    // In windows, this will init the winsock stuff
     curl_global_init(CURL_GLOBAL_ALL);
 
     pIBRand->hCurl = curl_easy_init();
@@ -1716,7 +1716,6 @@ int main(int argc, char * argv[])
 
     pIBRand->ResultantData.pData = NULL;
     pIBRand->ResultantData.cbData = 0;
-    pIBRand->isPaused = false;
 
     if (localDebugTracing) app_tracef("DEBUG: Calling dataStore_Initialise");
     if (!dataStore_Initialise(pIBRand))
@@ -1732,6 +1731,10 @@ int main(int argc, char * argv[])
     bool continueInMainLoop = true;
     bool printProgressToSyslog = true;
     bool printSleepMessageToSyslog = true;
+
+    long currentWaterLevel = 0;
+    bool isPaused = false;
+
     // The Big Loop
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: Enter State machine");
     while (continueInMainLoop)
@@ -1743,10 +1746,10 @@ int main(int argc, char * argv[])
                 app_tracef("INFO: Stats("
                                 "AUTH(S%lu,F%lu,f%lu),"
                                 "RNG(S%lu,F%lu,f%lu),"
-                                "STORE(%s,N%ld))",
+                                "STORE(%s,L%ld))",
                                 numberOfAuthSuccesses, numberOfAuthFailures, numberOfConsecutiveAuthFailures,
                                 numberOfRetreivalSuccesses, numberOfRetreivalFailures, numberOfConsecutiveRetreivalFailures,
-                                pIBRand->isPaused?"Draining":"Filling ", pIBRand->datastoreFilesize);
+                                isPaused?"Draining":"Filling ", currentWaterLevel);
             }
             printProgressToSyslog = false;
         }
@@ -1927,19 +1930,19 @@ int main(int argc, char * argv[])
             case STATE_CHECKIFRANDOMNESSISREQUIRED:
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: STATE_CHECKIFRANDOMNESSISREQUIRED");
                 // Hysteresis
-                pIBRand->datastoreFilesize = dataStore_GetCurrentWaterLevel(pIBRand);
-                if (pIBRand->datastoreFilesize < 0) // File not found
+                currentWaterLevel = dataStore_GetCurrentWaterLevel(pIBRand);
+                if (currentWaterLevel < 0)
                 {
                     app_tracef("INFO: Starting initial retrieval");
                     currentState = STATE_GETSOMERANDOMNESS;
                     continue;
                 }
-                if (pIBRand->isPaused) // We are waiting for the tank to drain
+                if (isPaused) // We are waiting for the tank to drain
                 {
-                    if (pIBRand->datastoreFilesize <= pIBRand->cfg.storageLowWaterMark) // Is it nearly empty
+                    if (currentWaterLevel <= dataStore_GetLowWaterMark(pIBRand)) // Is it nearly empty
                     {
                         app_tracef("INFO: Low water mark reached. Starting retrieval.");
-                        pIBRand->isPaused = false;
+                        isPaused = false;
                         currentState = STATE_GETSOMERANDOMNESS;
                         continue;
                     }
@@ -1948,15 +1951,15 @@ int main(int argc, char * argv[])
                 else // We are busy filling up the tank
                 {
                     // Does the tank still have space?
-                    if (pIBRand->datastoreFilesize < pIBRand->cfg.storageHighWaterMark)
+                    if (currentWaterLevel < dataStore_GetHighWaterMark(pIBRand))
                     {
                         // Yes... got some more randomness
                         currentState = STATE_GETSOMERANDOMNESS;
                         continue;
                     }
                     // No. The tank is full.
-                    app_tracef("INFO: High water mark reached. Pausing retrieval.", pIBRand->cfg.retrievalRetryDelay);
-                    pIBRand->isPaused = true;
+                    app_tracef("INFO: High water mark reached. Pausing retrieval.");
+                    isPaused = true;
                     // Fall through to sleep
                 }
                 // Wait for a short while, and then try again
@@ -2016,11 +2019,11 @@ int main(int argc, char * argv[])
 
             case STATE_STORERANDOMNESS:
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: STATE_STORERANDOMNESS");
-                printProgressToSyslog = true;
+                printProgressToSyslog = false;
                 numberOfRetreivalSuccesses++;
                 numberOfConsecutiveRetreivalFailures = 0;
                 // pIBRand->ResultantData.pData must be freed by the caller
-                bool success = storeRandomBytes(pIBRand);
+                bool success = storeRandomBytes(pIBRand, &(pIBRand->ResultantData));
                 // Should be freed already, but just in case...
                 if (pIBRand->ResultantData.pData)
                 {

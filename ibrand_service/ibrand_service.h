@@ -32,10 +32,6 @@ typedef struct tagIB_INSTANCEDATA
     char *        pRealToken;
     tLSTRING      Token;
     tLSTRING      ResultantData;
-    long          code;
-    long          response_code;
-    long          datastoreFilesize;
-    bool          isPaused;
 
     // SRNG State
     tLSTRING      encryptedKemSecretKey;

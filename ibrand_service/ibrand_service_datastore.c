@@ -32,36 +32,67 @@ static const int localDebugTracing = false;
 
 long dataStore_GetCurrentWaterLevel(tIB_INSTANCEDATA *pIBRand)
 {
-    long currentWaterLevel = -1;
+    long waterLevel;
 
     if (strcmp(pIBRand->cfg.szStorageType,"FILE")==0)
     {
-        currentWaterLevel = my_getFilesize(pIBRand->cfg.szStorageFilename);
+        waterLevel = my_getFilesize(pIBRand->cfg.szStorageFilename);
     }
     else if (strcmp(pIBRand->cfg.szStorageType,"SHMEM")==0)
     {
-
-        currentWaterLevel = ShMem_GetCurrentWaterLevel();
+        waterLevel = ShMem_GetCurrentWaterLevel();
+    }
+    else
+    {
+        waterLevel = -1;
     }
     if (localDebugTracing) app_tracef("DEBUG: Type=\"%s\", waterLevel=%d", pIBRand->cfg.szStorageType, waterLevel);
-    return currentWaterLevel;
+    return waterLevel;
+}
+
+long dataStore_GetHighWaterMark(tIB_INSTANCEDATA *pIBRand)
+{
+    long highWaterMark;
+
+    if (strcmp(pIBRand->cfg.szStorageType,"FILE")==0)
+    {
+        highWaterMark = pIBRand->cfg.storageHighWaterMark;
+    }
+    else if (strcmp(pIBRand->cfg.szStorageType,"SHMEM")==0)
+    {
+        highWaterMark = pIBRand->cfg.shMemStorageSize;
+    }
+    else
+    {
+        highWaterMark = -1;
+    }
+    if (localDebugTracing) app_tracef("DEBUG: Type=\"%s\", highWaterMark=%d", pIBRand->cfg.szStorageType, highWaterMark);
+    return highWaterMark;
+}
+
+long dataStore_GetLowWaterMark(tIB_INSTANCEDATA *pIBRand)
+{
+    long lowWaterMark;
+
+    if (strcmp(pIBRand->cfg.szStorageType,"FILE")==0)
+    {
+        lowWaterMark = pIBRand->cfg.storageLowWaterMark;
+    }
+    else if (strcmp(pIBRand->cfg.szStorageType,"SHMEM")==0)
+    {
+        lowWaterMark = pIBRand->cfg.shMemLowWaterMark;
+    }
+    else
+    {
+        lowWaterMark = -1;
+    }
+    if (localDebugTracing) app_tracef("DEBUG: Type=\"%s\", lowWaterMark=%d", pIBRand->cfg.szStorageType, lowWaterMark);
+    return lowWaterMark;
 }
 
 long dataStore_GetAvailableStorage(tIB_INSTANCEDATA *pIBRand)
 {
-    long availableStorage = -1;
-
-    if (strcmp(pIBRand->cfg.szStorageType,"FILE")==0)
-    {
-        availableStorage = pIBRand->cfg.storageHighWaterMark - my_getFilesize(pIBRand->cfg.szStorageFilename);
-    }
-    else if (strcmp(pIBRand->cfg.szStorageType,"SHMEM")==0)
-    {
-
-        availableStorage = ShMem_GetAvailableStorage();
-    if (localDebugTracing) app_tracef("DEBUG: Type=\"%s\", lowWaterMark=%d", pIBRand->cfg.szStorageType, lowWaterMark);
-    }
-
+    long availableStorage = dataStore_GetHighWaterMark(pIBRand) - dataStore_GetCurrentWaterLevel(pIBRand);
     return availableStorage;
 }
 
@@ -127,21 +158,21 @@ static unsigned int __dataStore_AppendToFile(char *pData,
     return bytesWritten1 + bytesWritten2;
 }
 
-bool dataStore_Append(tIB_INSTANCEDATA *pIBRand)
+bool dataStore_Append(tIB_INSTANCEDATA *pIBRand, tLSTRING *pResultantData)
 {
     unsigned int bytesWritten = 0;
     if (strcmp(pIBRand->cfg.szStorageType,"FILE")==0)
     {
-        bytesWritten = __dataStore_AppendToFile(pIBRand->ResultantData.pData,
-                                                pIBRand->ResultantData.cbData,
+        bytesWritten = __dataStore_AppendToFile(pResultantData->pData,
+                                                pResultantData->cbData,
                                                 pIBRand->cfg.szStorageFilename,
                                                 pIBRand->cfg.szStorageLockfilePath,
                                                 pIBRand->cfg.szStorageDataFormat);
     }
     else if (strcmp(pIBRand->cfg.szStorageType,"SHMEM")==0)
     {
-        bytesWritten = ShMem_AppendToDataStore(pIBRand->ResultantData.pData,
-                                               pIBRand->ResultantData.cbData);
+        bytesWritten = ShMem_AppendToDataStore(pResultantData->pData,
+                                               pResultantData->cbData);
     }
     else
     {

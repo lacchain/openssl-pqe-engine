@@ -17,7 +17,9 @@
 
 extern bool dataStore_Initialise(tIB_INSTANCEDATA *pIBRand);
 extern long dataStore_GetCurrentWaterLevel(tIB_INSTANCEDATA *pIBRand);
+extern long dataStore_GetHighWaterMark(tIB_INSTANCEDATA *pIBRand);
+extern long dataStore_GetLowWaterMark(tIB_INSTANCEDATA *pIBRand);
 extern long dataStore_GetAvailableStorage(tIB_INSTANCEDATA *pIBRand);
-extern bool dataStore_Append(tIB_INSTANCEDATA *pIBRand);
+extern bool dataStore_Append(tIB_INSTANCEDATA *pIBRand, tLSTRING *pResultantData);
 
 #endif // _INCLUDE_IBRAND_SERVICE_DATASTORE_H_
