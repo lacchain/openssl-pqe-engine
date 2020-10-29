@@ -82,7 +82,7 @@ JSON:{\n\
   "CommsSettings":\n\
   {\n\
     "BASEURL":"https://ironbridgeapi.com/api",\n\
-    "BYTESPERREQUEST":"256",\n\
+    "BYTESPERREQUEST":"4096",\n\
     "RETRIEVALRETRYDELAY":"3"\n\
   },\n\
   "StorageSettings":\n\
@@ -95,9 +95,9 @@ JSON:{\n\
     "FILE_LOWWATERMARK":"5120",\n\
     "SHMEM_BACKINGFILENAME":"shmem_ibrand01",\n\
     "SHMEM_SEMAPHORENAME":"sem_ibrand01",\n\
-    "SHMEM_STORAGESIZE":"20480",\n\
-    "SHMEM_LOWWATERMARK":"5120",\n\
-    "IDLEDELAY":"3"\n\
+    "SHMEM_STORAGESIZE":"102400",\n\
+    "SHMEM_LOWWATERMARK":"40960",\n\
+    "IDLEDELAY":"1"\n\
   }\n\
 }\n\
 _EOF_\n\
