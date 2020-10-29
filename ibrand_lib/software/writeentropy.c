@@ -10,6 +10,10 @@
 #include <linux/random.h>
 #include "libibrand.h"
 
+//#define USE_WRITE_ENTROPY
+
+#ifdef USE_WRITE_ENTROPY
+
 #define SIZE_PROC_FILENAME "/proc/sys/kernel/random/poolsize"
 #define FILL_PROC_FILENAME "/proc/sys/kernel/random/write_wakeup_threshold"
 
@@ -102,3 +106,5 @@ void inmWriteEntropyToPool(uint8_t *bytes, uint32_t length, uint32_t entropy)
     //app_tracef("Writing %u bytes with %u bits of entropy to /dev/random\n", length, entropy);
     ioctl(pfd.fd, RNDADDENTROPY, inmPoolInfo);
 }
+
+#endif // USE_WRITE_ENTROPY
