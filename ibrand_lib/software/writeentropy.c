@@ -10,6 +10,10 @@
 #include <linux/random.h>
 #include "libibrand.h"
 
+//#define USE_WRITE_ENTROPY
+
+#ifdef USE_WRITE_ENTROPY
+
 #define SIZE_PROC_FILENAME "/proc/sys/kernel/random/poolsize"
 #define FILL_PROC_FILENAME "/proc/sys/kernel/random/write_wakeup_threshold"
 
@@ -18,56 +22,65 @@ static uint32_t inmFillWatermark;
 static struct rand_pool_info *inmPoolInfo;
 
 // Find the entropy pool size.
-static uint32_t readNumberFromFile(char *fileName)
+static bool readNumberFromFile(char *fileName, uint32_t *pValue)
 {
     FILE *file = fopen(fileName, "r");
-    if(file == NULL)
+    if (file == NULL)
     {
-        fprintf(stderr, "[ibrand_lib] FATAL: Unable to open %s\n", fileName);
-        exit(455);
+        app_tracef("[ibrand_lib] FATAL: Unable to open %s\n", fileName);
+        return false;
     }
 
     uint32_t value = 0u;
     char c;
-    while( ((c = getc(file)) != EOF) && ('0' <= c) && (c <= '9') )
+    while ( ((c = getc(file)) != EOF) && ('0' <= c) && (c <= '9') )
     {
         value *= 10;
         value += c - '0';
     }
     fclose(file);
-    return value;
+    *pValue = value;
+    return true;
 }
 
 // Open /dev/random
-void inmWriteEntropyStart(uint32_t bufLen, bool debug)
+bool inmWriteEntropyStart(uint32_t bufLen, bool debug)
 {
+    bool rc;
     pfd.events = POLLOUT;
 
     //pfd.fd = open("/dev/random", O_WRONLY);
     pfd.fd = open("/dev/random", O_RDWR);
-    if(pfd.fd < 0)
+    if (pfd.fd < 0)
     {
-        fprintf(stderr, "[ibrand_lib] FATAL: Unable to open /dev/random\n");
-        exit(456);
+        app_tracef("[ibrand_lib] FATAL: Unable to open /dev/random\n");
+        return false;
     }
 
     inmPoolInfo = calloc(1, sizeof(struct rand_pool_info) + bufLen);
-    if(inmPoolInfo == NULL)
+    if (inmPoolInfo == NULL)
     {
-        fprintf(stderr, "[ibrand_lib] FATAL: Unable to allocate memory\n");
-        exit(457);
+        app_tracef("[ibrand_lib] FATAL: Unable to allocate memory\n");
+        return false;
     }
 
-    inmFillWatermark = readNumberFromFile(FILL_PROC_FILENAME);
-    if(debug)
+    rc = readNumberFromFile(FILL_PROC_FILENAME, &inmFillWatermark);
+    if (!rc)
     {
-        fprintf(stderr, "Entropy pool size:%u, fill watermark:%u\n", readNumberFromFile(SIZE_PROC_FILENAME), inmFillWatermark);
+        app_tracef("[ibrand_lib] FATAL: readNumberFromFile failed\n");
+        return false;
     }
+
+    if (debug)
+    {
+        app_tracef("Entropy pool size:%u, fill watermark:%u\n", readNumberFromFile(SIZE_PROC_FILENAME), inmFillWatermark);
+    }
+    return true;
 }
 
 void inmWriteEntropyEnd()
 {
-    free( inmPoolInfo );
+    free(inmPoolInfo);
 }
 
 // Block until either the entropy pool has room, or 1 minute has passed.
@@ -90,6 +103,8 @@ void inmWriteEntropyToPool(uint8_t *bytes, uint32_t length, uint32_t entropy)
     inmPoolInfo->entropy_count = entropy;
     inmPoolInfo->buf_size = length;
     memcpy(inmPoolInfo->buf, bytes, length);
-    //fprintf(stderr, "Writing %u bytes with %u bits of entropy to /dev/random\n", length, entropy);
+    //app_tracef("Writing %u bytes with %u bits of entropy to /dev/random\n", length, entropy);
     ioctl(pfd.fd, RNDADDENTROPY, inmPoolInfo);
 }
+
+#endif // USE_WRITE_ENTROPY

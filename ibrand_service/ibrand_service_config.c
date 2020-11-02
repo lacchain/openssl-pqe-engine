@@ -62,141 +62,13 @@ int ValidateSettings(tIB_CONFIGDATA *pIBConfig)
     return 0;
 }
 
-
-#if (USE_CONFIG==CONFIG_HARDCODED)
-int ReadConfig(char *szConfigFilename, tIB_CONFIGDATA *pIBConfig, size_t secretKeyBytes, size_t publicKeyBytes)
-{
-    int rc;
-    if (!pIBConfig)
-    {
-        return 2290;
-    }
-
-    UNUSED_PARAM(szConfigFilename);
-
-    app_tracef("WARNING: Configuration from hardcode values");
-
-    //////////////////////////////////////
-    // Hardcoded values for testing
-    /////////////////////////////////////
-    strcpy(pIBConfig->szAuthType            , "SIMPLE");
-    strcpy(pIBConfig->szAuthUrl             , "ironbridgeapi.com/api/login");
-    strcpy(pIBConfig->szUsername            , "Fred");
-    strcpy(pIBConfig->szPassword            , "Pa55w0rd");
-    strcpy(pIBConfig->szAuthSSLCertFile     , "/etc/ssl/certs/client_cert.pem");
-    strcpy(pIBConfig->szAuthSSLCertType     , "PEM");
-    strcpy(pIBConfig->szAuthSSLKeyFile      , "/etc/ssl/private/client_key.pem");
-    pIBConfig->authRetryDelay               = 15;
-
-    strcpy(pIBConfig->szBaseUrl             , "ironbridgeapi.com/api");
-    pIBConfig->bytesPerRequest              = 16;
-    pIBConfig->retrievalRetryDelay          = 3;
-
-    strcpy(pIBConfig->szStorageType         , "FILE");
-    strcpy(pIBConfig->szStorageDataFormat   , "RAW"); // "RAW", "BASE64", "HEX" (todo)
-    strcpy(pIBConfig->szStorageFilename     , "/var/lib/ibrand/ibrand_data.bin");
-    strcpy(pIBConfig->szStorageLockfilePath , "/tmp");
-    strcpy(pIBConfig->shMemBackingFilename  , "shmem_ibrand01"); // e.g. /dev/shm/shmem_ibrand01
-    pIBConfig->shMemStorageSize             = 100*1024;
-    strcpy(pIBConfig->shMemSemaphoreName    , "sem_ibrand01");
-    pIBConfig->storageHighWaterMark         = 102400; // 1038336; // 1MB
-    pIBConfig->storageLowWaterMark          = 10240; // 102400; // 100KB
-    pIBConfig->idleDelay                    = 10;
-    pIBConfig->secretKeyBytes               = secretKeyBytes;
-    pIBConfig->publicKeyBytes               = publicKeyBytes;
-
-    pIBConfig->useSecureRng                 = true;
-    strcpy(pIBConfig->clientSetupOOBFilename       , "");
-    strcpy(pIBConfig->ourKemSecretKeyFilename      , "");
-    //strcpy(pIBConfig->theirSigningPublicKeyFilename, "");
-
-    //pIBConfig->fVerbose                     = 0x03;
-    SET_BIT(pIBConfig->fVerbose, DBGBIT_STATUS );
-    SET_BIT(pIBConfig->fVerbose, DBGBIT_CONFIG );
-    SET_BIT(pIBConfig->fVerbose, DBGBIT_AUTH   );
-    SET_BIT(pIBConfig->fVerbose, DBGBIT_DATA   );
-    SET_BIT(pIBConfig->fVerbose, DBGBIT_CURL   );
-
-    rc = ValidateSettings(pIBConfig);
-    if (rc != 0)
-    {
-        app_tracef("ERROR: One or more settings are invalid");
-        return rc;
-    }
-    return 0;
-}
-#elif (USE_CONFIG==CONFIG_SIMPLE)
-int ReadConfig(char *szConfigFilename, tIB_CONFIGDATA *pIBConfig, size_t secretKeyBytes, size_t publicKeyBytes)
-{
-    int rc;
-    if (!pIBConfig)
-    {
-        return 2300;
-    }
-
-    //////////////////////////////////////
-    // Get values from config file
-    /////////////////////////////////////
-    char *szFilename;
-    FILE *hConfigFile;
-
-    rc = my_openSimpleConfigFile(szConfigFilename, &hConfigFile);
-    if (rc)
-    {
-        app_tracef("ERROR: OpenConfigFile error %d", rc);
-        return rc;
-    }
-    //app_tracef("INFO: Configuration file (SIMPLE format) [%s]", szConfigFilename);
-    if (hConfigFile)
-    {
-        rc = my_readSimpleConfigFileStr (hConfigFile, "AUTHTYPE"                     , pIBConfig->szAuthType            , sizeof(pIBConfig->szAuthType           ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "AUTHTYPE"                     , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "SIMPLE"
-        rc = my_readSimpleConfigFileStr (hConfigFile, "AUTHURL"                      , pIBConfig->szAuthUrl             , sizeof(pIBConfig->szAuthUrl            ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "AUTHURL"                      , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "https://ironbridgeapi.com/login"
-        rc = my_readSimpleConfigFileStr (hConfigFile, "AUTHUSER"                     , pIBConfig->szUsername            , sizeof(pIBConfig->szUsername           ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "AUTHUSER"                     , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "Pa55w0rd"
-        rc = my_readSimpleConfigFileStr (hConfigFile, "AUTHPSWD"                     , pIBConfig->szPassword            , sizeof(pIBConfig->szPassword           ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "AUTHPSWD"                     , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "Username"
-        rc = my_readSimpleConfigFileStr (hConfigFile, "AUTHSSLCERTFILE"              , pIBConfig->szAuthSSLCertFile     , sizeof(pIBConfig->szAuthSSLCertFile    ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "AUTHSSLCERTFILE"              , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "/etc/ssl/certs/client_cert.pem"
-        rc = my_readSimpleConfigFileStr (hConfigFile, "AUTHSSLCERTTYPE"              , pIBConfig->szAuthSSLCertType     , sizeof(pIBConfig->szAuthSSLCertType    ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "AUTHSSLCERTTYPE"              , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "PEM"
-        rc = my_readSimpleConfigFileStr (hConfigFile, "AUTHSSLKEYFILE"               , pIBConfig->szAuthSSLKeyFile      , sizeof(pIBConfig->szAuthSSLKeyFile     ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "AUTHSSLKEYFILE"               , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "/etc/ssl/private/client_key.pem"
-        rc = my_readSimpleConfigFileInt (hConfigFile, "AUTHRETRYDELAY"               , &pIBConfig->authRetryDelay                                                  ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "AUTHRETRYDELAY"               , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. 15 or 30
-        rc = my_readSimpleConfigFileStr (hConfigFile, "BASEURL"                      , pIBConfig->szBaseUrl             , sizeof(pIBConfig->szBaseUrl            ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "BASEURL"                      , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "ironbridgeapi.com/api" or "192.168.9.128:6502/v1/ironbridge/api"
-        rc = my_readSimpleConfigFileInt (hConfigFile, "BYTESPERREQUEST"              , &pIBConfig->bytesPerRequest                                                 ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "BYTESPERREQUEST"              , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. 16;
-        rc = my_readSimpleConfigFileInt (hConfigFile, "RETRIEVALRETRYDELAY"          , &pIBConfig->retrievalRetryDelay                                             ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "RETRIEVALRETRYDELAY"          , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. 15 or 30
-        rc = my_readSimpleConfigFileStr (hConfigFile, "STORAGETYPE"                  , pIBConfig->szStorageType         , sizeof(pIBConfig->szStorageType        ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "STORAGETYPE"                  , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. FILE, MEMORY, MYSQL etc
-        rc = my_readSimpleConfigFileStr (hConfigFile, "STORAGEDATAFORMAT"            , pIBConfig->szStorageDataFormat   , sizeof(pIBConfig->szStorageDataFormat  ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "STORAGEDATAFORMAT"            , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. RAW, BASE64, HEX
-        rc = my_readSimpleConfigFileStr (hConfigFile, "STORAGEFILENAME"              , pIBConfig->szStorageFilename     , sizeof(pIBConfig->szStorageFilename    ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "STORAGEFILENAME"              , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "/var/lib/ibrand/ibrand_data.bin"
-        rc = my_readSimpleConfigFileStr (hConfigFile, "STORAGELOCKFILEPATH"          , pIBConfig->szStorageLockfilePath , sizeof(pIBConfig->szStorageLockfilePath) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "STORAGELOCKFILEPATH"          , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "/tmp"
-        rc = my_readSimpleConfigFileStr (hConfigFile, "SHMEMBACKINGFILENAME"         , pIBConfig->shMemBackingFilename  , sizeof(pIBConfig->shMemBackingFilename ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "SHMEMBACKINGFILENAME"         , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "shmem_ibrand01" // e.g. /dev/shm/shmem_ibrand01
-        rc = my_readSimpleConfigFileLong(hConfigFile, "SHMEMSTORAGESIZE"             , &pIBConfig->shMemStorageSize                                                ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "SHMEMSTORAGESIZE"             , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. (100*1024)
-        rc = my_readSimpleConfigFileStr (hConfigFile, "SHMEMSEMAPHORENAME"           , pIBConfig->shMemSemaphoreName    , sizeof(pIBConfig->shMemSemaphoreName   ) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "SHMEMSEMAPHORENAME"           , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. "sem_ibrand01"
-        rc = my_readSimpleConfigFileLong(hConfigFile, "STORAGEHIGHWATERMARK"         , &pIBConfig->storageHighWaterMark                                            ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "STORAGEHIGHWATERMARK"         , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. 1038336 (1MB)
-        rc = my_readSimpleConfigFileLong(hConfigFile, "STORAGELOWWATERMARK"          , &pIBConfig->storageLowWaterMark                                             ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "STORAGELOWWATERMARK"          , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. 102400 (100KB)
-        rc = my_readSimpleConfigFileInt (hConfigFile, "IDLEDELAY"                    , &pIBConfig->idleDelay                                                       ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "IDLEDELAY"                    , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. 15 or 30
-        rc = my_readSimpleConfigFileByte(hConfigFile, "VERBOSE"                      , &pIBConfig->fVerbose                                                        ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "VERBOSE"                      , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. 3
-        rc = my_readSimpleConfigFileByte(hConfigFile, "USESECURERNG"                 , &pIBConfig->useSecureRng                                                    ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "USESECURERNG"                 , rc); my_closeSimpleConfigFile(hConfigFile); return rc; } // e.g. 3
-        rc = my_readSimpleConfigFileStr (hConfigFile, "CLIENTSETUPOOBFILENAME"       , pIBConfig->clientSetupOOBFilename       , sizeof(pIBConfig->clientSetupOOBFilename)        ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "CLIENTSETUPOOBFILENAME"       , rc); my_closeSimpleConfigFile(hConfigFile); return rc; }
-        rc = my_readSimpleConfigFileStr (hConfigFile, "OURKEMSECRETKEYFILENAME"      , pIBConfig->ourKemSecretKeyFilename      , sizeof(pIBConfig->ourKemSecretKeyFilename)       ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "OURKEMSECRETKEYFILENAME"      , rc); my_closeSimpleConfigFile(hConfigFile); return rc; }
-        //rc = my_readSimpleConfigFileStr (hConfigFile, "THEIRSIGNINGPUBLICKEYFILENAME", pIBConfig->theirSigningPublicKeyFilename, sizeof(pIBConfig->theirSigningPublicKeyFilename) ); if (rc) { app_tracef("ERROR: Failed to read config item \"%s\" rc=%d", "THEIRSIGNINGPUBLICKEYFILENAME", rc); my_closeSimpleConfigFile(hConfigFile); return rc; }
-
-        pIBConfig->secretKeyBytes = secretKeyBytes;
-        pIBConfig->publicKeyBytes = publicKeyBytes;
-        my_closeSimpleConfigFile(hConfigFile);
-    }
-
-    rc = ValidateSettings(pIBConfig);
-    if (rc != 0)
-    {
-        app_tracef("ERROR: One or more settings are invalid");
-        return rc;
-    }
-    return 0;
-}
-#elif (USE_CONFIG==CONFIG_JSON)
 ////////////////////////////////////////////////////////////////////////////////
 // Config Top Level Functions
 ////////////////////////////////////////////////////////////////////////////////
 static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfig)
 {
     JSONObject *json2;
-    const int localConfigTracing = false;
+    const int localDebugTracing = false;
 
     json2 = my_parseJSON(szJsonConfig);
     if (!json2)
@@ -207,7 +79,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
 
     for (int ii=0; ii<json2->count; ii++)
     {
-        if (localConfigTracing)
+        if (localDebugTracing)
             app_tracef("DEBUG: Found json item[%d] %s=%s\n", ii, json2->pairs[ii].key, (json2->pairs[ii].type == JSON_STRING)?(json2->pairs[ii].value->stringValue):"[JSON object]");
 
         if (strcmp(json2->pairs[ii].key,"AuthSettings") == 0 && json2->pairs[ii].type == JSON_OBJECT)
@@ -216,7 +88,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
 
             for (int jj=0; jj<childJson->count; jj++)
             {
-                if (localConfigTracing)
+                if (localDebugTracing)
                     app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
@@ -262,7 +134,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
 
             for (int jj=0; jj<childJson->count; jj++)
             {
-                if (localConfigTracing)
+                if (localDebugTracing)
                     app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
@@ -292,7 +164,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
 
             for (int jj=0; jj<childJson->count; jj++)
             {
-                if (localConfigTracing)
+                if (localDebugTracing)
                     app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
@@ -318,7 +190,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
 
             for (int jj=0; jj<childJson->count; jj++)
             {
-                if (localConfigTracing)
+                if (localDebugTracing)
                     app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
@@ -327,40 +199,45 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
                     {
                         my_strlcpy(pIBConfig->szStorageType, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szStorageType));
                     }
-                    else if (strcmp(childJson->pairs[jj].key,"STORAGEDATAFORMAT")==0)
+
+                    else if (strcmp(childJson->pairs[jj].key,"FILE_DATAFORMAT")==0)
                     {
                         my_strlcpy(pIBConfig->szStorageDataFormat, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szStorageDataFormat));
                     }
-                    else if (strcmp(childJson->pairs[jj].key,"STORAGEFILENAME")==0)
+                    else if (strcmp(childJson->pairs[jj].key,"FILE_FILENAME")==0)
                     {
                         my_strlcpy(pIBConfig->szStorageFilename, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szStorageFilename));
                     }
-                    else if (strcmp(childJson->pairs[jj].key,"STORAGELOCKFILEPATH")==0)
+                    else if (strcmp(childJson->pairs[jj].key,"FILE_LOCKFILEPATH")==0)
                     {
                         my_strlcpy(pIBConfig->szStorageLockfilePath, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szStorageLockfilePath));
+                    }
+                    else if (strcmp(childJson->pairs[jj].key,"FILE_HIGHWATERMARK")==0)
+                    {
+                        pIBConfig->storageHighWaterMark = atoi(childJson->pairs[jj].value->stringValue);
+                    }
+                    else if (strcmp(childJson->pairs[jj].key,"FILE_LOWWATERMARK")==0)
+                    {
+                        pIBConfig->storageLowWaterMark = atoi(childJson->pairs[jj].value->stringValue);
                     }
 
                     else if (strcmp(childJson->pairs[jj].key,"SHMEM_BACKINGFILENAME")==0)
                     {
                         my_strlcpy(pIBConfig->shMemBackingFilename, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->shMemBackingFilename));
                     }
-                    else if (strcmp(childJson->pairs[jj].key,"SHMEM_STORAGESIZE")==0)
-                    {
-                        pIBConfig->shMemStorageSize = atoi(childJson->pairs[jj].value->stringValue);
-                    }
                     else if (strcmp(childJson->pairs[jj].key,"SHMEM_SEMAPHORENAME")==0)
                     {
                         my_strlcpy(pIBConfig->shMemSemaphoreName, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->shMemSemaphoreName));
                     }
+                    else if (strcmp(childJson->pairs[jj].key,"SHMEM_STORAGESIZE")==0)
+                    {
+                        pIBConfig->shMemStorageSize = atoi(childJson->pairs[jj].value->stringValue);
+                    }
+                    else if (strcmp(childJson->pairs[jj].key,"SHMEM_LOWWATERMARK")==0)
+                    {
+                        pIBConfig->shMemLowWaterMark = atoi(childJson->pairs[jj].value->stringValue);
+                    }
 
-                    else if (strcmp(childJson->pairs[jj].key,"STORAGEHIGHWATERMARK")==0)
-                    {
-                        pIBConfig->storageHighWaterMark = atoi(childJson->pairs[jj].value->stringValue);
-                    }
-                    else if (strcmp(childJson->pairs[jj].key,"STORAGELOWWATERMARK")==0)
-                    {
-                        pIBConfig->storageLowWaterMark = atoi(childJson->pairs[jj].value->stringValue);
-                    }
                     else if (strcmp(childJson->pairs[jj].key,"IDLEDELAY")==0)
                     {
                         pIBConfig->idleDelay = atoi(childJson->pairs[jj].value->stringValue);
@@ -374,7 +251,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
 
             for (int jj=0; jj<childJson->count; jj++)
             {
-                if (localConfigTracing)
+                if (localDebugTracing)
                     app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
@@ -428,9 +305,6 @@ int ReadConfig(char *szConfigFilename, tIB_CONFIGDATA *pIBConfig, size_t secretK
     return 0;
 }
 
-#endif // USE_CONFIG
-
-
 void PrintConfig(tIB_CONFIGDATA *pIBConfig)
 {
     // Hide the password against wandering eyes
@@ -459,11 +333,12 @@ void PrintConfig(tIB_CONFIGDATA *pIBConfig)
     app_tracef("szStorageDataFormat   =[%s]" , pIBConfig->szStorageDataFormat   ); // char[16]      // RAW, BASE64, HEX
     app_tracef("szStorageFilename     =[%s]" , pIBConfig->szStorageFilename     ); // char[128]     // "/var/lib/ibrand/ibrand_data.bin"
     app_tracef("szStorageLockfilePath =[%s]" , pIBConfig->szStorageLockfilePath ); // char[128]     // "/tmp"
-    app_tracef("shMemBackingFilename  =[%s]" , pIBConfig->shMemBackingFilename  ); // char[128]     // "shmem_ibrand01" e.g. /dev/shm/shmem_ibrand01
-    app_tracef("shMemStorageSize      =[%ld]", pIBConfig->shMemStorageSize      ); // long          // (100*1024)
-    app_tracef("shMemSemaphoreName    =[%s]" , pIBConfig->shMemSemaphoreName    ); // char[16]      // "sem_ibrand01"
     app_tracef("storageHighWaterMark  =[%ld]", pIBConfig->storageHighWaterMark  ); // long          // 1038336; // 1MB
     app_tracef("storageLowWaterMark   =[%ld]", pIBConfig->storageLowWaterMark   ); // long          // 102400; // 100KB
+    app_tracef("shMemBackingFilename  =[%s]" , pIBConfig->shMemBackingFilename  ); // char[128]     // "shmem_ibrand01" e.g. /dev/shm/shmem_ibrand01
+    app_tracef("shMemSemaphoreName    =[%s]" , pIBConfig->shMemSemaphoreName    ); // char[16]      // "sem_ibrand01"
+    app_tracef("shMemStorageSize      =[%ld]", pIBConfig->shMemStorageSize      ); // long          // (100*1024)
+    app_tracef("shMemLowWaterMark     =[%ld]", pIBConfig->shMemLowWaterMark     ); // long          // 102400; // 100KB
     app_tracef("idleDelay             =[%d]" , pIBConfig->idleDelay             ); // int           //
 
     app_tracef("secretKeyBytes        =[%u]" , pIBConfig->secretKeyBytes        );
@@ -473,7 +348,7 @@ void PrintConfig(tIB_CONFIGDATA *pIBConfig)
 static bool __ParseJsonOOBData(const char *szJsonString, tIB_OOBDATA *pOobData)
 {
     JSONObject *json2;
-    const int localConfigTracing = false;
+    const int localDebugTracing = false;
 
     json2 = my_parseJSON(szJsonString);
     if (!json2)
@@ -484,7 +359,7 @@ static bool __ParseJsonOOBData(const char *szJsonString, tIB_OOBDATA *pOobData)
 
     for (int ii=0; ii<json2->count; ii++)
     {
-        if (localConfigTracing)
+        if (localDebugTracing)
             app_tracef("DEBUG: Found json item[%d] %s=%s\n", ii, json2->pairs[ii].key, (json2->pairs[ii].type == JSON_STRING)?(json2->pairs[ii].value->stringValue):"[JSON object]");
 
         if (json2->pairs[ii].type == JSON_STRING)

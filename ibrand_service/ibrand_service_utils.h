@@ -12,7 +12,7 @@
 #ifndef _INCLUDE_IBRAND_SERVICE_UTILS_H_
 #define _INCLUDE_IBRAND_SERVICE_UTILS_H_
 
-#include "my_utilslib.h"
+#include "my_utils.h" // For tLSTRING
 
 #define NO_EXPECTATION_OF_FILESIZE 0
 

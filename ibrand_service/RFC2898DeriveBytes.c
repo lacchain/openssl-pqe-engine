@@ -177,7 +177,7 @@ bool PBKDF2_KAT_verification(void)
     pActualResult = (unsigned char *) malloc(sizeof(unsigned char)*KEK_KEY_LEN);
     if (!pActualResult)
     {
-        fprintf(stderr, "[ibrand-service] ERROR: malloc failure\n");
+        app_tracef("[ibrand-service] ERROR: malloc failure\n");
         return false;
     }
 
@@ -193,7 +193,7 @@ bool PBKDF2_KAT_verification(void)
     rc = PKCS5_PBKDF2_HMAC_SHA1(password_value, strlen(password_value), salt_value, sizeof(salt_value), numberOfIterations, KEK_KEY_LEN, pActualResult);
     if ( rc == 0 )
     {
-        fprintf(stderr, "[ibrand-service] ERROR: PKCS5_PBKDF2_HMAC_SHA1 failed\n");
+        app_tracef("[ibrand-service] ERROR: PKCS5_PBKDF2_HMAC_SHA1 failed\n");
         free(pActualResult);
         return false;
     }
@@ -218,7 +218,7 @@ bool PBKDF2_KAT_verification(void)
 
     if (errorsFound)
     {
-        fprintf(stderr, "[ibrand-service] ERROR: PKCS5_PBKDF2_HMAC_SHA1 Failed\n");
+        app_tracef("[ibrand-service] ERROR: PKCS5_PBKDF2_HMAC_SHA1 Failed\n");
     }
     else
     {

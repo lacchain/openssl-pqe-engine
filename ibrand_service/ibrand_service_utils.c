@@ -22,6 +22,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include "my_logging.h" // For app_tracef
+
 #include "ibrand_service_utils.h"
 
 //-----------------------------------------------------------------------
@@ -131,9 +133,9 @@ bool IsHexString(const tLSTRING *pHexData)
 {
     size_t numberOfHexChars = pHexData->cbData;
 
-    //app_tracef("DEBUG: HexString Len   = %u", numberOfHexChars);
-    //app_tracef("DEBUG: HexString START = \"%c%c%c%c...\"", pHexData->pData[0], pHexData->pData[1], pHexData->pData[2], pHexData->pData[3]);
-    //app_tracef("DEBUG: HexString END   = \"...%c%c%c%c\"", pHexData->pData[pHexData->cbData-4], pHexData->pData[pHexData->cbData-3], pHexData->pData[pHexData->cbData-2], pHexData->pData[pHexData->cbData-1]);
+    //if (localDebugTracing) app_tracef("DEBUG: HexString Len   = %u", numberOfHexChars);
+    //if (localDebugTracing) app_tracef("DEBUG: HexString START = \"%c%c%c%c...\"", pHexData->pData[0], pHexData->pData[1], pHexData->pData[2], pHexData->pData[3]);
+    //if (localDebugTracing) app_tracef("DEBUG: HexString END   = \"...%c%c%c%c\"", pHexData->pData[pHexData->cbData-4], pHexData->pData[pHexData->cbData-3], pHexData->pData[pHexData->cbData-2], pHexData->pData[pHexData->cbData-1]);
 
     if (numberOfHexChars%2 != 0)
     {

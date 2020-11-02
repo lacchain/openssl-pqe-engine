@@ -11,9 +11,6 @@
 #include <sys/types.h>
 #include <syslog.h>
 
-#include "libibrand_globals.h"
-#include "libibrand_private.h"
-
 #include "my_utilslib.h"
 #include "ibrand_service_shmem.h"
 #include "libibrand_config.h"
@@ -23,14 +20,15 @@
 static const int localDebugTracing = false;
 
 static bool GetNewEntropyFromFile(struct ibrand_context *context, char *szIBDatafilename, char *szStorageLockfilePath, uint8_t *inBuf, size_t inBufLen);
-static bool GetNewEntropyFromSharedMemory(struct ibrand_context *context, uint8_t *inBuf, size_t inBufLen);
+static bool GetNewEntropyFromSharedMemory(struct ibrand_context *context, uint8_t *inBuf, size_t inBufLen, int delayBetweenAttempts, int numAttempts);
+
+
 
 bool GetNewEntropy(struct ibrand_context *context, tIB_INSTANCEDATA *pIBRand, uint8_t *inBuf, size_t inBufLen)
 {
     bool rc = false;
 
-    if (localDebugTracing)
-        app_tracef("DEBUG: GetNewEntropy inBufLen: %u", inBufLen);
+    //if (localDebugTracing) app_tracef("DEBUG: GetNewEntropy inBufLen: %u", inBufLen);
 
     if (strcmp(pIBRand->cfg.szStorageType, "FILE") == 0)
     {
@@ -40,7 +38,9 @@ bool GetNewEntropy(struct ibrand_context *context, tIB_INSTANCEDATA *pIBRand, ui
     }
     if (strcmp(pIBRand->cfg.szStorageType, "SHMEM") == 0)
     {
-        rc = GetNewEntropyFromSharedMemory(context, inBuf, inBufLen);
+        int delayBetweenAttempts = 2; // Seconds
+        int numAttempts = 20;
+        rc = GetNewEntropyFromSharedMemory(context, inBuf, inBufLen, delayBetweenAttempts, numAttempts );
     }
     return rc;
 }
@@ -56,7 +56,7 @@ static bool GetNewEntropyFromFile(struct ibrand_context *context, char *szIBData
 
     my_waitForFileLock(szLockfilePath, szIBDatafilename, FILELOCK_LOGLEVEL);
 
-    for(;;) // Not a real loop - just an exitable code block
+    do // Not a real loop - just an exitable code block
     {
         size_t bytesRead;
         size_t filesize;
@@ -108,8 +108,7 @@ static bool GetNewEntropyFromFile(struct ibrand_context *context, char *szIBData
             break;
         }
         success = true;
-        break;
-    }
+    } while (false);
 
     if (fIBDatafile)
     {
@@ -117,45 +116,105 @@ static bool GetNewEntropyFromFile(struct ibrand_context *context, char *szIBData
         fIBDatafile = NULL;
     }
     my_releaseFileLock(szLockfilePath, szIBDatafilename, FILELOCK_LOGLEVEL);
-    //fprintf(stderr, ".");
     return success;
 }
 
-static bool GetNewEntropyFromSharedMemory(struct ibrand_context *context, uint8_t *inBuf, size_t inBufLen)
+static bool GetNewEntropyFromSharedMemory(struct ibrand_context *context, uint8_t *inBuf, size_t inBufLen, int delayBetweenAttempts, int numAttempts)
 {
+    bool rc;
     int32_t bytesToRead;
-    int32_t bytesRead;
+    int32_t bytesRead = 0;
     int32_t waterLevel;
+    int numFailedReads = 0;
+    int numSuccessfulReads = 0;
+    bool doDelay = false;
 
     bytesToRead = inBufLen;
 
-    if (localDebugTracing)
-        app_tracef("DEBUG: GetNewEntropyFromSharedMemory bytesToRead: %u", bytesToRead);
+    if (localDebugTracing) app_tracef("DEBUG: GetNewEntropyFromSharedMemory bytesToRead=%u, delayBetweenAttempts=%d, numAttempts=%d", bytesToRead, delayBetweenAttempts, numAttempts);
 
-    // Ensure that there is enough data
-    waterLevel = ShMem_GetCurrentWaterLevel();
-    if (waterLevel < bytesToRead)
+    for (numFailedReads = 0; numFailedReads < numAttempts; )
     {
-        sprintf(context->tempMessageBuffer200, "ERROR: Insufficient data in IB DataStore (requested=%lu, available=%d)", (unsigned long)bytesToRead, waterLevel);
-        context->message = context->tempMessageBuffer200;
-        context->errorCode = 13705;
-        return false;
+        //if (localDebugTracing) app_tracef("DEBUG: GetNewEntropyFromSharedMemory [Attempt %d] -------------- <<<", numFailedReads);
+
+        // Should we give the ibrand_service a bit more time?
+        if (doDelay)
+        {
+            if (localDebugTracing) app_tracef("INFO: Problem acquiring new entropy. Will retry in %d seconds", delayBetweenAttempts);
+            if (delayBetweenAttempts > 0)
+            {
+                sleep(delayBetweenAttempts);
+            }
+            if (localDebugTracing) app_tracef("DEBUG: Awake");
+            doDelay = false;
+        }
+
+        // Ensure that there is enough data
+        waterLevel = ShMem_GetCurrentWaterLevel();
+
+        // If there is _some_ water, then drop through and let the retrieval code send back what it can.
+        // if (waterLevel < bytesToRead)
+        // Only loop if the tank is bone dry
+        if (waterLevel == 0)
+        {
+            context->errorCode = 13705;
+            numFailedReads++;
+            doDelay = true;
+            continue;
+        }
+
+        // All good. Let's go and get it.
+        // Read the data and remove the data we have just read.
+        bytesRead = ShMem_RetrieveFromDataStore((char *)inBuf, bytesToRead);
+        if (bytesRead < 0)
+        {
+            // A genuine error has occured
+            context->errorCode = 13706;
+            numFailedReads++;
+            doDelay = true;
+            continue;
+        }
+        // We got some data, although maybe not all
+        numSuccessfulReads++;
+        if (bytesRead != bytesToRead)  // BytesRead = my_minimum(requestedQty, availableStorage);
+        {
+            bytesToRead -= bytesRead;
+            inBuf += bytesRead;
+            continue;
+        }
+        context->errorCode = 0;
+        break; // All good
     }
 
-    // Read the data and remove the data we have just read.
-    bytesRead = ShMem_RetrieveFromDataStore((char *)inBuf, bytesToRead);
-    if (bytesRead < 0)
+    switch (context->errorCode)
     {
-        context->message = "ERROR: IB DataStore read error - see log above for more details";
-        context->errorCode = 13706;
-        return false;
+        case 0: // All good
+            sprintf(context->tempMessageBuffer200, "INFO: Acquired requested data (requested=%lu, OKreads=%d, NGreads=%d)", (unsigned long)bytesToRead, numSuccessfulReads, numFailedReads);
+            context->message = context->tempMessageBuffer200;
+            //context->tempMessageBuffer200[0] = 0;
+            //context->message = NULL;
+            rc = true;
+            break;
+        case 13705: // Insufficient data in IB DataStore
+            sprintf(context->tempMessageBuffer200, "ERROR: Insufficient data in IB DataStore (requested=%lu, available=%d)", (unsigned long)bytesToRead, waterLevel);
+            context->message = context->tempMessageBuffer200;
+            rc = false;
+            break;
+        case 13706: // IB DataStore read error
+            context->message = "ERROR: IB DataStore read error";
+            rc = false;
+            break;
+        case 13707: // IB DataStore read error
+            sprintf(context->tempMessageBuffer200, "ERROR: Failed to read enough data from IB DataStore (requested=%lu, delivered=%lu)", (unsigned long)bytesToRead, (unsigned long)bytesRead);
+            context->message = context->tempMessageBuffer200;
+            rc = false;
+            break;
+        default: // Unknown error
+            context->message = "ERROR: GetNewEntropy failed. Unknown error";
+            rc = false;
+            break;
     }
-    if (bytesRead != bytesToRead)
-    {
-        sprintf(context->tempMessageBuffer200, "ERROR: Failed to read enough data from IB DataStore (requested=%lu, delivered=%lu)", (unsigned long)bytesToRead, (unsigned long)bytesRead);
-        context->message = context->tempMessageBuffer200;
-        context->errorCode = 13707;
-        return false;
-    }
-    return true;
+    if (localDebugTracing) app_tracef("DEBUG: GetNewEntropyFromSharedMemory err:%d msg:%s", context->errorCode, context->message);
+
+    return rc;
 }

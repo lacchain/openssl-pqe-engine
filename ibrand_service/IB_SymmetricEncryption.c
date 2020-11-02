@@ -187,10 +187,13 @@ int ispadding(unsigned int cbData1, unsigned int cbData2, unsigned int N, unsign
 #ifdef INCLUDE_KNOWN_ANSWER_TESTS
 int testSymmetricEncryption(void)
 {
-    OUTPUT_TO_CONSOLE_ENABLED = 1;
     int failed_tests = 0;
     bool rc;
     int testno = 1;
+
+    app_trace_set_destination(true, false, false); // (toConsole, toLogFile; toSyslog)
+    //app_trace_openlog("ibrand_aestest", LOG_PID|LOG_CONS|LOG_PERROR, LOG_USER );
+
     app_tracef("=============================================== TEST %d", testno++);
 
     ///////////////////////////////////////////
@@ -225,9 +228,7 @@ int testSymmetricEncryption(void)
     cbEncryptedData = 1000;
     memset(pEncryptedData, 0x55, cbEncryptedData);
 
-    //dumpToFile("/home/jgilmore/dev/dump_test1_A_encrypted_data.txt", pEncryptedData, cbEncryptedData);
     rc = AESDecryptBytes(pEncryptedData, cbEncryptedData, pSessionKey, cbSessionKey, saltSize, &pDecryptedData, &cbDecryptedData);
-    //dumpToFile("/home/jgilmore/dev/dump_test1_B_decrypted_data.txt", pRawData, cbRawData);
     if (rc != 0)
     {
         fprintf(stderr, "AESDecryptBytes failed with rc=%d\n", rc);
@@ -260,13 +261,11 @@ int testSymmetricEncryption(void)
     size_t cbTransmittedData = 0;
     unsigned char *pTransmittedData = base64_decode(pTransmittedDataB64, cbTransmittedDataB64, &cbTransmittedData);
 
-    //dumpToFile("/home/jgilmore/dev/dump_test1_A_encrypted_data.txt", pEncryptedData, cbEncryptedData);
     rc = AESDecryptBytes(pTransmittedData, cbTransmittedData, pIronBridgeSessionKey, cbIronBridgeSessionKey, 16, &pDecryptedData, &cbDecryptedData);
     if (rc)
     {
         fprintf(stderr, "AESDecryptBytes failed with rc=%d\n", rc);
     }
-    //dumpToFile("/home/jgilmore/dev/dump_test1_B_decrypted_data.txt", pRawData, cbRawData);
 
     if (ispadding(cbDecryptedData, cbIronBridgeOriginalData, 16, pDecryptedData))
     {

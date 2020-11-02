@@ -12,13 +12,9 @@
 #ifndef _INCLUDE_LIBIBRAND_CONFIG_H_
 #define _INCLUDE_LIBIBRAND_CONFIG_H_
 
-#include "libibrand_globals.h"
 #include <stdint.h>
 
-#define CONFIG_HARDCODED 1
-#define CONFIG_SIMPLE    2
-#define CONFIG_JSON      3
-#define USE_CONFIG CONFIG_JSON
+#include <my_utils.h> // For _MAX_PATH
 
 #define DBGBIT_STATUS   0
 #define DBGBIT_CONFIG   1
@@ -39,11 +35,12 @@ typedef struct tagIB_CONFIGDATA
     char          szStorageDataFormat[16];          // RAW, BASE64, HEX
     char          szStorageFilename[_MAX_PATH];     // "/var/lib/ibrand/ibrand_data.bin"
     char          szStorageLockfilePath[_MAX_PATH]; // "/tmp"
-    char          shMemBackingFilename[_MAX_PATH];  // "shmem_ibrand01" // e.g. /dev/shm/shmem_ibrand01
-    long          shMemStorageSize;                 // (100*1024)
-    char          shMemSemaphoreName[16];           // "sem_ibrand01"
     long          storageHighWaterMark;             // 1038336 // 1MB
     long          storageLowWaterMark;              // 102400  // 100KB
+    char          shMemBackingFilename[_MAX_PATH];  // "shmem_ibrand01" // e.g. /dev/shm/shmem_ibrand01
+    char          shMemSemaphoreName[16];           // "sem_ibrand01"
+    long          shMemStorageSize;                 // (100*1024)
+    long          shMemLowWaterMark;                // 102400  // 100KB
 } tIB_CONFIGDATA;
 
 typedef struct tagIB_INSTANCEDATA

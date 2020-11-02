@@ -37,8 +37,7 @@
 #include <string.h>
 
 #include "my_utils.h"
-//#include "my_logging.h"
-//#include "my_debug.h"
+#include "my_logging.h"
 #include "my_json.h"
 
 //#define DEBUG_MALLOC_USAGE
@@ -133,13 +132,13 @@ void *my_malloc(unsigned int size, char purpose)
     void *ptr;
     if (mlog_index >= MLOG_COUNT)
     {
-        fprintf(stderr, "ERROR: Too many mallocs. Please increase MLOG_COUNT\n");
+        app_tracef("ERROR: Too many mallocs. Please increase MLOG_COUNT\n");
         return NULL;
     }
     ptr = malloc(size);
     if (!ptr)
     {
-        fprintf(stderr, "ERROR: malloc failure size=%u purpose=%c\n", size, purpose);
+        app_tracef("ERROR: malloc failure size=%u purpose=%c\n", size, purpose);
         return NULL;
     }
     memset(ptr, 0, size);
@@ -172,17 +171,17 @@ void my_free(void *ptr)
     }
     if (found == -1)
     {
-        fprintf(stderr, "ERROR: Attempted free of unknown ptr %p\n", ptr);
+        app_tracef("ERROR: Attempted free of unknown ptr %p\n", ptr);
         return;
     }
     if (mlog[found].s != 'A')
     {
-        fprintf(stderr, "ERROR: Attempted free of previously freed ptr %p\n", ptr);
+        app_tracef("ERROR: Attempted free of previously freed ptr %p\n", ptr);
         return;
     }
     if (mlog[found].p == UNALLOCATED_PTR || mlog[found].p == 0)
     {
-        fprintf(stderr, "ERROR: Attempted free of invalid ptr %p\n", ptr);
+        app_tracef("ERROR: Attempted free of invalid ptr %p\n", ptr);
         return;
     }
     mlog[found].s = 'F'; // Freed
@@ -206,12 +205,12 @@ void *my_realloc(void *oldptr, unsigned int newsize, char newpurpose)
     }
     if (found == -1)
     {
-        fprintf(stderr, "ERROR: Attempted realloc of unknown ptr %p\n", oldptr);
+        app_tracef("ERROR: Attempted realloc of unknown ptr %p\n", oldptr);
         return NULL;
     }
     if (mlog[found].s != 'A')
     {
-        fprintf(stderr, "ERROR: Attempted realloc of previously freed ptr %p\n", oldptr);
+        app_tracef("ERROR: Attempted realloc of previously freed ptr %p\n", oldptr);
         return NULL;
     }
     bytes_to_copy = MY_MIN(newsize, mlog[found].n);
@@ -219,7 +218,7 @@ void *my_realloc(void *oldptr, unsigned int newsize, char newpurpose)
     newptr = my_malloc(newsize, newpurpose);
     if (!newptr)
     {
-        fprintf(stderr, "ERROR: realloc failure size=%u purpose=%c\n", newsize, newpurpose);
+        app_tracef("ERROR: realloc failure size=%u purpose=%c\n", newsize, newpurpose);
         return NULL;
     }
     memset(newptr, 0, newsize);
@@ -251,7 +250,7 @@ void my_mlogdump(char *title)
     unsigned int countStatus[3] = {0};
     unsigned int countPurpose[8] = {0};
 
-    fprintf(stderr, "### mlogdump %s\n",title);
+    app_tracef("### mlogdump %s\n",title);
     for (ii=0;ii<MLOG_COUNT;ii++)
     {
         switch (mlog[ii].s)
@@ -282,20 +281,20 @@ void my_mlogdump(char *title)
         {
             continue;
         }
-        fprintf(stderr, "    mlog[%3u]: p=%p n=%4u s=%c y=%c\n",ii, mlog[ii].p, mlog[ii].n, mlog[ii].s, mlog[ii].y);
+        app_tracef("    mlog[%3u]: p=%p n=%4u s=%c y=%c\n",ii, mlog[ii].p, mlog[ii].n, mlog[ii].s, mlog[ii].y);
         countActive++;
     }
-    fprintf(stderr, "    mlog stats:\n");
-    fprintf(stderr, "        Active mallocs              : %u/%u\n",countActive,(unsigned int)MLOG_COUNT);
-    fprintf(stderr, "        Allocated/Freed/Other       : %u/%u/%u\n",countStatus[0],countStatus[1],countStatus[2]);
-    fprintf(stderr, "        MLOG_PURPOSE_ROOTOBJECT     : %u\n", countPurpose[0]);
-    fprintf(stderr, "        MLOG_PURPOSE_ROOTPAIR       : %u\n", countPurpose[1]);
-    fprintf(stderr, "        MLOG_PURPOSE_NEWKEY         : %u\n", countPurpose[2]);
-    fprintf(stderr, "        MLOG_PURPOSE_NEWCHILDOBJECT : %u\n", countPurpose[3]);
-    fprintf(stderr, "        MLOG_PURPOSE_NEWCHILDSTRING : %u\n", countPurpose[4]);
-    fprintf(stderr, "        MLOG_PURPOSE_NEWSTRINGVALUE : %u\n", countPurpose[5]);
-    fprintf(stderr, "        MLOG_PURPOSE_EXTENDPAIRS    : %u\n", countPurpose[6]);
-    fprintf(stderr, "        Other purpose               : %u\n", countPurpose[7]);
+    app_tracef("    mlog stats:\n");
+    app_tracef("        Active mallocs              : %u/%u\n",countActive,(unsigned int)MLOG_COUNT);
+    app_tracef("        Allocated/Freed/Other       : %u/%u/%u\n",countStatus[0],countStatus[1],countStatus[2]);
+    app_tracef("        MLOG_PURPOSE_ROOTOBJECT     : %u\n", countPurpose[0]);
+    app_tracef("        MLOG_PURPOSE_ROOTPAIR       : %u\n", countPurpose[1]);
+    app_tracef("        MLOG_PURPOSE_NEWKEY         : %u\n", countPurpose[2]);
+    app_tracef("        MLOG_PURPOSE_NEWCHILDOBJECT : %u\n", countPurpose[3]);
+    app_tracef("        MLOG_PURPOSE_NEWCHILDSTRING : %u\n", countPurpose[4]);
+    app_tracef("        MLOG_PURPOSE_NEWSTRINGVALUE : %u\n", countPurpose[5]);
+    app_tracef("        MLOG_PURPOSE_EXTENDPAIRS    : %u\n", countPurpose[6]);
+    app_tracef("        Other purpose               : %u\n", countPurpose[7]);
 }
 
 #endif // DEBUG_MALLOC_USAGE
@@ -327,50 +326,49 @@ void my_freeJSONFromMemory(JSONObject *obj)
 {
     if (obj)
     {
-        dbg_stmnt_hv1(fprintf(stderr, "DEBUG: Found root object (ptr=%p)\n", obj));
+        dbg_stmnt_hv1(app_tracef("DEBUG: Found root object (ptr=%p)\n", obj));
         if (obj->pairs)
         {
-            dbg_stmnt_hv1(fprintf(stderr, "DEBUG: Found array of %d pairs (ptr=%p)\n", obj->count, obj->pairs));
+            dbg_stmnt_hv1(app_tracef("DEBUG: Found array of %d pairs (ptr=%p)\n", obj->count, obj->pairs));
             for (int i = 0; i < obj->count; i++)
             {
                 if (obj->pairs[i].key != NULL)
                 {
-                    dbg_stmnt_hv1(fprintf(stderr, "DEBUG: Found key on pair %d (ptr=%p)\n", i, obj->pairs[i].key));
-                    dbg_stmnt_hv2(fprintf(stderr, "DEBUG: (heap:free) key size=(%2d+1) ptr=%p key=\"%s\"\n",i,obj->pairs[i].key,obj->pairs[i].key));
+                    dbg_stmnt_hv1(app_tracef("DEBUG: Found key on pair %d (ptr=%p)\n", i, obj->pairs[i].key));
+                    dbg_stmnt_hv2(app_tracef("DEBUG: (heap:free) key size=(%2d+1) ptr=%p key=\"%s\"\n",i,obj->pairs[i].key,obj->pairs[i].key));
                     my_delete(obj->pairs[i].key);
                 }
                 if (obj->pairs[i].value != NULL)
                 {
-                    dbg_stmnt_hv1(fprintf(stderr, "DEBUG: Found value on pair %d (ptr=%p)\n", i, obj->pairs[i].value));
+                    dbg_stmnt_hv1(app_tracef("DEBUG: Found value on pair %d (ptr=%p)\n", i, obj->pairs[i].value));
                     switch (obj->pairs[i].type)
                     {
                         case JSON_STRING:
                         {
-                            dbg_stmnt_hv1(fprintf(stderr, "DEBUG: Found string on value on pair %d (ptr=%p)\n", i, obj->pairs[i].value->stringValue));
-                            dbg_stmnt_hv2(fprintf(stderr, "DEBUG: (heap:free) strvalue size=(%2d+1) ptr=%p val=\"%s\"\n",i,obj->pairs[i].value->stringValue,obj->pairs[i].value->stringValue));
+                            dbg_stmnt_hv1(app_tracef("DEBUG: Found string on value on pair %d (ptr=%p)\n", i, obj->pairs[i].value->stringValue));
+                            dbg_stmnt_hv2(app_tracef("DEBUG: (heap:free) strvalue size=(%2d+1) ptr=%p val=\"%s\"\n",i,obj->pairs[i].value->stringValue,obj->pairs[i].value->stringValue));
                             my_delete(obj->pairs[i].value->stringValue);
                             break;
                         }
                         case JSON_OBJECT:
                         {
-                            dbg_stmnt_hv1(fprintf(stderr, "DEBUG: Found childobj on value on pair %d (recursing with ptr=%p)\n", i, obj->pairs[i].value->jsonObject));
+                            dbg_stmnt_hv1(app_tracef("DEBUG: Found childobj on value on pair %d (recursing with ptr=%p)\n", i, obj->pairs[i].value->jsonObject));
                             my_freeJSONFromMemory(obj->pairs[i].value->jsonObject);
-                            dbg_stmnt_hv1(fprintf(stderr, "DEBUG: Back from recursion of childobj on value on pair %d (recursing)\n", i));
+                            dbg_stmnt_hv1(app_tracef("DEBUG: Back from recursion of childobj on value on pair %d (recursing)\n", i));
                             break;
                         }
                     }
-                    dbg_stmnt_hv1(fprintf(stderr, "DEBUG: We can now free the value struct on pair %d (ptr=%p)\n", i, obj->pairs[i].value));
-                    dbg_stmnt_hv2(fprintf(stderr, "DEBUG: (heap:free) val size=(%2d+1) ptr=%p\n",0,obj->pairs[i].value));
+                    dbg_stmnt_hv1(app_tracef("DEBUG: We can now free the value struct on pair %d (ptr=%p)\n", i, obj->pairs[i].value));
+                    dbg_stmnt_hv2(app_tracef("DEBUG: (heap:free) val size=(%2d+1) ptr=%p\n",0,obj->pairs[i].value));
                     my_delete(obj->pairs[i].value);
                 }
             }
-            // Added by JG
-            dbg_stmnt_hv1(fprintf(stderr, "DEBUG: We can now free the array of pairs (ptr=%p)\n", obj->pairs));
-            dbg_stmnt_hv2(fprintf(stderr, "DEBUG: (heap:free) rootpairs array ptr=%p\n",obj));
+            dbg_stmnt_hv1(app_tracef("DEBUG: We can now free the array of pairs (ptr=%p)\n", obj->pairs));
+            dbg_stmnt_hv2(app_tracef("DEBUG: (heap:free) rootpairs array ptr=%p\n",obj));
             my_delete(obj->pairs);
         }
-        dbg_stmnt_hv1(fprintf(stderr, "DEBUG: We can now free the root object (ptr=%p)\n", obj));
-        dbg_stmnt_hv2(fprintf(stderr, "DEBUG: (heap:free) rootobj ptr=%p\n",obj));
+        dbg_stmnt_hv1(app_tracef("DEBUG: We can now free the root object (ptr=%p)\n", obj));
+        dbg_stmnt_hv2(app_tracef("DEBUG: (heap:free) rootobj ptr=%p\n",obj));
         my_delete(obj);
     }
 #ifdef DEBUG_MALLOC_USAGE
@@ -410,12 +408,12 @@ static JSONObject * _parseJSON(const char * str, int *pOffset)
 
     // Create new object
     JSONObject *obj = my_new(JSONObject,MLOG_PURPOSE_ROOTOBJECT);
-    dbg_stmnt_hv2(fprintf(stderr, "DEBUG: (heap:malloc) rootobj size=(%2lu) ptr=%p\n", (unsigned long)sizeof(JSONObject), obj));
+    dbg_stmnt_hv2(app_tracef("DEBUG: (heap:malloc) rootobj size=(%2lu) ptr=%p\n", (unsigned long)sizeof(JSONObject), obj));
     // Set number of keyvaluepairs in this object
     obj->count = 1;
     // Create the first keyvalue pair
     obj->pairs = my_newWithSize(JSONPair, 1,MLOG_PURPOSE_ROOTPAIR);
-    dbg_stmnt_hv2(fprintf(stderr, "DEBUG: (heap:malloc) rootpair size=(%2lu) ptr=%p\n", (unsigned long)sizeof(JSONPair), obj->pairs));
+    dbg_stmnt_hv2(app_tracef("DEBUG: (heap:malloc) rootpair size=(%2lu) ptr=%p\n", (unsigned long)sizeof(JSONPair), obj->pairs));
 
     char prevToken = JSON_STARTOFTEXT; // Arbitrary character to indicate the beginning of the string
 
@@ -427,8 +425,7 @@ static JSONObject * _parseJSON(const char * str, int *pOffset)
             // Start of new object
             if (prevToken != JSON_STARTOFTEXT && prevToken != JSON_PAIRDELIMITER)
             {
-                fprintf(stderr, "ERROR: Error parsing JSON string - Unexpected '%c' after '%c' (or SOT)\n", *str, prevToken);
-                while(true);
+                app_tracef("ERROR: Error parsing JSON string - Unexpected '%c' after '%c' (or SOT)\n", *str, prevToken);
                 return NULL;
             }
             prevToken = JSON_STARTOFOBJECT;
@@ -441,8 +438,7 @@ static JSONObject * _parseJSON(const char * str, int *pOffset)
             // Start of String
             if (prevToken != JSON_STARTOFOBJECT && prevToken != JSON_PAIRDELIMITER)
             {
-                fprintf(stderr, "ERROR: Error parsing JSON string - Unexpected '%c' after '%c'\n", *str, prevToken);
-                while(true);
+                app_tracef("ERROR: Error parsing JSON string - Unexpected '%c' after '%c'\n", *str, prevToken);
                 return NULL;
             }
             prevToken = JSON_STARTOFKEYSTRING;
@@ -461,8 +457,7 @@ static JSONObject * _parseJSON(const char * str, int *pOffset)
 
             if (prevToken != JSON_STARTOFKEYSTRING)
             {
-                fprintf(stderr, "ERROR: Error parsing JSON string - Unexpected '%c' after '%c'\n", *str, prevToken);
-                while(true);
+                app_tracef("ERROR: Error parsing JSON string - Unexpected '%c' after '%c'\n", *str, prevToken);
                 return NULL;
             }
             prevToken = JSON_ENDOFKEYSTRING;
@@ -473,14 +468,13 @@ static JSONObject * _parseJSON(const char * str, int *pOffset)
             tempPtr.key = my_newWithSize(char, i + 1,MLOG_PURPOSE_NEWKEY);
             if (tempPtr.key == NULL)
             {
-                fprintf(stderr, "ERROR: Out of memory for tempPtr.key\n");
-                while(true);
+                app_tracef("ERROR: Out of memory for tempPtr.key\n");
                 return NULL;
             }
             memcpy(tempPtr.key, str, i * sizeof(char));
             tempPtr.key[i] = '\0';
-            dbg_stmnt_hv2(fprintf(stderr, "DEBUG: (heap:malloc) newkey size=(%2d+1) ptr=%p key=\"%s\"\n",i,tempPtr.key,tempPtr.key));
-            dbg_stmnt_hv3(fprintf(stderr, "DEBUG: newkey key=\"%s\"\n",tempPtr.key));
+            dbg_stmnt_hv2(app_tracef("DEBUG: (heap:malloc) newkey size=(%2d+1) ptr=%p key=\"%s\"\n",i,tempPtr.key,tempPtr.key));
+            dbg_stmnt_hv3(app_tracef("DEBUG: newkey key=\"%s\"\n",tempPtr.key));
 
             // Skip over the found string, and closing doublequote char
             str += i + 1;
@@ -497,8 +491,7 @@ static JSONObject * _parseJSON(const char * str, int *pOffset)
 
             if (prevToken != JSON_ENDOFKEYSTRING)
             {
-                fprintf(stderr, "ERROR: Error parsing JSON string - Unexpected '%c' after '%c'\n", *str, prevToken);
-                while(true);
+                app_tracef("ERROR: Error parsing JSON string - Unexpected '%c' after '%c'\n", *str, prevToken);
                 return NULL;
             }
             prevToken = JSON_KEYVALUESEPARATOR;
@@ -518,8 +511,7 @@ static JSONObject * _parseJSON(const char * str, int *pOffset)
                 // The value is an object
                 if (prevToken != JSON_KEYVALUESEPARATOR)
                 {
-                    fprintf(stderr, "ERROR: Error parsing JSON string - Unexpected '%c' after '%c'\n", *str, prevToken);
-                    while(true);
+                    app_tracef("ERROR: Error parsing JSON string - Unexpected '%c' after '%c'\n", *str, prevToken);
                     return NULL;
                 }
                 prevToken = JSON_STARTOFOBJECT;
@@ -527,11 +519,10 @@ static JSONObject * _parseJSON(const char * str, int *pOffset)
                 tempPtr.value = my_new(JSONValue,MLOG_PURPOSE_NEWCHILDOBJECT);
                 if (tempPtr.value == NULL)
                 {
-                    fprintf(stderr, "ERROR: Out of memory for tempPtr.value\n");
-                    while(true);
+                    app_tracef("ERROR: Out of memory for tempPtr.value\n");
                     return NULL;
                 }
-                dbg_stmnt_hv2(fprintf(stderr, "DEBUG: (heap:malloc) childobj size=(%2lu) ptr=%p\n", (unsigned long)sizeof(JSONValue), tempPtr.value));
+                dbg_stmnt_hv2(app_tracef("DEBUG: (heap:malloc) childobj size=(%2lu) ptr=%p\n", (unsigned long)sizeof(JSONValue), tempPtr.value));
                 tempPtr.type = JSON_OBJECT;
                 // Parse the object recursively
                 tempPtr.value->jsonObject = _parseJSON(str, &_offset);
@@ -541,7 +532,7 @@ static JSONObject * _parseJSON(const char * str, int *pOffset)
                     my_freeJSONFromMemory(obj);
                     return NULL;
                 }
-                // JG: Is this the problem. What is _offset ???
+
                 // Advance the string pointer by the size of the processed child object
                 _sizeOfChildObject = _offset - _offsetBeforeParsingChildObject;
                 str += _sizeOfChildObject;
@@ -555,8 +546,7 @@ static JSONObject * _parseJSON(const char * str, int *pOffset)
                 // The value is a string
                 if (prevToken != JSON_KEYVALUESEPARATOR)
                 {
-                    fprintf(stderr, "ERROR: Error parsing JSON string - Unexpected '%c' after '%c'\n", *str, prevToken);
-                    while(true);
+                    app_tracef("ERROR: Error parsing JSON string - Unexpected '%c' after '%c'\n", *str, prevToken);
                     return NULL;
                 }
                 prevToken = JSON_STARTOFVALUESTRING;
@@ -574,21 +564,20 @@ static JSONObject * _parseJSON(const char * str, int *pOffset)
 
                 if (prevToken != JSON_STARTOFVALUESTRING)
                 {
-                    fprintf(stderr, "ERROR: Error parsing JSON string - Unexpected '%c' after '%c'\n", *str, prevToken);
-                    while(true);
+                    app_tracef("ERROR: Error parsing JSON string - Unexpected '%c' after '%c'\n", *str, prevToken);
                     return NULL;
                 }
                 prevToken = JSON_ENDOFVALUESTRING;
 
                 // Store the value string in the value portion of the keyvalue pair
                 tempPtr.value = my_new(JSONValue,MLOG_PURPOSE_NEWCHILDSTRING);
-                dbg_stmnt_hv2(fprintf(stderr, "DEBUG: (heap:malloc) childstr size=(%2lu) ptr=%p\n", (unsigned long)sizeof(JSONValue), tempPtr.value));
+                dbg_stmnt_hv2(app_tracef("DEBUG: (heap:malloc) childstr size=(%2lu) ptr=%p\n", (unsigned long)sizeof(JSONValue), tempPtr.value));
                 tempPtr.type = JSON_STRING;
                 tempPtr.value->stringValue = my_newWithSize(char, i + 1,MLOG_PURPOSE_NEWSTRINGVALUE);
                 memcpy(tempPtr.value->stringValue, str, i * sizeof(char));
                 tempPtr.value->stringValue[i] = '\0';
-                dbg_stmnt_hv2(fprintf(stderr, "DEBUG: (heap:malloc) strval size=(%2d+1) ptr=%p val=\"%s\"\n",i,tempPtr.value->stringValue,tempPtr.value->stringValue));
-                dbg_stmnt_hv3(fprintf(stderr, "DEBUG: val=\"%s\"\n",tempPtr.value->stringValue));
+                dbg_stmnt_hv2(app_tracef("DEBUG: (heap:malloc) strval size=(%2d+1) ptr=%p val=\"%s\"\n",i,tempPtr.value->stringValue,tempPtr.value->stringValue));
+                dbg_stmnt_hv3(app_tracef("DEBUG: val=\"%s\"\n",tempPtr.value->stringValue));
 
                 // Skip over the string and the closing doublequote
                 str += i + 1;
@@ -602,8 +591,7 @@ static JSONObject * _parseJSON(const char * str, int *pOffset)
             // Start of the next keyvalue pair
             if (prevToken != JSON_ENDOFOBJECT && prevToken != JSON_ENDOFVALUESTRING)
             {
-                fprintf(stderr, "ERROR: Error parsing JSON string - Unexpected '%c' after '%c'\n", *str, prevToken);
-                while(true);
+                app_tracef("ERROR: Error parsing JSON string - Unexpected '%c' after '%c'\n", *str, prevToken);
                 return NULL;
             }
             prevToken = JSON_PAIRDELIMITER;
@@ -611,9 +599,9 @@ static JSONObject * _parseJSON(const char * str, int *pOffset)
             // Increment the number of keyvalue pairs
             obj->count++;
             // Add another keyvalue pair to the object
-            dbg_stmnt_hv2(fprintf(stderr, "DEBUG: (heap:free) val ptr=%p\n",obj->pairs));
+            dbg_stmnt_hv2(app_tracef("DEBUG: (heap:free) val ptr=%p\n",obj->pairs));
             obj->pairs = my_renewWithSize(obj->pairs, JSONPair, obj->count, MLOG_PURPOSE_EXTENDPAIRS);
-            dbg_stmnt_hv2(fprintf(stderr, "DEBUG: (heap:realloc) extendpairs size=(%2lu+1) ptr=%p\n", (unsigned long)(sizeof(JSONPair)*obj->count), obj->pairs));
+            dbg_stmnt_hv2(app_tracef("DEBUG: (heap:realloc) extendpairs size=(%2lu+1) ptr=%p\n", (unsigned long)(sizeof(JSONPair)*obj->count), obj->pairs));
 
             // Skip over the comma
             str++;
@@ -624,8 +612,7 @@ static JSONObject * _parseJSON(const char * str, int *pOffset)
             // End of object
             if (prevToken != JSON_ENDOFOBJECT && prevToken != JSON_ENDOFVALUESTRING)
             {
-                fprintf(stderr, "ERROR: Error parsing JSON string - Unexpected '%c' after '%c'\n", *str, prevToken);
-                while(true);
+                app_tracef("ERROR: Error parsing JSON string - Unexpected '%c' after '%c'\n", *str, prevToken);
                 return NULL;
             }
             prevToken = JSON_ENDOFOBJECT;
@@ -639,12 +626,9 @@ static JSONObject * _parseJSON(const char * str, int *pOffset)
 
             return obj;
         }
-        // JG: Added else block
         else
         {
-            // JG: Internal error (we should have caught all
-            //     error possibilities, but justin case)
-
+            // Internal error (we should have caught all error possibilities, but justin case)
             // ignore leading junk e.g. "JSON:"
             str++;
             _offset++;
@@ -654,15 +638,13 @@ static JSONObject * _parseJSON(const char * str, int *pOffset)
     }
     if (prevToken != JSON_ENDOFOBJECT)
     {
-        fprintf(stderr, "ERROR: Error parsing JSON string - Unexpected EOT after '%c'\n", prevToken);
-        while(true);
+        app_tracef("ERROR: Error parsing JSON string - Unexpected EOT after '%c'\n", prevToken);
         return NULL;
     }
     prevToken = JSON_ENDOFTEXT; // Arbitrary character to indicate the End Of Text
     UNUSED(prevToken);
 
-    // JG: When does this happen??
-    // JG: Premature end of input string???
+    // Premature end of input string?
     return obj;
 }
 
