@@ -25,7 +25,7 @@ static const int localDebugTracing = false;
 ////////////////////////////////////////////////////////////////////////////////
 //
 ////////////////////////////////////////////////////////////////////////////////
-bool initIBRand(struct ibrand_context *context)
+bool IBRand_init(struct ibrand_context *context)
 {
     context->message = "";
     context->errorCode = 0;
@@ -43,7 +43,7 @@ bool initIBRand(struct ibrand_context *context)
 ////////////////////////////////////////////////////////////////////////////////
 //
 ////////////////////////////////////////////////////////////////////////////////
-void deinitIBRand(struct ibrand_context *context)
+void IBRand_deinit(struct ibrand_context *context)
 {
     UNUSED_VAR(context);
 }
@@ -51,7 +51,7 @@ void deinitIBRand(struct ibrand_context *context)
 ////////////////////////////////////////////////////////////////////////////////
 //
 ////////////////////////////////////////////////////////////////////////////////
-uint32_t readData(struct ibrand_context *context, uint8_t *pResult, size_t cbResult)
+uint32_t IBRand_readData(struct ibrand_context *context, uint8_t *pResult, size_t cbResult)
 {
     static int fReadDataIsBusy = 0;
     uint32_t rc;

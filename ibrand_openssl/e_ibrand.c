@@ -131,10 +131,10 @@ static int IBRandEngineStateInit(tENGINESTATE *engine_state)
 
   memset(engine_state, 0, sizeof(*engine_state));
   RingBufferInit(&engine_state->ring_buffer);
-  engine_state->status = initIBRand(&engine_state->trng_context);
+  engine_state->status = IBRand_init(&engine_state->trng_context);
   if (!engine_state->status)
   {
-    app_tracef("ERROR: initIBRand initialization error: %s", engine_state->trng_context.message ? engine_state->trng_context.message : "unknown");
+    app_tracef("ERROR: IBRand_init initialization error: %s", engine_state->trng_context.message ? engine_state->trng_context.message : "unknown");
   }
 
   return engine_state->status;
@@ -169,10 +169,10 @@ static int GetRngMaterial(unsigned char *buf, int num)
       unsigned long shMemRequestBytes = MIN(bytesStillRequired, (int)RING_BUFFER_REPLENISH_SIZE); // was RING_BUFFER_REPLENISH_SIZE
 
       //if (localDebugTracing) app_tracef("DEBUG: Replenish RingBuffer from shmem(%d)", shMemRequestBytes);
-      size_t rand_bytes = readData(&engine_state.trng_context, rand_buffer, shMemRequestBytes);
+      size_t rand_bytes = IBRand_readData(&engine_state.trng_context, rand_buffer, shMemRequestBytes);
       if (engine_state.trng_context.errorCode)
       {
-        app_tracef("ERROR: readData failed: errorCode=%d, msg=%s", engine_state.trng_context.errorCode, engine_state.trng_context.message ? engine_state.trng_context.message : "unknown");
+        app_tracef("ERROR: IBRand_readData failed: errorCode=%d, msg=%s", engine_state.trng_context.errorCode, engine_state.trng_context.message ? engine_state.trng_context.message : "unknown");
         engine_state.status = ENGINE_STATUS_NG;
         engine_state.trng_context.errorCode = 0;
         break;
