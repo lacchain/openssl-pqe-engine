@@ -17,6 +17,8 @@
 
 #include "../ibrand_common/my_utilslib.h"
 
+//#define USE_RINGBUFFER // Can cause problems with genrsa >= 2048
+
 #ifndef MIN
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 #endif
@@ -33,6 +35,8 @@ static const int localDebugTracing = true;
 ////////////////////////////////
 // Ring buffer implementation
 ////////////////////////////////
+
+#ifdef USE_RINGBUFFER
 
 #define RING_BUFFER_SIZE (2u * BUFLEN) // So that we do not waste RNG bytes.
 #define RING_BUFFER_REPLENISH_SIZE (BUFLEN)
@@ -112,6 +116,7 @@ static size_t RingBufferWrite(RingBuffer *buffer, size_t num_bytes, const uint8_
 
   return total_bytes_written;
 }
+#endif // USE_RINGBUFFER
 
 ///////////////////////////
 // Engine implementation
@@ -120,7 +125,9 @@ static size_t RingBufferWrite(RingBuffer *buffer, size_t num_bytes, const uint8_
 typedef struct tagENGINESTATE
 {
   struct ibrand_context trng_context;
+#ifdef USE_RINGBUFFER
   RingBuffer ring_buffer;
+#endif
   int status;
 } tENGINESTATE;
 
@@ -130,7 +137,9 @@ static int IBRandEngineStateInit(tENGINESTATE *engine_state)
   app_trace_openlog(NULL, LOG_PID, LOG_USER );
 
   memset(engine_state, 0, sizeof(*engine_state));
+#ifdef USE_RINGBUFFER
   RingBufferInit(&engine_state->ring_buffer);
+#endif
   engine_state->status = IBRand_init(&engine_state->trng_context);
   if (!engine_state->status)
   {
@@ -152,6 +161,7 @@ static int GetRngMaterial(unsigned char *buf, int num)
   unsigned char *w_ptr = buf;
   while ((bytesStillRequired > 0) && (engine_state.status == ENGINE_STATUS_OK))
   {
+#ifdef USE_RINGBUFFER
     size_t bytes_read = RingBufferRead(&engine_state.ring_buffer, bytesStillRequired, w_ptr);
     w_ptr += bytes_read;
     bytesStillRequired -= bytes_read;
@@ -186,6 +196,19 @@ static int GetRngMaterial(unsigned char *buf, int num)
       }
       //if (localDebugTracing) app_tracef("DEBUG: RingBuffer replenished with %lu bytes. Try again...", (unsigned long)bytes_written);
     }
+#else // USE_RINGBUFFER
+      unsigned long shMemRequestBytes = bytesStillRequired;
+      size_t rand_bytes = IBRand_readData(&engine_state.trng_context, w_ptr, shMemRequestBytes);
+      if (engine_state.trng_context.errorCode)
+      {
+        app_tracef("ERROR: IBRand_readData failed: errorCode=%d, msg=%s", engine_state.trng_context.errorCode, engine_state.trng_context.message ? engine_state.trng_context.message : "unknown");
+        engine_state.status = ENGINE_STATUS_NG;
+        engine_state.trng_context.errorCode = 0;
+        break;
+      }
+      w_ptr += rand_bytes;
+      bytesStillRequired -= rand_bytes;
+#endif // USE_RINGBUFFER
   }
   //if (localDebugTracing) app_tracef("DEBUG: Inbound openssl rand (requested:%d, supplied:%d) Done", requestBytes, requestBytes-bytesStillRequired);
 
