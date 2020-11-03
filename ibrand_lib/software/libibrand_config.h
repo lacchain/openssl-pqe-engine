@@ -14,7 +14,13 @@
 
 #include <stdint.h>
 
-#include <my_utils.h> // For _MAX_PATH
+#ifndef _MAX_PATH
+    #ifdef MAX_PATH
+        #define _MAX_PATH MAX_PATH
+    #else
+        #define _MAX_PATH 128
+    #endif
+#endif
 
 #define DBGBIT_STATUS   0
 #define DBGBIT_CONFIG   1
