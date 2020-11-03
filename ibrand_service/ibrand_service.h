@@ -17,8 +17,6 @@
 
 #include "ibrand_service_config.h" // for tIB_CONFIGDATA
 
-//#define FORCE_ALL_LOGGING_ON
-
 typedef struct tagIB_INSTANCEDATA
 {
     tIB_CONFIGDATA cfg;
@@ -36,7 +34,7 @@ typedef struct tagIB_INSTANCEDATA
     // SRNG State
     tLSTRING      encryptedKemSecretKey;
     tLSTRING      ourKemSecretKey;
-    //tLSTRING      theirSigningPublicKey;
+
     tLSTRING      encapsulatedSharedSecret;
     tLSTRING      symmetricSharedSecret;
 

@@ -37,8 +37,6 @@
 #include "ibrand_service_config.h"
 #include "ibrand_service_datastore.h"
 
-//#define FORCE_ALL_LOGGING_ON
-
 #define SYSTEM_NAME    "FrodoKEM-640"
 #define crypto_kem_keypair            crypto_kem_keypair_Frodo640
 #define crypto_kem_enc                crypto_kem_enc_Frodo640
@@ -1596,15 +1594,6 @@ int main(int argc, char * argv[])
         return EXIT_FAILURE;
     }
 
-#ifdef FORCE_ALL_LOGGING_ON
-    SET_BIT(pIBRand->cfg.fVerbose, DBGBIT_STATUS );
-    SET_BIT(pIBRand->cfg.fVerbose, DBGBIT_CONFIG );
-    SET_BIT(pIBRand->cfg.fVerbose, DBGBIT_AUTH   );
-    SET_BIT(pIBRand->cfg.fVerbose, DBGBIT_DATA   );
-    SET_BIT(pIBRand->cfg.fVerbose, DBGBIT_CURL   );
-#endif // FORCE_ALL_LOGGING_ON
-
-
     // Fork off the parent process
     processId = fork();
     if (processId < 0)
@@ -1661,14 +1650,19 @@ int main(int argc, char * argv[])
         return EXIT_FAILURE;
     }
 
-#ifdef FORCE_ALL_LOGGING_ON
-    // Leave the standard file descriptors open
-#else // FORCE_ALL_LOGGING_ON
-    // Close out the standard file descriptors
-    close(STDIN_FILENO);
-    close(STDOUT_FILENO);
-    close(STDERR_FILENO);
-#endif // FORCE_ALL_LOGGING_ON
+    // Curl logging is sent to stdout
+    // So if DBGBIT_CURL bit is set, then do not close stdout etc.
+    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CURL))
+    {
+        // Leave the standard file descriptors open
+    }
+    else
+    {
+        // Close out the standard file descriptors
+        close(STDIN_FILENO);
+        close(STDOUT_FILENO);
+        close(STDERR_FILENO);
+    }
 
     // =========================================================================
     // Daemon-specific initialization
@@ -1923,7 +1917,7 @@ int main(int argc, char * argv[])
                 {
                     if (currentWaterLevel <= dataStore_GetLowWaterMark(pIBRand)) // Is it nearly empty
                     {
-                        app_tracef("INFO: Low water mark reached. Starting retrieval.");
+                        app_tracef("INFO: LowWaterMark reached. Starting retrieval.");
                         isPaused = false;
                         currentState = STATE_GETSOMERANDOMNESS;
                         continue;
@@ -1940,7 +1934,7 @@ int main(int argc, char * argv[])
                         continue;
                     }
                     // No. The tank is full.
-                    app_tracef("INFO: High water mark reached. Pausing retrieval.");
+                    app_tracef("INFO: HighWaterMark reached. Pausing retrieval.");
                     isPaused = true;
                     // Fall through to sleep
                 }
