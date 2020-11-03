@@ -212,7 +212,7 @@ static int cb_Status(void)
 
 static void cb_Cleanup(void)
 {
-  if (localDebugTracing) app_tracef("INFO: cb_Cleanup()");
+  if (localDebugTracing) app_tracef("INFO: cb_Cleanup() [waterlevel=%d]", engine_state.trng_context.recentWaterLevel);
 }
 
 int ibrand_bind(ENGINE *pEngine, const char *pID)

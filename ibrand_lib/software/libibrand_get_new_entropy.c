@@ -160,6 +160,7 @@ static bool GetNewEntropyFromSharedMemory(struct ibrand_context *context, uint8_
 
         // Ensure that there is enough data
         waterLevel = ShMem_GetCurrentWaterLevel();
+        context->recentWaterLevel = waterLevel;
 
         // If there is _some_ water, then drop through and let the retrieval code send back what it can.
         // if (waterLevel < bytesToRead)

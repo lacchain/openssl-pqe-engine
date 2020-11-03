@@ -24,6 +24,7 @@ struct ibrand_context
     const char *message;
     char tempMessageBuffer200[200];
     int errorCode;
+    int32_t recentWaterLevel;
 };
 
 extern bool     IBRand_init     (struct ibrand_context *context);
