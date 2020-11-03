@@ -54,36 +54,37 @@ void IBRand_deinit(struct ibrand_context *context)
 uint32_t IBRand_readData(struct ibrand_context *context, uint8_t *pResult, size_t cbResult)
 {
     static int fReadDataIsBusy = 0;
-    uint32_t rc;
+    uint32_t quantitySupplied = 0;
 
     if (pResult == NULL || cbResult == 0)
     {
+        context->message = "IBRand_readData parameter error";
+        context->errorCode = 13709;
         return 0;
     }
 
     if (fReadDataIsBusy > 0)
     {
-        context->message = "readData is busy";
+        context->message = "IBRand_readData is busy";
         context->errorCode = 13708;
         return 0;
     }
 
-    if (localDebugTracing) app_tracef("DEBUG: readData Requested: %lu\n", (unsigned long)cbResult);
+    if (localDebugTracing) app_tracef("DEBUG: IBRand_readData - requesting %lu bytes\n", (unsigned long)cbResult);
 
     fReadDataIsBusy++;
+    do
     {
-        // Collect new entropy
         context->errorCode = 0;
         if (!GetNewEntropy(context, pIBRand, pResult, cbResult))
         {
             app_tracef("ERROR: GetNewEntropy failed. errorCode=%d: msg=%s\n", context->errorCode, context->message?context->message:"<No message supplied>");
-            rc = 0;
+            quantitySupplied = 0;
+            break;
         }
-        else
-        {
-            rc = cbResult;
-        }
-    }
+        quantitySupplied = cbResult;
+    } while (false);
+
     fReadDataIsBusy--;
-    return rc;
+    return quantitySupplied;
 }
