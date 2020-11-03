@@ -8,13 +8,13 @@
 #define KEM_BENCH_SECONDS     1
 
 
-static int kem_test(const char *named_parameters, int iterations) 
+static int kem_test(const char *named_parameters, int iterations)
 {
     uint8_t pk[CRYPTO_PUBLICKEYBYTES];
     uint8_t sk[CRYPTO_SECRETKEYBYTES];
     uint8_t ss_encap[CRYPTO_BYTES], ss_decap[CRYPTO_BYTES];
     uint8_t ct[CRYPTO_CIPHERTEXTBYTES];
-    
+
     printf("\n");
     printf("=============================================================================================================================\n");
     printf("Testing correctness of key encapsulation mechanism (KEM), system %s, tests for %d iterations\n", named_parameters, iterations);
@@ -26,7 +26,7 @@ static int kem_test(const char *named_parameters, int iterations)
         crypto_kem_dec(ss_decap, ct, sk);
         if (memcmp(ss_encap, ss_decap, CRYPTO_BYTES) != 0) {
             printf("\n ERROR!\n");
-	        return false; 
+	        return false;
         }
     }
     printf("Tests PASSED. All session keys matched.\n");
@@ -36,7 +36,7 @@ static int kem_test(const char *named_parameters, int iterations)
 }
 
 
-static void kem_bench(const int seconds) 
+static void kem_bench(const int seconds)
 {
     uint8_t pk[CRYPTO_PUBLICKEYBYTES];
     uint8_t sk[CRYPTO_SECRETKEYBYTES];
@@ -47,15 +47,15 @@ static void kem_bench(const int seconds)
 
     crypto_kem_keypair(pk, sk);
     TIME_OPERATION_SECONDS({ crypto_kem_enc(ct, ss_encap, pk); }, "KEM encapsulate", seconds);
-    
+
     crypto_kem_enc(ct, ss_encap, pk);
     TIME_OPERATION_SECONDS({ crypto_kem_dec(ss_decap, ct, sk); }, "KEM decapsulate", seconds);
 }
 
 
-int main() 
+int main()
 {
-    int OK = true;
+    int OK;
 
     OK = kem_test(SYSTEM_NAME, KEM_TEST_ITERATIONS);
     if (OK != true) {
