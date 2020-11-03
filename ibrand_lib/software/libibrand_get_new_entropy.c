@@ -11,9 +11,10 @@
 #include <sys/types.h>
 #include <syslog.h>
 
-#include "my_utilslib.h"
-#include "ibrand_service_shmem.h"
-#include "libibrand_config.h"
+#include "../../ibrand_common/my_filelock.h"
+#include "../../ibrand_common/my_logging.h" // For app_tracef()
+#include "../../ibrand_service/ibrand_service_shmem.h" // For ShMem_GetCurrentWaterLevel() & ShMem_RetrieveFromDataStore()
+
 #include "libibrand.h"
 #include "libibrand_get_new_entropy.h"
 

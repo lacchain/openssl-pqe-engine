@@ -15,7 +15,7 @@
 #include <string.h>
 #include <syslog.h>
 
-#include "my_utilslib.h"
+#include "../ibrand_common/my_utilslib.h"
 
 #ifndef MIN
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))

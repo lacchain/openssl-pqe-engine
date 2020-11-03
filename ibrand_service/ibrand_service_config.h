@@ -12,7 +12,7 @@
 #ifndef _INCLUDE_IBRAND_SERVICE_CONFIG_H_
 #define _INCLUDE_IBRAND_SERVICE_CONFIG_H_
 
-#include "my_utilslib.h"
+#include "../ibrand_common/my_utilslib.h"
 #include "ibrand_service_utils.h"
 
 #define DBGBIT_STATUS   0

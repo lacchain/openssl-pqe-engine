@@ -30,7 +30,7 @@
 
 #include "../PQCrypto-LWEKE/src/api_frodo640.h"
 
-#include "my_utils.h"
+#include "../ibrand_common/my_utilslib.h"
 
 #include "ibrand_service.h"
 #include "ibrand_service_utils.h"

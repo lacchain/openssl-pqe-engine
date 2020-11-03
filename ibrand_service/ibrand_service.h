@@ -13,7 +13,7 @@
 #define _INCLUDE_IBRAND_SERVICE_H_
 
 #include <curl/curl.h>
-#include "my_utilslib.h"
+#include "../ibrand_common/my_utilslib.h"
 
 #include "ibrand_service_config.h" // for tIB_CONFIGDATA
 

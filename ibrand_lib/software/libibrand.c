@@ -15,12 +15,11 @@
 #include <fcntl.h>
 #endif
 
-#include "my_utilslib.h"
+#include "../../ibrand_common/my_utilslib.h"
 #include "libibrand_get_new_entropy.h"
 #include "libibrand_config.h"
 
 tIB_INSTANCEDATA *pIBRand = NULL;
-
 static const int localDebugTracing = false;
 
 ////////////////////////////////////////////////////////////////////////////////

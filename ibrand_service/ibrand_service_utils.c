@@ -22,7 +22,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include "my_logging.h" // For app_tracef
+#include "../ibrand_common/my_utilslib.h"
 
 #include "ibrand_service_utils.h"
 
