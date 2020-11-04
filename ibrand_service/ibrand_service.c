@@ -185,12 +185,11 @@ static bool copyToNewBuffer (tLSTRING *pDest, tLSTRING *pSrc, bool appendToExist
 //-----------------------------------------------------------------------
 size_t ReceiveDataHandler_login(char *buffer, size_t size, size_t nmemb, void *userp)
 {
-    char *     pNewData;
-    size_t     cbNewData;
+    tLSTRING inboundData;
     tIB_INSTANCEDATA *pIBRand;
 
-    pNewData  = buffer;
-    cbNewData = (size * nmemb);
+    inboundData.pData = buffer;
+    inboundData.cbData = (size * nmemb);
 
     // Cast our userp back to its original (tIB_INSTANCEDATA *) type
     pIBRand = (tIB_INSTANCEDATA *)userp;
@@ -201,7 +200,11 @@ size_t ReceiveDataHandler_login(char *buffer, size_t size, size_t nmemb, void *u
     }
 
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
-        app_tracef("INFO: Login: %u bytes received", cbNewData);
+    {
+        app_tracef("INFO: Login: %u bytes received",
+                   inboundData.cbData);
+        app_trace_hexall("DEBUG: ReceiveDataHandler_login:", (unsigned char *)inboundData.pData, inboundData.cbData);
+    }
 
     // Free up the old buffer, if there is one
     if (pIBRand->Token.pData && pIBRand->Token.cbData)
@@ -213,7 +216,7 @@ size_t ReceiveDataHandler_login(char *buffer, size_t size, size_t nmemb, void *u
     }
 
     // Allocate a new buffer
-    pIBRand->Token.pData = (char *)malloc(cbNewData);
+    pIBRand->Token.pData = (char *)malloc(inboundData.cbData);
     if (pIBRand->Token.pData == NULL)
     {
         app_tracef("ERROR: ReceiveDataHandler_login() malloc failure");
@@ -221,13 +224,16 @@ size_t ReceiveDataHandler_login(char *buffer, size_t size, size_t nmemb, void *u
     }
 
     // Copy in the new data
-    memcpy(pIBRand->Token.pData, pNewData, cbNewData);
-    pIBRand->Token.cbData = cbNewData;
+    memcpy(pIBRand->Token.pData, inboundData.pData, inboundData.cbData);
+    pIBRand->Token.cbData = inboundData.cbData;
 
-    //app_tracef("INFO: ReceiveDataHandler_login() Saved %lu bytes", pIBRand->Token.cbData);
+    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
+    {
+        app_tracef("INFO: ReceiveDataHandler_login() Saved %lu bytes", pIBRand->Token.cbData);
+    }
 
     // Job done
-    return cbNewData;  // Number of bytes processed
+    return inboundData.cbData;  // Number of bytes processed
 }
 
 
@@ -540,24 +546,29 @@ static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
     unsigned char *p = (unsigned char *)pIBRand->encapsulatedSharedSecret.pData;
     size_t n = pIBRand->encapsulatedSharedSecret.cbData;
 
-    //app_trace_hexall("DEBUG: base64 encoded encapsulatedSharedSecret:", pIBRand->encapsulatedSharedSecret.pData, pIBRand->encapsulatedSharedSecret.cbData);
+    //app_trace_hexall("DEBUG: base64 encoded encapsulatedSharedSecret:", (unsigned char *)pIBRand->encapsulatedSharedSecret.pData, pIBRand->encapsulatedSharedSecret.cbData);
+
     if (p[0] == '"') {p++; n--;}
     if (p[n-1] == '"') {n--;}
     //app_trace_hexall("DEBUG: p:", p, n);
 
     // base64_decode the encapsulate key
     size_t decodeSize = 0;
-    unsigned char *rawEncapsulatedKey = base64_decode((char *)p, n, (size_t *)&(decodeSize));
-    if (!rawEncapsulatedKey)
+    unsigned char *rawEncapsulatedSharedSecret = base64_decode((char *)p, n, (size_t *)&(decodeSize));
+    if (!rawEncapsulatedSharedSecret)
     {
-       app_tracef("WARNING: Failed to decode Base64 EncapsulatedKey");
+       app_tracef("WARNING: Failed to decode Base64 encapsulatedSharedSecret");
+       if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
+       {
+           app_trace_hexall("DEBUG: Base64 encapsulatedSharedSecret: ", p, n);
+       }
        return 2204;
     }
 
     if (decodeSize != CRYPTO_CIPHERTEXTBYTES)
     {
         app_tracef("ERROR: Size of decoded encapsulated key (%u) is not as expected (%u)", decodeSize, CRYPTO_CIPHERTEXTBYTES);
-        //app_trace_hexall("DEBUG: encapsulatedSharedSecret:", (char *)rawEncapsulatedKey, decodeSize);
+        //app_trace_hexall("DEBUG: encapsulatedSharedSecret:", (char *)rawEncapsulatedSharedSecret, decodeSize);
         return 2205;
     }
 
@@ -573,7 +584,7 @@ static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
 
     // Do the KEM decapsulation
     crypto_kem_dec((unsigned char *)pIBRand->symmetricSharedSecret.pData,
-                   (unsigned char *)rawEncapsulatedKey,
+                   (unsigned char *)rawEncapsulatedSharedSecret,
                    (unsigned char *)pIBRand->ourKemSecretKey.pData);
 
     // We will set the size once we know it has completed
