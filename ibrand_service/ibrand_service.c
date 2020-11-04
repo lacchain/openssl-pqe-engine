@@ -1353,20 +1353,7 @@ int DoAuthentication(tIB_INSTANCEDATA *pIBRand)
     }
     else if (strcmp(pIBRand->cfg.szAuthType, "CLIENT_CERT") == 0)
     {
-        // Deeper in, the AuthenticateUser function differs for SIMPLE vs. CLIENT_CERT
-        rc = DoSimpleAuthentication(pIBRand);
-        if (rc != 0)
-        {
-            app_tracef("ERROR: Simple authentication failed rc=%d", rc);
-            return rc;
-        }
-
-        //rc = VerifyClientCertificate(pIBRand);
-        // if (rc != 0)
-        //{
-        //    app_tracef("ERROR: Simple authentication failed rc=%d", rc);
-        //    return rc;
-        //}
+        // Nothing special required here
     }
     else
     {
