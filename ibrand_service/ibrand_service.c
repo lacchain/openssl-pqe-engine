@@ -591,6 +591,29 @@ static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
 }
 
 
+static void SetPreferredRngEngine(tIB_INSTANCEDATA *pIBRand, char *szPreferredRngEngine)
+{
+    // Force use of non-IronBridge OpenSSL RNG engine
+    // Anything except ourselves.
+    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
+    {
+        app_tracef("INFO: Set preferred OpenSSL RNG engine: \"%s\"", szPreferredRngEngine);
+    }
+
+    // Ideally:
+    //     curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, NULL);
+    // Other options are...
+    //     curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, "dynamic");
+    //     curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, "rdrand");
+
+    curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, szPreferredRngEngine);
+    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CURL))
+    {
+        app_tracef("INFO: CURLOPT_SSLENGINE_DEFAULT");
+    }
+    curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE_DEFAULT, 1L);
+}
+
 //-----------------------------------------------------------------------
 // authenticateUser
 //-----------------------------------------------------------------------
@@ -618,21 +641,7 @@ int authenticateUser(tIB_INSTANCEDATA *pIBRand)
     }
 
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pIBRand->cfg.szAuthUrl);
-
-
-    {
-        // FORCE_USE_OF_NON_IRONBRIDGE_RNG_ENGINE
-        // Anything except ourselves.
-        // Ideally: RAND_set_rand_engine(NULL)
-        //curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, "dynamic");
-        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
-            app_tracef("INFO: Force use of alternate OpenSSL RNG engine");
-        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, "rdrand");
-        //curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, NULL);
-        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
-            app_tracef("INFO: CURLOPT_SSLENGINE_DEFAULT");
-        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE_DEFAULT, 1L);
-    }
+    SetPreferredRngEngine(pIBRand, "rdrand");
 
     // Pass our list of custom made headers
     struct curl_slist *headers = NULL;
@@ -779,7 +788,7 @@ int getRandomBytes(tIB_INSTANCEDATA *pIBRand)
         return 22230;
     }
     sprintf(pUrl,"%s/%s/%u", pIBRand->cfg.szBaseUrl, szEndpoint, pIBRand->cfg.bytesPerRequest);
-
+    SetPreferredRngEngine(pIBRand, "rdrand");
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPGET, TRUE );
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pUrl);
 
@@ -865,7 +874,7 @@ int getNewKemKeyPair(tIB_INSTANCEDATA *pIBRand)
         return 2240;
     }
     sprintf(pUrl,"%s/%s", pIBRand->cfg.szBaseUrl, szEndpoint);
-
+    SetPreferredRngEngine(pIBRand, "rdrand");
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPGET, TRUE );
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pUrl);
 
@@ -959,7 +968,7 @@ int getSecureRNGSharedSecret(tIB_INSTANCEDATA *pIBRand)
         return 2240;
     }
     sprintf(pUrl,"%s/%s", pIBRand->cfg.szBaseUrl, szEndpoint);
-
+    SetPreferredRngEngine(pIBRand, "rdrand");
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPGET, TRUE );
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pUrl);
 
