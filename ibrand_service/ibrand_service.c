@@ -131,6 +131,53 @@ static bool KatDataVerify(tLSTRING *pActualData, size_t expectedLength, char *sz
 }
 #endif // KAT_KNOWN_ANSWER_TESTING
 
+static bool copyToNewBuffer (tLSTRING *pDest, tLSTRING *pSrc, bool appendToExistingData)
+{
+    // Alloc (or Realloc) a new buffer for the data, and free previous buffer, if there was one
+    tLSTRING freeMe;
+    tLSTRING existingData;
+    tLSTRING result;
+
+    // Save the details of the original buffer so that we can destroy and free it at the end.
+    freeMe = *pDest;
+    existingData = *pDest;
+
+    if (!appendToExistingData)
+    {
+        existingData.cbData = 0;
+    }
+    result.cbData = existingData.cbData + pSrc->cbData;
+
+    // Alloc/Realloc a new buffer
+    result.pData = (char *)malloc(result.cbData);
+    if (result.pData == NULL)
+    {
+        app_tracef("ERROR: Failed to allocate storage for inbound KEM data");
+        return false;
+    }
+    if (appendToExistingData && existingData.pData && existingData.cbData)
+    {
+        memcpy(result.pData, existingData.pData, existingData.cbData);
+    }
+    // Concatenate the data
+    memcpy(result.pData + existingData.cbData, pSrc->pData, pSrc->cbData);
+
+    // Free up the old buffer, if there is one
+    if (freeMe.pData)
+    {
+        memset(freeMe.pData, 0, freeMe.cbData);
+        free(freeMe.pData);
+        freeMe.pData = NULL;
+        freeMe.cbData = 0;
+    }
+
+    // We will set the size once we know it has completed
+    pDest->pData = result.pData;
+    pDest->cbData = result.cbData;
+
+    return true;
+}
+
 //-----------------------------------------------------------------------
 // ReceiveDataHandler_login
 // This is our CURLOPT_WRITEFUNCTION
@@ -183,6 +230,7 @@ size_t ReceiveDataHandler_login(char *buffer, size_t size, size_t nmemb, void *u
     return cbNewData;  // Number of bytes processed
 }
 
+
 //-----------------------------------------------------------------------
 // ReceiveDataHandler_rng
 // This is our CURLOPT_WRITEFUNCTION
@@ -190,15 +238,11 @@ size_t ReceiveDataHandler_login(char *buffer, size_t size, size_t nmemb, void *u
 //-----------------------------------------------------------------------
 size_t ReceiveDataHandler_rng(char *buffer, size_t size, size_t nmemb, void *userp)
 {
-    char *     pNewData;
-    size_t     cbNewData;
-    char *     pAllData;
-    char *     pExistingData;
-    size_t     cbExistingData;
+    tLSTRING inboundData;
     tIB_INSTANCEDATA *pIBRand;
 
-    pNewData  = buffer;
-    cbNewData = (size * nmemb);
+    inboundData.pData = buffer;
+    inboundData.cbData = (size * nmemb);
 
     // Cast our userp back to its original (tIB_INSTANCEDATA *) type
     pIBRand = (tIB_INSTANCEDATA *)userp;
@@ -208,53 +252,40 @@ size_t ReceiveDataHandler_rng(char *buffer, size_t size, size_t nmemb, void *use
         return 0; // Zero bytes processed
     }
 
+    pIBRand->encryptedRng_RcvdSegments++;
+
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
-        app_tracef("INFO: rng request: %u bytes received", cbNewData);
+    {
+        app_tracef("INFO: rng request: %u bytes received (segment %d)",
+                   inboundData.cbData,
+                   pIBRand->encryptedRng_RcvdSegments);
+        app_trace_hexall("DEBUG: ReceiveDataHandler_rng:", (unsigned char *)inboundData.pData, inboundData.cbData);
+    }
 
-    pExistingData  = pIBRand->ResultantData.pData;
-    cbExistingData = pIBRand->ResultantData.cbData;
-    // If pLString already contains some data (i.e. cbExistingData > 0)
-    // then we'll...
-    //    a) alloc enough room for both
-    //    b) copy in the existing data
-    //    c) append our new data to it.
+    size_t prevLen = pIBRand->ResultantData.cbData;
 
-    // Allocate a new buffer
-    pAllData = (char *)malloc(cbExistingData + cbNewData);
-    if (pAllData == NULL)
+    // Alloc (or Realloc) a new buffer for the data, and free previous buffer, if there was one
+    bool rc = copyToNewBuffer (&(pIBRand->ResultantData),
+                               &inboundData,
+                               //(pIBRand->encryptedKemSecretKey_RcvdSegments > 1) ); // If this is the 2nd or subsequent segment, then append
+                               (pIBRand->ResultantData.cbData > 0) ); // If the buffer already holds some data, then append
+    if (!rc)
     {
         app_tracef("ERROR: ReceiveDataHandler_rng() malloc failure");
         return 0; // Zero bytes processed
     }
 
-    // Copy in the existing data, if there is
-    if (cbExistingData && pExistingData)
-    {
-        memcpy(pAllData, pExistingData, cbExistingData);
-    }
-
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
-        app_tracef("INFO: Appending %u bytes", cbNewData);
-
-    // Copy in the new data
-    memcpy(pAllData+cbExistingData, pNewData, cbNewData);
-
-    // Point our userp at the new buffer
-    pIBRand->ResultantData.pData = pAllData;
-    pIBRand->ResultantData.cbData = cbExistingData + cbNewData;
-
-    // Free up the old buffer, if there is one
-    if (cbExistingData && pExistingData)
     {
-        free(pExistingData);
-        pExistingData = NULL;
-        cbExistingData = 0;
+        app_tracef("INFO: Segment %d of encryptedRng received successfully (%lu + %lu = %lu bytes)",
+                   pIBRand->encryptedRng_RcvdSegments,
+                   prevLen,
+                   inboundData.cbData,
+                   pIBRand->ResultantData.cbData);
     }
-
-    //app_tracef("INFO: ReceiveDataHandler_rng() Saved %lu bytes", pIBRand->ResultantData.cbData);
 
     // Job done
-    return cbNewData; // Number of bytes processed
+    return inboundData.cbData; // Number of bytes processed
 }
 
 //-----------------------------------------------------------------------
@@ -264,12 +295,11 @@ size_t ReceiveDataHandler_rng(char *buffer, size_t size, size_t nmemb, void *use
 //-----------------------------------------------------------------------
 size_t ReceiveDataHandler_RequestNewKeyPair(char *buffer, size_t size, size_t nmemb, void *userp)
 {
-    char *     pInboundEncryptedData;
-    size_t     cbInboundEncryptedData;
+    tLSTRING inboundData;
     tIB_INSTANCEDATA *pIBRand;
 
-    pInboundEncryptedData = buffer;
-    cbInboundEncryptedData = (size * nmemb);
+    inboundData.pData = buffer;
+    inboundData.cbData = (size * nmemb);
 
     // Cast our userp back to its original (tIB_INSTANCEDATA *) type
     pIBRand = (tIB_INSTANCEDATA *)userp;
@@ -279,28 +309,36 @@ size_t ReceiveDataHandler_RequestNewKeyPair(char *buffer, size_t size, size_t nm
         return 0; // Zero bytes processed
     }
 
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
-        app_tracef("INFO: RequestNewKeyPair: %u bytes received", cbInboundEncryptedData);
+    pIBRand->encryptedKemSecretKey_RcvdSegments++;
 
-    // Free up the old buffer, if there is one
-    if (pIBRand->encryptedKemSecretKey.pData)
+    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
     {
-        memset(pIBRand->encryptedKemSecretKey.pData, 0, pIBRand->encryptedKemSecretKey.cbData);
-        free(pIBRand->encryptedKemSecretKey.pData);
-        pIBRand->encryptedKemSecretKey.pData = NULL;
-        pIBRand->encryptedKemSecretKey.cbData = 0;
+        app_tracef("INFO: RequestNewKeyPair: %u bytes received (segment %d)",
+                   inboundData.cbData,
+                   pIBRand->encryptedKemSecretKey_RcvdSegments);
+        app_trace_hexall("DEBUG: ReceiveDataHandler_RequestNewKeyPair:", (unsigned char *)inboundData.pData, inboundData.cbData);
     }
 
-    // Allocate a new buffer
-    pIBRand->encryptedKemSecretKey.pData = (char *)malloc(cbInboundEncryptedData);
-    if (pIBRand->encryptedKemSecretKey.pData == NULL)
+    size_t prevLen = pIBRand->encryptedKemSecretKey.cbData;
+
+    // Alloc (or Realloc) a new buffer for the data, and free previous buffer, if there was one
+    bool rc = copyToNewBuffer (&(pIBRand->encryptedKemSecretKey),
+                               &inboundData,
+                               (pIBRand->encryptedKemSecretKey_RcvdSegments > 1) ); // If this is the 2nd or subsequent segment, then append
+    if (!rc)
     {
         app_tracef("ERROR: Failed to allocate storage for inbound encrypted data");
         return 0; // Zero bytes processed
     }
-    memcpy(pIBRand->encryptedKemSecretKey.pData, pInboundEncryptedData, cbInboundEncryptedData);
-    // We will set the size once we know it has completed
-    pIBRand->encryptedKemSecretKey.cbData = cbInboundEncryptedData;
+
+    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
+    {
+        app_tracef("INFO: Segment %d of encryptedKemSecretKey received successfully (%lu + %lu = %lu bytes)",
+                   pIBRand->encryptedKemSecretKey_RcvdSegments,
+                   prevLen,
+                   inboundData.cbData,
+                   pIBRand->encryptedKemSecretKey.cbData);
+    }
 
     // Destroy any existing KEM secret key, forcing the new one to be decrypted and used as and when needed.
     if (pIBRand->ourKemSecretKey.pData)
@@ -311,10 +349,8 @@ size_t ReceiveDataHandler_RequestNewKeyPair(char *buffer, size_t size, size_t nm
         pIBRand->ourKemSecretKey.cbData = 0;
     }
 
-    app_tracef("INFO: Symmetric encrypted payload received successfully (%lu bytes)", pIBRand->encryptedKemSecretKey.cbData);
-
     // Job done
-    return cbInboundEncryptedData; // Number of bytes processed
+    return inboundData.cbData; // Number of bytes processed
 }
 
 //-----------------------------------------------------------------------
@@ -324,12 +360,11 @@ size_t ReceiveDataHandler_RequestNewKeyPair(char *buffer, size_t size, size_t nm
 //-----------------------------------------------------------------------
 size_t ReceiveDataHandler_SharedSecret(char *buffer, size_t size, size_t nmemb, void *userp)
 {
-    char *     pInboundKemData;
-    size_t     cbInboundKemData;
+    tLSTRING inboundData;
     tIB_INSTANCEDATA *pIBRand;
 
-    pInboundKemData = buffer;
-    cbInboundKemData = (size * nmemb);
+    inboundData.pData = buffer;
+    inboundData.cbData = (size * nmemb);
 
     // Cast our userp back to its original (tIB_INSTANCEDATA *) type
     pIBRand = (tIB_INSTANCEDATA *)userp;
@@ -339,28 +374,36 @@ size_t ReceiveDataHandler_SharedSecret(char *buffer, size_t size, size_t nmemb, 
         return 0; // Zero bytes processed
     }
 
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
-        app_tracef("INFO: SharedSecret: %u bytes received", cbInboundKemData);
+    pIBRand->encapsulatedSharedSecret_RcvdSegments++;
 
-    // Free up the old buffer, if there is one
-    if (pIBRand->encapsulatedSharedSecret.pData)
+    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
     {
-        memset(pIBRand->encapsulatedSharedSecret.pData, 0, pIBRand->encapsulatedSharedSecret.cbData);
-        free(pIBRand->encapsulatedSharedSecret.pData);
-        pIBRand->encapsulatedSharedSecret.pData = NULL;
-        pIBRand->encapsulatedSharedSecret.cbData = 0;
+        app_tracef("INFO: SharedSecret: %u bytes received (segment %d)",
+                   inboundData.cbData,
+                   pIBRand->encapsulatedSharedSecret_RcvdSegments);
+        app_trace_hexall("DEBUG: ReceiveDataHandler_SharedSecret:", (unsigned char *)inboundData.pData, inboundData.cbData);
     }
 
-    // Allocate a new buffer
-    pIBRand->encapsulatedSharedSecret.pData = (char *)malloc(cbInboundKemData);
-    if (pIBRand->encapsulatedSharedSecret.pData == NULL)
+    size_t prevLen = pIBRand->encapsulatedSharedSecret.cbData;
+
+    // Alloc (or Realloc) a new buffer for the data, and free previous buffer, if there was one
+    bool rc = copyToNewBuffer (&(pIBRand->encapsulatedSharedSecret),
+                               &inboundData,
+                               (pIBRand->encapsulatedSharedSecret_RcvdSegments > 1) ); // If this is the 2nd or subsequent segment, then append
+    if (!rc)
     {
         app_tracef("ERROR: Failed to allocate storage for inbound KEM data");
         return 0; // Zero bytes processed
     }
-    memcpy(pIBRand->encapsulatedSharedSecret.pData, pInboundKemData, cbInboundKemData);
-    // We will set the size once we know it has completed
-    pIBRand->encapsulatedSharedSecret.cbData = cbInboundKemData;
+
+    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
+    {
+        app_tracef("INFO: Segment %d of encapsulatedSharedSecret received successfully (%lu + %lu = %lu bytes)",
+                   pIBRand->encapsulatedSharedSecret_RcvdSegments,
+                   prevLen,
+                   inboundData.cbData,
+                   pIBRand->encapsulatedSharedSecret.cbData);
+    }
 
     // Destroy any existing SharedSecret, forcing the new one to be decapsulated and used as and when needed.
     if (pIBRand->symmetricSharedSecret.pData)
@@ -371,10 +414,8 @@ size_t ReceiveDataHandler_SharedSecret(char *buffer, size_t size, size_t nmemb, 
         pIBRand->symmetricSharedSecret.cbData = 0;
     }
 
-    app_tracef("INFO: KEM encrypted payload received successfully (%lu bytes)", pIBRand->encapsulatedSharedSecret.cbData);
-
     // Job done
-    return cbInboundKemData; // Number of bytes processed
+    return inboundData.cbData; // Number of bytes processed
 }
 
 
@@ -428,8 +469,6 @@ static int DecryptAndStoreKemSecretKey(tIB_INSTANCEDATA *pIBRand)
         //app_trace_hexall("DEBUG: encryptedKemSecretKey:", (char *)rawEncryptedKey, decodeSize);
         return 2104;
     }
-
-    //
 
     // Do the AES decryption (result returned in a malloc'd buffer, which we will assign to our ourKemSecretKey tLSTRING)
     unsigned char *pDecryptedData = NULL;

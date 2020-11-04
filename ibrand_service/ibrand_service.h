@@ -30,12 +30,15 @@ typedef struct tagIB_INSTANCEDATA
     char *        pRealToken;
     tLSTRING      Token;
     tLSTRING      ResultantData;
+    int           encryptedRng_RcvdSegments;
 
     // SRNG State
     tLSTRING      encryptedKemSecretKey;
+    int           encryptedKemSecretKey_RcvdSegments;
     tLSTRING      ourKemSecretKey;
 
     tLSTRING      encapsulatedSharedSecret;
+    int           encapsulatedSharedSecret_RcvdSegments;
     tLSTRING      symmetricSharedSecret;
 
 } tIB_INSTANCEDATA;
