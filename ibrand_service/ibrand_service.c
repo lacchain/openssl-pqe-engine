@@ -1623,6 +1623,8 @@ int main(int argc, char * argv[])
     int rc;
     tIB_INSTANCEDATA *pIBRand;
 
+    UNUSED_PARAM(argc);
+    UNUSED_PARAM(argv);
 
     // =========================================================================
     // Create instance storage
@@ -1642,41 +1644,35 @@ int main(int argc, char * argv[])
     fprintf(stdout, "Copyright (c) 2020 Cambridge Quantum Computing Limited. All rights reserved.\n");
     fprintf(stdout, "\n");
 
-    if ((argc > 2) && strcmp(argv[1],"-f")==0)
+    if (argc > 1)
     {
-        my_strlcpy(pIBRand->szConfigFilename, argv[2], sizeof(pIBRand->szConfigFilename));
-    }
-    else
-    {
-        char *tempPtr;
-        rc = my_getFilenameFromEnvVar("IBRAND_CONF", &tempPtr);
-        if (rc==0)
-        {
-            my_strlcpy(pIBRand->szConfigFilename, tempPtr, sizeof(pIBRand->szConfigFilename));
-            free(tempPtr);
-        }
-    }
-
-    if (strlen(pIBRand->szConfigFilename) == 0)
-    {
-        fprintf(stderr, "[ibrand-service] FATAL: Configuration not specified, neither on commandline nor via an environment variable.\n");
-        fprintf(stdout, "USAGE: ibrand_service [-f <ConfigFilename>]\n");
-        fprintf(stdout, "       If <ConfigFilename> is NOT specified on the command line,\n");
-        fprintf(stdout, "       then it must be specified in envar \"IBRAND_CONF\".\n");
+        fprintf(stderr, "ERROR: Commandline parameter \"%s\" not supported\n", argv[1]);
         free(pIBRand);
         return EXIT_FAILURE;
     }
+
+    char *tempPtr = NULL;
+    rc = my_getFilenameFromEnvVar("IBRAND_CONF", &tempPtr);
+    if ((rc != 0) || (tempPtr == NULL) || strlen(tempPtr)==0)
+    {
+        fprintf(stderr, "FATAL: Config environment variable \"IBRAND_CONF\" not found or invalid.\n");
+        free(pIBRand);
+        return EXIT_FAILURE;
+    }
+
+    my_strlcpy(pIBRand->szConfigFilename, tempPtr, sizeof(pIBRand->szConfigFilename));
+    free(tempPtr);
 
     app_trace_set_destination(false, false, true); // (toConsole, toLogFile; toSyslog)
     app_trace_openlog(NULL, LOG_PID, LOG_DAEMON);
 
     app_tracef("===ibrand_service==================================================================================================");
 
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: ReadConfig");
+    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: ReadConfig \"%s\"", pIBRand->szConfigFilename);
     rc = ReadConfig(pIBRand->szConfigFilename, &(pIBRand->cfg), CRYPTO_SECRETKEYBYTES, CRYPTO_PUBLICKEYBYTES);
     if (rc != 0)
     {
-        app_tracef("FATAL: Configuration error. Aborting. rc=%d", rc);
+        app_tracef("FATAL: Configuration error while processing \"%s\". Aborting. rc=%d", pIBRand->szConfigFilename, rc);
         app_trace_closelog();
         free(pIBRand);
         return EXIT_FAILURE;
