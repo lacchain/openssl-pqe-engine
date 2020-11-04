@@ -103,7 +103,7 @@ JSON:{\n\
 _EOF_\n\
 export OPENSSL_CONF=/usr/lib/ssl/ibrand_openssl.cnf\n\
 export IBRAND_CONF=/ibrand.cnf\n\
-ibrand_service -f /ibrand.cnf\n\
+ibrand_service\n\
 openssl engine\n\
 #tail -f /var/log/syslog\n'\
 sleep 15\n\

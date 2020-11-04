@@ -37,6 +37,14 @@
 #include <syslog.h>
 #endif
 
+#ifndef _MAX_PATH
+    #ifdef MAX_PATH
+        #define _MAX_PATH MAX_PATH
+    #else
+        #define _MAX_PATH 128
+    #endif
+#endif
+
 
 typedef struct tagAPPTRACECONFIG
 {
@@ -173,7 +181,7 @@ void app_trace_hex(const char *pHeader, const char *pData, int cbData)
   malloc_size =   (pHeader?strlen(pHeader):0) +       // Space for "%s"
                 + (pHeader?(6+5+2):0) +               // Space for " (len=%d) "
                 + (pHeader?3:0) +                     // Space for "==>"
-                + (cbData*6)                          // Space for Max 6 bytes per character eg "<0x12>"
+                + (cbData*2)                          // Space for Max 2 hex chars per byte eg "EF"
                 + (pHeader?strlen(pHeader)+4+3:0) +   // Space for "<=="
                 + 1;                                  // Space for trailing NULL
 
@@ -210,7 +218,7 @@ void app_trace_hexall(const char *pHeader, const unsigned char *pData, unsigned 
   malloc_size =   (pHeader?strlen(pHeader):0) +       // Space for "%s"
                 + (pHeader?(6+5+2):0) +               // Space for " (len=%d) "
                 + (pHeader?3:0) +                     // Space for "==>"
-                + (cbData*6)                          // Space for Max 6 bytes per character eg "<0x12>"
+                + (cbData*2)                          // Space for 2 hex chars per byte eg "EF"
                 + (pHeader?strlen(pHeader)+4+3:0) +   // Space for "<=="
                 + 1;                                  // Space for trailing NULL
 
@@ -399,12 +407,12 @@ void app_trace(const char *szString)
 
 int app_tracef(const char *formatStr, ...)
 {
-#define SPRINTF_TRACE_BUFSIZE 4096
+#define SPRINTF_TRACE_BUFSIZE (32*1024)
     va_list va;
     char *pBuf;
     int rc;
 
-    pBuf = malloc(SPRINTF_TRACE_BUFSIZE);
+    pBuf = (char *)malloc(SPRINTF_TRACE_BUFSIZE);
     if (!pBuf)
     {
         return -1;
@@ -493,8 +501,8 @@ int my_getToken(const char *pSrcData, char *pDstField, int nFieldNum, int nDstFi
     return FALSE;
   }
 
-  my_trimLeading(pDstField," [");
-  my_trimTrailing(pDstField," ]");
+  my_trimLeading(pDstField,(char *)" [");
+  my_trimTrailing(pDstField,(char *)" ]");
 
   app_trace_hex ("TRACE: GetToken pSrcData=",pSrcData, (int)strlen(pSrcData));
   char buf[20];

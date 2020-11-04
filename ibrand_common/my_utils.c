@@ -237,7 +237,7 @@ long my_getFilesize(const char *szFilename)
 
 bool my_fileExists(const char *szFilename)
 /*+---------------------------------------------------------+*/
-/*�                                                         �*/
+/*                                                           */
 /*+---------------------------------------------------------+*/
 {
     if (access(szFilename, F_OK) != -1) // From unistd.h
@@ -273,6 +273,11 @@ int my_roundUp(int num, int multipleOf)
         newlen += multipleOf - (num % multipleOf);
     }
     return newlen;
+}
+
+bool my_isSuperUser(void)
+{
+    return (geteuid() == 0);
 }
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------------

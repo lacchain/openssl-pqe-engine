@@ -24,11 +24,12 @@ struct ibrand_context
     const char *message;
     char tempMessageBuffer200[200];
     int errorCode;
+    int32_t recentWaterLevel;
 };
 
-extern bool initIBRand(struct ibrand_context *context);
-extern void deinitIBRand(struct ibrand_context *context);
-extern uint32_t readData(struct ibrand_context *context, uint8_t *result, size_t result_buffer_size/*, bool raw, uint32_t outputMultiplier*/);
+extern bool     IBRand_init     (struct ibrand_context *context);
+extern void     IBRand_deinit   (struct ibrand_context *context);
+extern uint32_t IBRand_readData (struct ibrand_context *context, uint8_t *result, size_t result_buffer_size);
 
 #ifdef __cplusplus
 }

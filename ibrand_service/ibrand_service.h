@@ -13,11 +13,9 @@
 #define _INCLUDE_IBRAND_SERVICE_H_
 
 #include <curl/curl.h>
-#include "my_utilslib.h"
+#include "../ibrand_common/my_utilslib.h"
 
 #include "ibrand_service_config.h" // for tIB_CONFIGDATA
-
-//#define FORCE_ALL_LOGGING_ON
 
 typedef struct tagIB_INSTANCEDATA
 {
@@ -32,12 +30,15 @@ typedef struct tagIB_INSTANCEDATA
     char *        pRealToken;
     tLSTRING      Token;
     tLSTRING      ResultantData;
+    int           encryptedRng_RcvdSegments;
 
     // SRNG State
     tLSTRING      encryptedKemSecretKey;
+    int           encryptedKemSecretKey_RcvdSegments;
     tLSTRING      ourKemSecretKey;
-    //tLSTRING      theirSigningPublicKey;
+
     tLSTRING      encapsulatedSharedSecret;
+    int           encapsulatedSharedSecret_RcvdSegments;
     tLSTRING      symmetricSharedSecret;
 
 } tIB_INSTANCEDATA;
