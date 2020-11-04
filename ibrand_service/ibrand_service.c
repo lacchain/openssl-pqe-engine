@@ -633,11 +633,8 @@ int authenticateUser(tIB_INSTANCEDATA *pIBRand)
 
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
     {
-        app_tracef("INFO: authenticateUser: (\"%s\", \"%s\", \"%s\")", pIBRand->cfg.szAuthUrl, pIBRand->cfg.szUsername, pIBRand->cfg.szPassword);
-    }
-    else
-    {
         app_tracef("INFO: Authenticating User: (\"%s\", \"%s\")", pIBRand->cfg.szAuthUrl, pIBRand->cfg.szUsername);
+        //app_tracef("INFO: authenticateUser: (\"%s\", \"%s\", \"%s\")", pIBRand->cfg.szAuthUrl, pIBRand->cfg.szUsername, pIBRand->cfg.szPassword);
     }
 
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pIBRand->cfg.szAuthUrl);
@@ -650,53 +647,16 @@ int authenticateUser(tIB_INSTANCEDATA *pIBRand)
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPHEADER, headers);
 
     char bodyData[1024] = "";
-    if (strcmp(pIBRand->cfg.szAuthType, "SIMPLE") == 0)
-    {
-        sprintf(bodyData, "{\"Username\":\"%s\",\"Password\":\"%s\"}", pIBRand->cfg.szUsername, pIBRand->cfg.szPassword );
-    }
-    else if (strcmp(pIBRand->cfg.szAuthType, "CLIENT_CERT") == 0)
-    {
-        // We don't need nor rely on username and password when using a client certificate,
-        // so we'll send just dummy credentials ("a" and "a")
-        sprintf(bodyData, "{\"Username\":\"%s\",\"Password\":\"%s\"}", "a", "a" );
-    }
+    sprintf(bodyData, "{\"Username\":\"%s\",\"Password\":\"%s\"}", pIBRand->cfg.szUsername, pIBRand->cfg.szPassword );
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_POSTFIELDS, bodyData);
-
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEFUNCTION, ReceiveDataHandler_login);
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEDATA, pIBRand);
 
     if (strcmp(pIBRand->cfg.szAuthType, "CLIENT_CERT") == 0)
     {
-
-        // ***********************************************************************
-        // In windows, Open Certificate Manager
-        // Export cert, with private key to a pfx file e.g. MYDOMAIN.pfx
-        //   openssl pkcs12 -in MYDOMAIN.pfx -clcerts -nokeys -out MYDOMAIN.crt
-        //   openssl x509   -in MYDOMAIN.crt                  -out MYDOMAIN.pem
-        //   openssl pkcs12 -in MYDOMAIN.pfx -nocerts         -out MYDOMAIN-encrypted.key
-        //   openssl rsa    -in MYDOMAIN-encrypted.key        -out MYDOMAIN.key
-        //
-        // For example...
-        //   echo Create PEM file from PFX file:
-        //   openssl pkcs12 -in dev_ironbridgeapi_export_with_pvtkey_aes256sha256.pfx -clcerts -nokeys -out dev_ironbridgeapi_com.crt
-        //   openssl x509   -in dev_ironbridgeapi_com.crt                                              -out dev_ironbridgeapi_com.pem
-        //
-        //   echo Create KEY file from PFX file:
-        //   openssl pkcs12 -in dev_ironbridgeapi_export_with_pvtkey_aes256sha256.pfx -nocerts         -out dev_ironbridgeapi_com.key
-        //   openssl rsa    -in dev_ironbridgeapi_com.key                                              -out dev_ironbridgeapi_com-decrypted.key
-        // **********************************************************************/
-
-        // Add the client certificate to our headers
-        //curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLCERT, "/etc/ssl/certs/client_cert.pem"); // Load the certificate
-        //curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLCERTTYPE, "PEM");
-        //curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLKEY, "/etc/ssl/private/client_key.pem"); // Load the key
-
-        //curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLCERT, "/etc/ssl/certs/dev_ironbridgeapi_com.pem"); // Load the certificate
-        //curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLCERTTYPE, "PEM");
-        //curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLKEY, "/etc/ssl/private/dev_ironbridgeapi_com-decrypted_key.pem"); // Load the key
-
         // Client Certificate
-        app_tracef("INFO: Using client certificate \"%s\" of type \"%s\"", pIBRand->cfg.szAuthSSLCertFile, pIBRand->cfg.szAuthSSLCertType);
+        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
+            app_tracef("INFO: Using client certificate \"%s\" of type \"%s\"", pIBRand->cfg.szAuthSSLCertFile, pIBRand->cfg.szAuthSSLCertType);
         if (!my_fileExists(pIBRand->cfg.szAuthSSLCertFile))
         {
             app_tracef("WARNING: Client Certificate file not found: \"%s\"", pIBRand->cfg.szAuthSSLCertFile);
@@ -706,14 +666,14 @@ int authenticateUser(tIB_INSTANCEDATA *pIBRand)
         curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLCERTTYPE, pIBRand->cfg.szAuthSSLCertType); // Load the certificate type
 
         // SSL Key
-        app_tracef("INFO: Using Client SSL key \"%s\"", pIBRand->cfg.szAuthSSLKeyFile);
+        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
+            app_tracef("INFO: Using Client SSL key \"%s\"", pIBRand->cfg.szAuthSSLKeyFile);
         if (!my_fileExists(pIBRand->cfg.szAuthSSLKeyFile))
         {
             app_tracef("WARNING: Client SSL key file not found: \"%s\"", pIBRand->cfg.szAuthSSLKeyFile);
             //return 55582;
         }
         curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLKEY     , pIBRand->cfg.szAuthSSLKeyFile ); // Load the key
-
     }
 
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
@@ -754,7 +714,8 @@ int authenticateUser(tIB_INSTANCEDATA *pIBRand)
 
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
     {
-        app_tracef("INFO: authenticateUser() Token = [%s]"            , pIBRand->Token.pData);
+        if (strcmp(pIBRand->cfg.szAuthType, "SIMPLE") == 0)
+            app_tracef("INFO: authenticateUser() Token = [%s]"            , pIBRand->Token.pData);
     }
 
     curl_slist_free_all(headers); // Free custom header list
@@ -770,16 +731,10 @@ int getRandomBytes(tIB_INSTANCEDATA *pIBRand)
     CURLcode curlResultCode;
     char * pUrl;
     char * szEndpoint;
+    char *pAuthHeader = NULL;
     #define MAXUINT_DIGITS 20 // 0x7FFF FFFF FFFF FFFF = 9,223,372,036,854,775,807 ==> 19 digits for signed, 20 for unsigned.
 
-    if (pIBRand->cfg.useSecureRng)
-    {
-        szEndpoint = "srng";
-    }
-    else
-    {
-        szEndpoint = "rng";
-    }
+    szEndpoint = (pIBRand->cfg.useSecureRng) ? "srng":"rng";
 
     pUrl = (char *)malloc(strlen(pIBRand->cfg.szBaseUrl)+strlen(szEndpoint)+2+MAXUINT_DIGITS); // i.e. strlen("/rng/NNNNNNN")
     if (!pUrl)
@@ -796,33 +751,60 @@ int getRandomBytes(tIB_INSTANCEDATA *pIBRand)
     struct curl_slist *headers = NULL;
     headers = curl_slist_append ( headers, "Content-Type: application/json" );
     headers = curl_slist_append ( headers, "Accept: application/json, text/plain, */*" );
-    char *pAuthHeader = (char *)malloc(strlen(pIBRand->pRealToken)+30u); // i.e. + strlen("Authorization: Bearer ")
-    if (!pAuthHeader)
+    if (strcmp(pIBRand->cfg.szAuthType, "SIMPLE") == 0)
     {
-        app_tracef("ERROR: Out of memory allocating for AuthHeader");
-        return 2231;
+        // e.g.
+        //   "name": "accept",
+        //   "value": "application/json, text/plain, */*"
+        //   "name": "authorization",
+        //   "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6InVzZXIxIiwibmJmIjoxNTczODM5ODU0LCJleHAiOjE1NzM5MjYyNTQsImlhdCI6MTU3MzgzOTg1NCwiaXNzIjoiaHR0cHM6Ly9pcm9uYnJpZGdlYXBpLmNvbSIsImF1ZCI6IkFueSJ9.sTD67YPrCdj1RWOqa8R3Pc3j7DA88mF8x0oD2ZMbmQ0"
+        //   "name": "content-type",
+        //   "value": "application/json"
+
+        pAuthHeader = (char *)malloc(strlen(pIBRand->pRealToken)+30u); // i.e. + strlen("Authorization: Bearer ")
+        if (!pAuthHeader)
+        {
+            app_tracef("ERROR: Out of memory allocating for AuthHeader");
+            return 2231;
+        }
+        sprintf(pAuthHeader, "authorization: Bearer %s", pIBRand->pRealToken);
+        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
+        {
+            app_tracef("INFO: %s AuthHeader = \"%s\"", szEndpoint, pAuthHeader);
+        }
+        headers = curl_slist_append ( headers, pAuthHeader );
     }
-    sprintf(pAuthHeader, "authorization: Bearer %s", pIBRand->pRealToken);
-
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
-    {
-        app_tracef("INFO: %s AuthHeader = \"%s\"", szEndpoint, pAuthHeader);
-    }
-
-    headers = curl_slist_append ( headers, pAuthHeader );
-
-    // e.g.
-    //   "name": "accept",
-    //   "value": "application/json, text/plain, */*"
-    //   "name": "authorization",
-    //   "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6InVzZXIxIiwibmJmIjoxNTczODM5ODU0LCJleHAiOjE1NzM5MjYyNTQsImlhdCI6MTU3MzgzOTg1NCwiaXNzIjoiaHR0cHM6Ly9pcm9uYnJpZGdlYXBpLmNvbSIsImF1ZCI6IkFueSJ9.sTD67YPrCdj1RWOqa8R3Pc3j7DA88mF8x0oD2ZMbmQ0"
-    //   "name": "content-type",
-    //   "value": "application/json"
-
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEFUNCTION, ReceiveDataHandler_rng);
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEDATA, pIBRand);
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_FAILONERROR, true);
+
+    // Prepare the pIBRand for the new block of data
+    pIBRand->encryptedRng_RcvdSegments = 0;
+
+    if (strcmp(pIBRand->cfg.szAuthType, "CLIENT_CERT") == 0)
+    {
+        // Client Certificate
+        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
+            app_tracef("INFO: Using client certificate \"%s\" of type \"%s\"", pIBRand->cfg.szAuthSSLCertFile, pIBRand->cfg.szAuthSSLCertType);
+        if (!my_fileExists(pIBRand->cfg.szAuthSSLCertFile))
+        {
+            app_tracef("WARNING: Client Certificate file not found: \"%s\"", pIBRand->cfg.szAuthSSLCertFile);
+            //return 55581;
+        }
+        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLCERT    , pIBRand->cfg.szAuthSSLCertFile); // Load the certificate
+        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLCERTTYPE, pIBRand->cfg.szAuthSSLCertType); // Load the certificate type
+
+        // SSL Key
+        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
+            app_tracef("INFO: Using Client SSL key \"%s\"", pIBRand->cfg.szAuthSSLKeyFile);
+        if (!my_fileExists(pIBRand->cfg.szAuthSSLKeyFile))
+        {
+            app_tracef("WARNING: Client SSL key file not found: \"%s\"", pIBRand->cfg.szAuthSSLKeyFile);
+            //return 55582;
+        }
+        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLKEY     , pIBRand->cfg.szAuthSSLKeyFile ); // Load the key
+    }
 
     // Do it
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
@@ -839,6 +821,9 @@ int getRandomBytes(tIB_INSTANCEDATA *pIBRand)
     if (curlResultCode != CURLE_OK)
     {
         app_tracef("ERROR: %s perform failed: [%s]", szEndpoint, curl_easy_strerror(curlResultCode));
+        curl_slist_free_all(headers); // Free custom header list
+        if (pAuthHeader) free(pAuthHeader);
+        free(pUrl);
         return 2232;
     }
 
@@ -847,25 +832,29 @@ int getRandomBytes(tIB_INSTANCEDATA *pIBRand)
     //    app_tracef("INFO: %s ResultantData = [%*.*s]", szEndpoint, pIBRand->ResultantData.cbData, pIBRand->ResultantData.cbData, pIBRand->ResultantData.pData);
     //}
 
-    curl_slist_free_all(headers); // Free custom header list
-    free(pAuthHeader);
-    free(pUrl);
-
     if (httpResponseCode == HTTP_RESP_SHAREDSECRETEXPIRED)
     {
+        curl_slist_free_all(headers); // Free custom header list
+        if (pAuthHeader) free(pAuthHeader);
+        free(pUrl);
         return ERC_OopsSharedSecretExpired;
     }
+
+    curl_slist_free_all(headers); // Free custom header list
+    if (pAuthHeader) free(pAuthHeader);
+    free(pUrl);
     return 0;
 }
 
 //-----------------------------------------------------------------------
-// getSecureRNGSharedSecret
+// getNewKemKeyPair
 //-----------------------------------------------------------------------
 int getNewKemKeyPair(tIB_INSTANCEDATA *pIBRand)
 {
     CURLcode curlResultCode;
     char * pUrl;
     char *szEndpoint = "reqkeypair";
+    char *pAuthHeader = NULL;
 
     pUrl = (char *)malloc(strlen(pIBRand->cfg.szBaseUrl)+1+strlen(szEndpoint)+1);
     if (!pUrl)
@@ -882,34 +871,59 @@ int getNewKemKeyPair(tIB_INSTANCEDATA *pIBRand)
     struct curl_slist *headers = NULL;
     headers = curl_slist_append ( headers, "Content-Type: application/json" );
     headers = curl_slist_append ( headers, "Accept: application/json, text/plain, */*" );
-    char *pAuthHeader = (char *)malloc(strlen(pIBRand->pRealToken)+30u); // i.e. + strlen("Authorization: Bearer ")
-    if (!pAuthHeader)
+    if (strcmp(pIBRand->cfg.szAuthType, "SIMPLE") == 0)
     {
-        app_tracef("ERROR: Out of memory allocating for AuthHeader");
-        free(pUrl);
-        return 2241;
+        // e.g.
+        //   "name": "accept",
+        //   "value": "application/json, text/plain, */*"
+        //   "name": "authorization",
+        //   "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6InVzZXIxIiwibmJmIjoxNTczODM5ODU0LCJleHAiOjE1NzM5MjYyNTQsImlhdCI6MTU3MzgzOTg1NCwiaXNzIjoiaHR0cHM6Ly9pcm9uYnJpZGdlYXBpLmNvbSIsImF1ZCI6IkFueSJ9.sTD67YPrCdj1RWOqa8R3Pc3j7DA88mF8x0oD2ZMbmQ0"
+        //   "name": "content-type",
+        //   "value": "application/json"
+        pAuthHeader = (char *)malloc(strlen(pIBRand->pRealToken)+30u); // i.e. + strlen("Authorization: Bearer ")
+        if (!pAuthHeader)
+        {
+            app_tracef("ERROR: Out of memory allocating for AuthHeader");
+            free(pUrl);
+            return 2241;
+        }
+        sprintf(pAuthHeader, "authorization: Bearer %s", pIBRand->pRealToken);
+        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
+        {
+            app_tracef("INFO: reqkeypair AuthHeader = \"%s\"", pAuthHeader);
+        }
+        headers = curl_slist_append ( headers, pAuthHeader );
     }
-    sprintf(pAuthHeader, "authorization: Bearer %s", pIBRand->pRealToken);
-
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
-    {
-        app_tracef("INFO: reqkeypair AuthHeader = \"%s\"", pAuthHeader);
-    }
-
-    headers = curl_slist_append ( headers, pAuthHeader );
-
-    // e.g.
-    //   "name": "accept",
-    //   "value": "application/json, text/plain, */*"
-    //   "name": "authorization",
-    //   "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6InVzZXIxIiwibmJmIjoxNTczODM5ODU0LCJleHAiOjE1NzM5MjYyNTQsImlhdCI6MTU3MzgzOTg1NCwiaXNzIjoiaHR0cHM6Ly9pcm9uYnJpZGdlYXBpLmNvbSIsImF1ZCI6IkFueSJ9.sTD67YPrCdj1RWOqa8R3Pc3j7DA88mF8x0oD2ZMbmQ0"
-    //   "name": "content-type",
-    //   "value": "application/json"
-
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEFUNCTION, ReceiveDataHandler_RequestNewKeyPair);
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEDATA, pIBRand);
 
+    // Prepare the pIBRand for the new shared secret
+    pIBRand->encryptedKemSecretKey_RcvdSegments = 0;
+
+    if (strcmp(pIBRand->cfg.szAuthType, "CLIENT_CERT") == 0)
+    {
+        // Client Certificate
+        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
+            app_tracef("INFO: Using client certificate \"%s\" of type \"%s\"", pIBRand->cfg.szAuthSSLCertFile, pIBRand->cfg.szAuthSSLCertType);
+        if (!my_fileExists(pIBRand->cfg.szAuthSSLCertFile))
+        {
+            app_tracef("WARNING: Client Certificate file not found: \"%s\"", pIBRand->cfg.szAuthSSLCertFile);
+            //return 55581;
+        }
+        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLCERT    , pIBRand->cfg.szAuthSSLCertFile); // Load the certificate
+        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLCERTTYPE, pIBRand->cfg.szAuthSSLCertType); // Load the certificate type
+
+        // SSL Key
+        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
+            app_tracef("INFO: Using Client SSL key \"%s\"", pIBRand->cfg.szAuthSSLKeyFile);
+        if (!my_fileExists(pIBRand->cfg.szAuthSSLKeyFile))
+        {
+            app_tracef("WARNING: Client SSL key file not found: \"%s\"", pIBRand->cfg.szAuthSSLKeyFile);
+            //return 55582;
+        }
+        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLKEY     , pIBRand->cfg.szAuthSSLKeyFile ); // Load the key
+    }
 
     // Do it
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
@@ -927,7 +941,7 @@ int getNewKemKeyPair(tIB_INSTANCEDATA *pIBRand)
     {
         app_tracef("ERROR: reqkeypair perform failed: [%s]", curl_easy_strerror(curlResultCode));
         curl_slist_free_all(headers); // Free custom header list
-        free(pAuthHeader);
+        if (pAuthHeader) free(pAuthHeader);
         free(pUrl);
         return 2242;
     }
@@ -940,16 +954,18 @@ int getNewKemKeyPair(tIB_INSTANCEDATA *pIBRand)
     if (httpResponseCode == HTTP_RESP_SHAREDSECRETEXPIRED)
     {
         curl_slist_free_all(headers); // Free custom header list
-        free(pAuthHeader);
+        if (pAuthHeader) free(pAuthHeader);
         free(pUrl);
         return ERC_OopsSharedSecretExpired;
     }
 
     curl_slist_free_all(headers); // Free custom header list
-    free(pAuthHeader);
+    if (pAuthHeader) free(pAuthHeader);
     free(pUrl);
     return 0;
 }
+
+
 
 
 //-----------------------------------------------------------------------
@@ -960,6 +976,7 @@ int getSecureRNGSharedSecret(tIB_INSTANCEDATA *pIBRand)
     CURLcode curlResultCode;
     char * pUrl;
     char *szEndpoint = "sharedsecret";
+    char *pAuthHeader = NULL;
 
     pUrl = (char *)malloc(strlen(pIBRand->cfg.szBaseUrl)+1+strlen(szEndpoint)+1);
     if (!pUrl)
@@ -976,34 +993,59 @@ int getSecureRNGSharedSecret(tIB_INSTANCEDATA *pIBRand)
     struct curl_slist *headers = NULL;
     headers = curl_slist_append ( headers, "Content-Type: application/json" );
     headers = curl_slist_append ( headers, "Accept: application/json, text/plain, */*" );
-    char *pAuthHeader = (char *)malloc(strlen(pIBRand->pRealToken)+30u); // i.e. + strlen("Authorization: Bearer ")
-    if (!pAuthHeader)
+    if (strcmp(pIBRand->cfg.szAuthType, "SIMPLE") == 0)
     {
-        app_tracef("ERROR: Out of memory allocating for AuthHeader");
-        free(pUrl);
-        return 2241;
+        // e.g.
+        //   "name": "accept",
+        //   "value": "application/json, text/plain, */*"
+        //   "name": "authorization",
+        //   "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6InVzZXIxIiwibmJmIjoxNTczODM5ODU0LCJleHAiOjE1NzM5MjYyNTQsImlhdCI6MTU3MzgzOTg1NCwiaXNzIjoiaHR0cHM6Ly9pcm9uYnJpZGdlYXBpLmNvbSIsImF1ZCI6IkFueSJ9.sTD67YPrCdj1RWOqa8R3Pc3j7DA88mF8x0oD2ZMbmQ0"
+        //   "name": "content-type",
+        //   "value": "application/json"
+        pAuthHeader = (char *)malloc(strlen(pIBRand->pRealToken)+30u); // i.e. + strlen("Authorization: Bearer ")
+        if (!pAuthHeader)
+        {
+            app_tracef("ERROR: Out of memory allocating for AuthHeader");
+            free(pUrl);
+            return 2241;
+        }
+        sprintf(pAuthHeader, "authorization: Bearer %s", pIBRand->pRealToken);
+        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
+        {
+            app_tracef("INFO: sharedsecret AuthHeader = \"%s\"", pAuthHeader);
+        }
+        headers = curl_slist_append ( headers, pAuthHeader );
     }
-    sprintf(pAuthHeader, "authorization: Bearer %s", pIBRand->pRealToken);
-
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
-    {
-        app_tracef("INFO: sharedsecret AuthHeader = \"%s\"", pAuthHeader);
-    }
-
-    headers = curl_slist_append ( headers, pAuthHeader );
-
-    // e.g.
-    //   "name": "accept",
-    //   "value": "application/json, text/plain, */*"
-    //   "name": "authorization",
-    //   "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6InVzZXIxIiwibmJmIjoxNTczODM5ODU0LCJleHAiOjE1NzM5MjYyNTQsImlhdCI6MTU3MzgzOTg1NCwiaXNzIjoiaHR0cHM6Ly9pcm9uYnJpZGdlYXBpLmNvbSIsImF1ZCI6IkFueSJ9.sTD67YPrCdj1RWOqa8R3Pc3j7DA88mF8x0oD2ZMbmQ0"
-    //   "name": "content-type",
-    //   "value": "application/json"
-
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEFUNCTION, ReceiveDataHandler_SharedSecret);
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEDATA, pIBRand);
 
+    // Prepare the pIBRand for the new shared secret
+    pIBRand->encapsulatedSharedSecret_RcvdSegments = 0;
+
+    if (strcmp(pIBRand->cfg.szAuthType, "CLIENT_CERT") == 0)
+    {
+        // Client Certificate
+        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
+            app_tracef("INFO: Using client certificate \"%s\" of type \"%s\"", pIBRand->cfg.szAuthSSLCertFile, pIBRand->cfg.szAuthSSLCertType);
+        if (!my_fileExists(pIBRand->cfg.szAuthSSLCertFile))
+        {
+            app_tracef("WARNING: Client Certificate file not found: \"%s\"", pIBRand->cfg.szAuthSSLCertFile);
+            //return 55581;
+        }
+        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLCERT    , pIBRand->cfg.szAuthSSLCertFile); // Load the certificate
+        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLCERTTYPE, pIBRand->cfg.szAuthSSLCertType); // Load the certificate type
+
+        // SSL Key
+        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
+            app_tracef("INFO: Using Client SSL key \"%s\"", pIBRand->cfg.szAuthSSLKeyFile);
+        if (!my_fileExists(pIBRand->cfg.szAuthSSLKeyFile))
+        {
+            app_tracef("WARNING: Client SSL key file not found: \"%s\"", pIBRand->cfg.szAuthSSLKeyFile);
+            //return 55582;
+        }
+        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLKEY     , pIBRand->cfg.szAuthSSLKeyFile ); // Load the key
+    }
 
     // Do it
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
@@ -1021,7 +1063,7 @@ int getSecureRNGSharedSecret(tIB_INSTANCEDATA *pIBRand)
     {
         app_tracef("ERROR: sharedsecret perform failed: [%s]", curl_easy_strerror(curlResultCode));
         curl_slist_free_all(headers); // Free custom header list
-        free(pAuthHeader);
+        if (pAuthHeader) free(pAuthHeader);
         free(pUrl);
         return 2242;
     }
@@ -1034,13 +1076,13 @@ int getSecureRNGSharedSecret(tIB_INSTANCEDATA *pIBRand)
     if (httpResponseCode == HTTP_RESP_KEMKEYPAIREXPIRED)
     {
         curl_slist_free_all(headers); // Free custom header list
-        free(pAuthHeader);
+        if (pAuthHeader) free(pAuthHeader);
         free(pUrl);
         return ERC_OopsKemKeyPairExpired;
     }
 
     curl_slist_free_all(headers); // Free custom header list
-    free(pAuthHeader);
+    if (pAuthHeader) free(pAuthHeader);
     free(pUrl);
     return 0;
 }
