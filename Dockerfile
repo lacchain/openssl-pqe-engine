@@ -27,6 +27,8 @@ RUN debuild -b -uc -us -nc
 
 FROM debian:testing-slim as runner
 
+ENV SERVER_HOST=ironbridgeapi.com
+
 RUN apt-get update && apt-get install --no-install-recommends -yV \
     openssl \
     ca-certificates \
@@ -34,6 +36,8 @@ RUN apt-get update && apt-get install --no-install-recommends -yV \
     rsyslog \
     curl \
     jq \
+    wait-for-it \
+    file \
  && rm -rf /var/lib/apt/lists/*
 
 COPY ./_sample_data/ibrand_openssl.cnf /usr/lib/ssl/
@@ -42,15 +46,22 @@ COPY --from=builder /openssl-pqe-engine_0.1.0_amd64.deb .
 RUN dpkg -i ./openssl-pqe-engine_0.1.0_amd64.deb
 RUN sed -i '/imklog/s/^/#/' /etc/rsyslog.conf
 RUN mkdir -p /var/lib/ibrand/
+RUN mkdir /certs/
 RUN echo '#!/bin/sh\n\
 set -x\n\
 service rsyslog start\n\
-certSerial=$(openssl x509 -noout -serial -in /certs/client.pem | cut -d'\''='\'' -f2)\n\
-jwtToken=$(curl --http1.1 --silent --cert /certs/client.pem --key /certs/client_key.pem --data-raw "" '\''https://ironbridgeapi.com/api/login'\'' | jq -r '\''.token'\'')\n\
-# Diago's config:
-#curl --http1.1 --silent --fail --show-error --cert /certs/client.pem --key /certs/client_key.pem --header "Authorization: Bearer $jwtToken" --header "Content-Type: application/json" --data-raw "{\"clientCertName\":\"monarca.iadb.org\", \"clientCertSerialNumber\":\"$certSerial\", \"countryCode\":\"GB\", \"smsNumber\":\"10000000001\", \"email\":\"diegol@iadb.org\", \"keyparts\": \"2\", \"kemAlgorithm\":\"222\"}" '\''https://ironbridgeapi.com/api/setupclient'\'' -o /ironbridge_clientsetup_OOB.json\n\
-# Ben's config:
-curl --http1.1 --cert /certs/client.pem --key /certs/client_key.pem --header "Authorization: Bearer $jwtToken" --header "Content-Type: application/json" --data-raw "{\"clientCertName\":\"client.ironbridgeapi.com\", \"clientCertSerialNumber\":\"$certSerial\", \"countryCode\":\"GB\", \"smsNumber\":\"10000000001\", \"email\":\"ben.merriman@cambridgequantum.com\", \"keyparts\": \"2\", \"kemAlgorithm\":\"222\"}" '\''https://ironbridgeapi.com/api/setupclient'\'' -o /ironbridge_clientsetup_OOB.json\n\
+cp /ca-certs/root.crt /usr/local/share/ca-certificates/\n\
+update-ca-certificates -v\n\
+openssl genrsa -out /certs/client.key 2048\n\
+openssl req -new -sha512 -key /certs/client.key -subj "/C=US/ST=CA/O=IADB/CN=client" -out /certs/client.csr\n\
+openssl x509 -req -in /certs/client.csr -CA /ca-certs/root.crt -CAkey /ca-certs/root.key -CAcreateserial -out /certs/client.crt -days 500 -sha512\n\
+certSerial=$(openssl x509 -noout -serial -in /certs/client.crt | cut -d'\''='\'' -f2)\n\
+curl --http1.1 --fail --show-error --silent --cert /certs/client.crt --key /certs/client.key https://$SERVER_HOST/api/testconnection\n\
+ret=$?\n\
+if [ $ret -ne 0 ] ; then\n\
+  exit 1\n\
+fi\n\
+curl --http1.1 --silent --fail --show-error --cert /certs/client.crt --key /certs/client.key --header "Content-Type: application/json" --data-raw "{\"clientCertName\":\"monarca.iadb.org\", \"clientCertSerialNumber\":\"$certSerial\", \"countryCode\":\"GB\", \"smsNumber\":\"10000000001\", \"email\":\"diegol@iadb.org\", \"keyparts\": \"2\", \"kemAlgorithm\":\"222\"}" https://$SERVER_HOST/api/setupclient -o /ironbridge_clientsetup_OOB.json\n\
 ret=$?\n\
 if [ $ret -ne 0 ] ; then\n\
   exit 1\n\
@@ -65,12 +76,12 @@ JSON:{\n\
   "AuthSettings":\n\
   {\n\
     "AUTHTYPE":"CLIENT_CERT",\n\
-    "AUTHURL":"https://ironbridgeapi.com/api/login",\n\
+    "AUTHURL":"https://$SERVER_HOST/api/login",\n\
     "AUTHUSER":"notused1",\n\
     "AUTHPSWD":"notused2",\n\
     "AUTHSSLCERTTYPE":"PEM",\n\
-    "AUTHSSLCERTFILE":"/certs/client.pem",\n\
-    "AUTHSSLKEYFILE":"/certs/client_key.pem",\n\
+    "AUTHSSLCERTFILE":"/certs/client.crt",\n\
+    "AUTHSSLKEYFILE":"/certs/client.key",\n\
     "AUTHRETRYDELAY":"5"\n\
   },\n\
   "SecuritySettings":\n\
@@ -81,7 +92,7 @@ JSON:{\n\
   },\n\
   "CommsSettings":\n\
   {\n\
-    "BASEURL":"https://ironbridgeapi.com/api",\n\
+    "BASEURL":"https://$SERVER_HOST/api",\n\
     "BYTESPERREQUEST":"4096",\n\
     "RETRIEVALRETRYDELAY":"3"\n\
   },\n\
@@ -107,8 +118,9 @@ ibrand_service\n\
 openssl engine\n\
 #tail -f /var/log/syslog\n'\
 sleep 15\n\
-openssl rand 24\n'\
+openssl rand 24\n\
+curl -v http://$SERVER_HOST:8080/shutdown\n'\
 >> /run.sh
 RUN chmod +x /run.sh
 
-ENTRYPOINT ["/run.sh"]
+CMD ["/run.sh"]
