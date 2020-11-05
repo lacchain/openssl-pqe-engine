@@ -2,6 +2,8 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <errno.h>
+#include <arpa/inet.h> // For ntohl() etc
 
 #include <openssl/evp.h>
 #include <openssl/aes.h>
@@ -27,7 +29,14 @@
 // }
 
 
-int AESDecryptBytes(uint8_t *pEncryptedData, size_t cbEncryptedData, uint8_t *pSharedSecret, size_t cbSharedSecret, unsigned int saltSize, uint8_t **ppDecryptedData, size_t *pcbDecryptedData)
+int AESDecryptBytes(uint8_t *pEncryptedData,
+                    size_t cbEncryptedData,
+                    size_t cbSignificantData,
+                    uint8_t *pSharedSecret,
+                    size_t cbSharedSecret,
+                    unsigned int saltSize,
+                    uint8_t **ppDecryptedData,
+                    size_t *pcbDecryptedData)
 {
     // Get Salt: First saltSize bytes of data
     // Get cipherText: Remaining bytes of data
@@ -149,6 +158,15 @@ int AESDecryptBytes(uint8_t *pEncryptedData, size_t cbEncryptedData, uint8_t *pS
         *pcbDecryptedData = cbCipherText;
     }
 
+    // Truncate final data, discarding padding
+    // This has been implmented this way because "we" were unable
+    // to reliably implement PKCS7 padding on the servcer side.
+    // So we resort to communication the significant length in a
+    // header prepended to the encrypted data.
+    if (cbSignificantData > 0 && cbSignificantData < cbCipherText)
+    {
+        *pcbDecryptedData = cbSignificantData;
+    }
     retval = 0;
 
 CLEANUP_AND_RETURN:
@@ -182,6 +200,129 @@ int ispadding(unsigned int cbData1, unsigned int cbData2, unsigned int N, unsign
         //    cbData1 = cbData2;
     }
     return false;
+}
+
+//-----------------------------------------------------------------------
+// AESDecryptPackage
+//-----------------------------------------------------------------------
+int AESDecryptPackage(tIB_INSTANCEDATA *pIBRand,
+                      tLSTRING *pSourceBuffer,
+                      tLSTRING *pDestBuffer,
+                      size_t expectedSize,
+                      bool hasHeader)
+{
+    int errcode;
+
+    // Check that we have the sharedsecret needed for the decryption
+    if (pIBRand->symmetricSharedSecret.pData == NULL || pIBRand->symmetricSharedSecret.cbData <= 0)
+    {
+        app_tracef("ERROR: Shared Secret not found");
+        return 2101;
+    }
+
+    // Check that we have something to decrypt
+    if (!pSourceBuffer->pData || pSourceBuffer->cbData == 0)
+    {
+        app_tracef("ERROR: No encrypted data found to decrypt");
+        return 2102;
+    }
+
+    // The data is currently Base64 encoded encrypted data
+
+    // Remove any enclosing quotes
+    char *p = pSourceBuffer->pData;
+    size_t n = pSourceBuffer->cbData;
+
+    //app_trace_hexall("DEBUG: base64 encoded encrypted data:", p, n);
+    if (p[0] == '"' && p[n-1] == '"')
+    {
+        p++;
+        n -= 2;
+    }
+    //app_trace_hexall("DEBUG: after B64decoding:", p, n);
+
+    ///////////////////////////////////
+    // DeBase64 the data...
+    ///////////////////////////////////
+    size_t cbEncryptedData = 0;
+    unsigned char *pEncryptedData = base64_decode(p, n, &cbEncryptedData);
+    if (!pEncryptedData)
+    {
+        const char *pReason = (my_errno == EINVAL) ? "Length not mod4" : (my_errno == ENOMEM) ? "Out of memory" : "Unspecified";
+        app_tracef("WARNING: Failed to decode Base64 data (%s)", pReason);
+       return 2103;
+    }
+
+    ///////////////////////////////////
+    // Process the header
+    ///////////////////////////////////
+    size_t cbSignificantData = cbEncryptedData;
+    if (hasHeader)
+    {
+        #pragma pack(push, 4)
+        typedef struct tagAESPACKAGE_HEADER
+        {
+            uint32_t packageLength;      // 4 bytes
+            uint8_t packageChecksum[32]; // Unused
+        } tAESPACKAGE_HEADER;
+        #pragma pack(pop)
+
+        tAESPACKAGE_HEADER *pAesPackageHeader = (tAESPACKAGE_HEADER *)pEncryptedData;
+
+        // Verify Header
+        const size_t expectedHeaderLength = (4+32);
+        if (sizeof(tAESPACKAGE_HEADER) != expectedHeaderLength)
+        {
+            app_tracef("ERROR: sizeof(tAESPACKAGE_HEADER)(%lu) != expectedHeaderLength(%lu)", sizeof(tAESPACKAGE_HEADER), expectedHeaderLength);
+            return 2104; // Attention Developer: Compile/packing problem
+        }
+
+        pAesPackageHeader->packageLength = ntohl(pAesPackageHeader->packageLength);
+
+        pEncryptedData += sizeof(tAESPACKAGE_HEADER);
+        cbEncryptedData -= sizeof(tAESPACKAGE_HEADER);
+        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
+        {
+            app_tracef("DEBUG: pAesPackageHeader->packageLength(%lu) vs. cbEncryptedData(%lu)", pAesPackageHeader->packageLength, cbEncryptedData);
+        }
+        cbSignificantData = pAesPackageHeader->packageLength;
+    }
+
+    if (cbSignificantData != expectedSize)
+    {
+        app_tracef("ERROR: Size of significant data (%u) is not as expected (%u) (size of inbound data was %u)", cbSignificantData, expectedSize, cbEncryptedData);
+        //if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
+        //    app_trace_hexall("DEBUG: encryptedKemSecretKey:", (char *)pEncryptedData, decodeSize);
+        return 2105;
+    }
+
+
+    ///////////////////////////////////
+    // Decrypt the data...
+    ///////////////////////////////////
+    // Do the AES decryption (result returned in a malloc'd buffer, which we will assign to our ourKemSecretKey tLSTRING)
+
+    // USE_PBKDF2
+    unsigned char *pDecryptedData = NULL;
+    size_t         cbDecryptedData = 0;
+    const int SALTSIZE = 32;
+    errcode = AESDecryptBytes(pEncryptedData,                                  // pEncryptedData
+                              cbEncryptedData,
+                              cbSignificantData,                               // cbEncryptedData
+                              (uint8_t *)pIBRand->symmetricSharedSecret.pData, // pSharedSecret
+                              pIBRand->symmetricSharedSecret.cbData,           // cbSharedSecret
+                              SALTSIZE,                                        // saltSize
+                              &pDecryptedData,                                 // ppDecryptedData
+                              &cbDecryptedData);                               // pcbDecryptedData
+    if (errcode)
+    {
+        app_tracef("ERROR: AESDecryptBytes failed with rc=%d\n", errcode);
+        return errcode;
+    }
+    pDestBuffer->pData = (char *)pDecryptedData;
+    pDestBuffer->cbData = cbDecryptedData;
+
+    return 0;
 }
 
 #ifdef INCLUDE_KNOWN_ANSWER_TESTS
@@ -228,7 +369,7 @@ int testSymmetricEncryption(void)
     cbEncryptedData = 1000;
     memset(pEncryptedData, 0x55, cbEncryptedData);
 
-    rc = AESDecryptBytes(pEncryptedData, cbEncryptedData, pSessionKey, cbSessionKey, saltSize, &pDecryptedData, &cbDecryptedData);
+    rc = AESDecryptBytes(pEncryptedData, cbEncryptedData, cbEncryptedData, pSessionKey, cbSessionKey, saltSize, &pDecryptedData, &cbDecryptedData);
     if (rc != 0)
     {
         fprintf(stderr, "AESDecryptBytes failed with rc=%d\n", rc);
@@ -261,7 +402,7 @@ int testSymmetricEncryption(void)
     size_t cbTransmittedData = 0;
     unsigned char *pTransmittedData = base64_decode(pTransmittedDataB64, cbTransmittedDataB64, &cbTransmittedData);
 
-    rc = AESDecryptBytes(pTransmittedData, cbTransmittedData, pIronBridgeSessionKey, cbIronBridgeSessionKey, 16, &pDecryptedData, &cbDecryptedData);
+    rc = AESDecryptBytes(pTransmittedData, cbTransmittedData, 1000, pIronBridgeSessionKey, cbIronBridgeSessionKey, 16, &pDecryptedData, &cbDecryptedData);
     if (rc)
     {
         fprintf(stderr, "AESDecryptBytes failed with rc=%d\n", rc);

@@ -5,9 +5,26 @@
 #ifndef _INCLUDE_IB_SYMMETRICENCRYPTION_H_
 #define _INCLUDE_IB_SYMMETRICENCRYPTION_H_
 
-#include "RFC2898DeriveBytes.h"
+#include <stdint.h> // For uint8_t etc
 
-extern int AESDecryptBytes(uint8_t *pIBCryptMessage, size_t cbIBCryptMessage, uint8_t *pSharedSecret, size_t cbSharedSecret, unsigned int saltSize, uint8_t **ppDecryptedData, size_t *pcbDecryptedData);
+#include "../ibrand_common/my_utilslib.h" // For tLSTRING
+#include "ibrand_service.h" // For tIB_INSTANCEDATA
+
+extern int AESDecryptBytes(uint8_t *pIBCryptMessage,
+                           size_t cbIBCryptMessage,
+                           size_t cbSignificantData,
+                           uint8_t *pSharedSecret,
+                           size_t cbSharedSecret,
+                           unsigned int saltSize,
+                           uint8_t **ppDecryptedData,
+                           size_t *pcbDecryptedData);
+
+extern int AESDecryptPackage(tIB_INSTANCEDATA *pIBRand,
+                             tLSTRING *pSourceBuffer,
+                             tLSTRING *pDestBuffer,
+                             size_t expectedSize,
+                             bool hasHeader);
+
 extern int testSymmetricEncryption(void);
 
 #endif // _INCLUDE_IB_SYMMETRICENCRYPTION_H_

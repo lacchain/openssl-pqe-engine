@@ -426,6 +426,8 @@ size_t ReceiveDataHandler_SharedSecret(char *buffer, size_t size, size_t nmemb, 
 //-----------------------------------------------------------------------
 static int DecryptAndStoreKemSecretKey(tIB_INSTANCEDATA *pIBRand)
 {
+    int errcode;
+
     // If there is already a KEM secret key stored, then clear and free it.
     if (pIBRand->ourKemSecretKey.pData)
     {
@@ -435,62 +437,23 @@ static int DecryptAndStoreKemSecretKey(tIB_INSTANCEDATA *pIBRand)
         pIBRand->ourKemSecretKey.cbData = 0;
     }
 
-    // Check that we have the sharedsecret needed for the decryption
-    if (!pIBRand->symmetricSharedSecret.pData || pIBRand->symmetricSharedSecret.cbData <= 0)
+    errcode = AESDecryptPackage(pIBRand,
+                                &pIBRand->encryptedKemSecretKey, // Source
+                                &pIBRand->ourKemSecretKey,       // Destination
+                                CRYPTO_CIPHERTEXTBYTES,          // expectedSize
+                                true);                           // hasHeader
+    if (errcode)
     {
-        app_tracef("ERROR: Size of sharedsecret is not as expected");
-        return 2101;
+        app_tracef("ERROR: Error %d - Failed to decrypt payload", errcode);
+        return errcode;
     }
-    // Check that we have the encrypted KEM secret key
-    if (!pIBRand->encryptedKemSecretKey.pData || pIBRand->encryptedKemSecretKey.cbData == 0)
-    {
-        app_tracef("ERROR: Encrypted KEM secret key not found");
-        return 2102;
-    }
-
-    unsigned char *p = (unsigned char *)pIBRand->encryptedKemSecretKey.pData;
-    size_t n = pIBRand->encryptedKemSecretKey.cbData;
-
-    //app_trace_hexall("DEBUG: base64 encoded encryptedKemSecretKey:", pIBRand->encryptedKemSecretKey.pData, pIBRand->encryptedKemSecretKey.cbData);
-    if (p[0] == '"') {p++; n--;}
-    if (p[n-1] == '"') {n--;}
-    //app_trace_hexall("DEBUG: p:", p, n);
-
-    // base64_decode the encapsulate key
-    size_t decodeSize = 0;
-    unsigned char *rawEncryptedKey = base64_decode((char *)p, n, (size_t *)&(decodeSize));
-    if (!rawEncryptedKey)
-    {
-       app_tracef("WARNING: Failed to decode Base64 EncryptedKey");
-       return 2103;
-    }
-
-    if (decodeSize != CRYPTO_CIPHERTEXTBYTES)
-    {
-        app_tracef("ERROR: Size of decoded encrypted key (%u) is not as expected (%u)", decodeSize, CRYPTO_CIPHERTEXTBYTES);
-        //app_trace_hexall("DEBUG: encryptedKemSecretKey:", (char *)rawEncryptedKey, decodeSize);
-        return 2104;
-    }
-
-    // Do the AES decryption (result returned in a malloc'd buffer, which we will assign to our ourKemSecretKey tLSTRING)
-    unsigned char *pDecryptedData = NULL;
-    size_t         cbDecryptedData = 0;
-    int rc;
-#define SALTSIZE 32
-    rc = AESDecryptBytes(rawEncryptedKey, decodeSize, (uint8_t *)pIBRand->symmetricSharedSecret.pData, pIBRand->symmetricSharedSecret.cbData, SALTSIZE, &pDecryptedData, &cbDecryptedData);
-    if (rc)
-    {
-        app_tracef("AESDecryptBytes failed with rc=%d\n", rc);
-    }
-    pIBRand->ourKemSecretKey.pData = (char *)pDecryptedData;
-    pIBRand->ourKemSecretKey.cbData = cbDecryptedData;
 
     // Persist new KEM secretKey to file
-    rc = WriteToFile(pIBRand->cfg.ourKemSecretKeyFilename, &(pIBRand->ourKemSecretKey), true);
-    if (rc != 0)
+    errcode = WriteToFile(pIBRand->cfg.ourKemSecretKeyFilename, &(pIBRand->ourKemSecretKey), true);
+    if (errcode != 0)
     {
-        app_tracef("ERROR: Failed to save KEM secret key to file \"%s\"", pIBRand->cfg.ourKemSecretKeyFilename);
-        return rc;
+        app_tracef("ERROR: Error %d - Failed to save KEM secret key to file \"%s\"", errcode, pIBRand->cfg.ourKemSecretKeyFilename);
+        return errcode;
     }
 
 #ifdef KAT_KNOWN_ANSWER_TESTING
@@ -658,6 +621,7 @@ int authenticateUser(tIB_INSTANCEDATA *pIBRand)
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_POSTFIELDS, bodyData);
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEFUNCTION, ReceiveDataHandler_login);
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEDATA, pIBRand);
+    curl_easy_setopt(pIBRand->hCurl, CURLOPT_FAILONERROR, true);
 
     if (strcmp(pIBRand->cfg.szAuthType, "CLIENT_CERT") == 0)
     {
@@ -827,7 +791,11 @@ int getRandomBytes(tIB_INSTANCEDATA *pIBRand)
     }
     if (curlResultCode != CURLE_OK)
     {
-        app_tracef("ERROR: %s perform failed: [%s]", szEndpoint, curl_easy_strerror(curlResultCode));
+        app_tracef("ERROR: %s perform failed: curl:%ld [%s] http:%ld [%s]", szEndpoint, curlResultCode, curl_easy_strerror(curlResultCode), httpResponseCode, HttpResponseCodeDescription(httpResponseCode));
+        if (pIBRand->ResultantData.pData && pIBRand->ResultantData.cbData)
+        {
+            app_tracef("ERROR: %s response: [%s]", szEndpoint, pIBRand->ResultantData);
+        }
         curl_slist_free_all(headers); // Free custom header list
         if (pAuthHeader) free(pAuthHeader);
         free(pUrl);
@@ -904,6 +872,7 @@ int getNewKemKeyPair(tIB_INSTANCEDATA *pIBRand)
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEFUNCTION, ReceiveDataHandler_RequestNewKeyPair);
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEDATA, pIBRand);
+    curl_easy_setopt(pIBRand->hCurl, CURLOPT_FAILONERROR, true);
 
     // Prepare the pIBRand for the new shared secret
     pIBRand->encryptedKemSecretKey_RcvdSegments = 0;
@@ -946,7 +915,11 @@ int getNewKemKeyPair(tIB_INSTANCEDATA *pIBRand)
     }
     if (curlResultCode != CURLE_OK)
     {
-        app_tracef("ERROR: reqkeypair perform failed: [%s]", curl_easy_strerror(curlResultCode));
+        app_tracef("ERROR: %s perform failed: curl:%ld [%s] http:%ld [%s]", "reqkeypair", curlResultCode, curl_easy_strerror(curlResultCode), httpResponseCode, HttpResponseCodeDescription(httpResponseCode));
+        if (pIBRand->encryptedKemSecretKey.pData && pIBRand->encryptedKemSecretKey.cbData)
+        {
+            app_tracef("ERROR: %s response: [%s]", szEndpoint, pIBRand->encryptedKemSecretKey);
+        }
         curl_slist_free_all(headers); // Free custom header list
         if (pAuthHeader) free(pAuthHeader);
         free(pUrl);
@@ -1024,6 +997,7 @@ int getSecureRNGSharedSecret(tIB_INSTANCEDATA *pIBRand)
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEFUNCTION, ReceiveDataHandler_SharedSecret);
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEDATA, pIBRand);
+    curl_easy_setopt(pIBRand->hCurl, CURLOPT_FAILONERROR, true);
 
     // Prepare the pIBRand for the new shared secret
     pIBRand->encapsulatedSharedSecret_RcvdSegments = 0;
@@ -1066,11 +1040,15 @@ int getSecureRNGSharedSecret(tIB_INSTANCEDATA *pIBRand)
     }
     if (curlResultCode != CURLE_OK)
     {
-        app_tracef("ERROR: sharedsecret perform failed: [%s]", curl_easy_strerror(curlResultCode));
+        app_tracef("ERROR: %s perform failed: curl:%ld [%s] http:%ld [%s]", "sharedsecret", curlResultCode, curl_easy_strerror(curlResultCode), httpResponseCode, HttpResponseCodeDescription(httpResponseCode));
+        if (pIBRand->encapsulatedSharedSecret.pData && pIBRand->encapsulatedSharedSecret.cbData)
+        {
+            app_tracef("ERROR: %s response: [%s]", szEndpoint, pIBRand->encapsulatedSharedSecret);
+        }
         curl_slist_free_all(headers); // Free custom header list
         if (pAuthHeader) free(pAuthHeader);
         free(pUrl);
-        return 2242;
+        return 2252;
     }
 
     //if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
@@ -1186,97 +1164,31 @@ static bool prepareRNGBytes(tIB_INSTANCEDATA *pIBRand)
 //-----------------------------------------------------------------------
 static bool prepareSRNGBytes(tIB_INSTANCEDATA *pIBRand)
 {
-    // The data is currently Base64 encoded encrypted data
-    ///////////////////////////////////
-    // DeBase64 the data...
-    ///////////////////////////////////
-    char * pOriginalData  = pIBRand->ResultantData.pData;
-    size_t cbOriginalData = pIBRand->ResultantData.cbData;
-    char * pDecodeData    = pOriginalData;
-    size_t cbDecodeData   = cbOriginalData;
+    int errcode;
+    tLSTRING decryptedData = {0, NULL};
 
-    if (pOriginalData[0] == '"' && pOriginalData[cbOriginalData-1] == '"')
+    errcode = AESDecryptPackage(pIBRand,
+                                &pIBRand->ResultantData,      // Source
+                                &decryptedData,               // Destination
+                                pIBRand->cfg.bytesPerRequest, // expectedSize
+                                true);                        // hasHeader
+    if (errcode)
     {
-        pDecodeData = pOriginalData + 1;
-        cbDecodeData = cbOriginalData - 2;
-    }
-    else
-    {
-        pDecodeData = pOriginalData;
-        cbDecodeData = cbOriginalData;
-    }
-    size_t cbEncryptedData = 0;
-    unsigned char *pEncryptedData = base64_decode(pDecodeData, cbDecodeData, &cbEncryptedData);
-    if (!pEncryptedData)
-    {
-        char *pReason = (my_errno == EINVAL) ? "Length not mod4" : (my_errno == ENOMEM) ? "Out of memory" : "Unspecified";
-        app_tracef("WARNING: Failed to decode Base64 data (%s). Discarding %u bytes.", pReason, pIBRand->ResultantData.cbData);
+        app_tracef("ERROR: Error %d - Failed to decrypt payload", errcode);
         return false;
     }
-    free(pIBRand->ResultantData.pData);
-    pIBRand->ResultantData.pData = NULL;
-    pIBRand->ResultantData.cbData = 0;
 
-    ///////////////////////////////////
-    // Decrypt the data...
-    ///////////////////////////////////
-
-    if (pIBRand->symmetricSharedSecret.pData==NULL)
+    // Destroy and free inbound encrypted material
+    if (pIBRand->ResultantData.pData && pIBRand->ResultantData.cbData)
     {
-        app_tracef("WARNING: Shared Secret not found");
+        memset(pIBRand->ResultantData.pData, 0, pIBRand->ResultantData.cbData);
+        free(pIBRand->ResultantData.pData);
+        pIBRand->ResultantData.pData = NULL;
+        pIBRand->ResultantData.cbData = 0;
     }
 
-#define USE_PBKDF2
-#ifdef USE_PBKDF2
-    unsigned char *pDecryptedData = NULL;
-    size_t         cbDecryptedData = 0;
-    int rc;
-
-    rc = AESDecryptBytes(pEncryptedData, cbEncryptedData, (uint8_t *)pIBRand->symmetricSharedSecret.pData, pIBRand->symmetricSharedSecret.cbData, 32, &pDecryptedData, &cbDecryptedData);
-    if (rc)
-    {
-        app_tracef("ERROR: AESDecryptBytes failed with rc=%d\n", rc);
-    }
-    pIBRand->ResultantData.pData = (char *)pDecryptedData;
-    pIBRand->ResultantData.cbData = cbDecryptedData;
-#else
-    // Initialisation vector
-    unsigned char iv[AES_BLOCK_SIZE];
-    AES_KEY dec_key;
-
-    // AES-128 bit CBC Decryption
-    memset(iv, 0x00, AES_BLOCK_SIZE); // don't forget to set iv vector again, else you can't decrypt data properly
-
-    // Rfc2898DeriveBytes
-    // Crypto::Rfc2898DeriveBytes   derivedBytes(key, saltSize);
-    // auto                         salt       = derivedBytes.salt();
-    // auto                         keyBytes   = derivedBytes.getBytes(32);
-    // auto                         ivBytes    = derivedBytes.getBytes(16);
-
-    // We have a key
-    // We have an IV
-    // We have some data
-    // Let's do it.
-
-    AES_set_decrypt_key((unsigned char *)pIBRand->symmetricSharedSecret.pData, pIBRand->symmetricSharedSecret.cbData*8, &dec_key); // Size of key is in bits
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
-        app_tracef("INFO: Decrypting %u bytes", pIBRand->symmetricSharedSecret.cbData);
-    unsigned char *pRawData = (unsigned char *)malloc(cbEncryptedData);
-    if (!pRawData)
-    {
-        app_tracef("ERROR: Malloc for decrypted data failed");
-        return false; // todo cleanup
-    }
-    AES_cbc_encrypt(pEncryptedData, pRawData, cbEncryptedData, &dec_key, iv, AES_DECRYPT);
-    size_t cbRawData = cbEncryptedData;
-
-    free(pEncryptedData);
-    pEncryptedData = NULL;
-    cbEncryptedData = 0;
-
-    pIBRand->ResultantData.pData = (char *)pRawData;
-    pIBRand->ResultantData.cbData = cbRawData;
-#endif
+    // And take on the buffer containing the newly decrypted data
+    pIBRand->ResultantData = decryptedData;
 
     // The data is now raw data
     if (strcmp(pIBRand->cfg.szStorageDataFormat,"RAW")!=0)
