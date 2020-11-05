@@ -49,7 +49,7 @@ extern const char *app_trace_get_logfilename(const char *szFilename);
 extern char * FormatData ( char *szTarget, const char *szTitle, const unsigned char *pData, int cbData, tOUTPUTFORMAT fOutputFormat );
 extern void   app_trace_openlog(const char *ident, int logopt, int facility);
 extern void   app_trace_closelog(void);
-extern void   app_trace_hex(const char *pHeader, const char *pData, int cbData);
+extern void   app_trace_hex(const char *pHeader, const unsigned char *pData, unsigned int cbData);
 extern void   app_trace_hexall(const char *pHeader, const unsigned char *pData, unsigned int cbData);
 extern void   app_traceln(const char *szString);
 extern void   app_trace(const char *szString);

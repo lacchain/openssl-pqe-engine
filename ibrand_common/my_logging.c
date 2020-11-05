@@ -165,27 +165,24 @@ char *FormatData ( char *szTarget, const char *szTitle, const unsigned char *pDa
    return szTarget;
 }
 
-void app_trace_hex(const char *pHeader, const char *pData, int cbData)
+void app_trace_hex(const char *pHeader, const unsigned char *pData, unsigned int cbData)
 {
   char *pTemp;
   size_t malloc_size;
 
-  if (cbData<0)
-    return;
-
-  //
-  // "<=="
-  malloc_size =   (pHeader?strlen(pHeader):0) +       // Space for "%s"
-                + (pHeader?(6+5+2):0) +               // Space for " (len=%d) "
-                + (pHeader?3:0) +                     // Space for "==>"
-                + (cbData*2)                          // Space for Max 2 hex chars per byte eg "EF"
-                + (pHeader?strlen(pHeader)+4+3:0) +   // Space for "<=="
-                + 1;                                  // Space for trailing NULL
+  malloc_size = (cbData*6);           // Space for Max 6 hex chars per byte eg "<0xEF>"
+  if (pHeader)
+  {
+      malloc_size += strlen(pHeader); // Space for "%s"
+      malloc_size += 18;              // Space for " (len=4294967295) "
+      malloc_size += 6;               // Space for "==>" and "<=="
+  }
+  malloc_size += 1;                   // Space for trailing NULL
 
   pTemp = (char *)malloc(malloc_size);
   if (pTemp)
   {
-    app_traceln(FormatData(pTemp, pHeader, (unsigned char *)pData, cbData, ALL_IN_BASIC_HEX));
+    app_traceln(FormatData(pTemp, pHeader, (unsigned char *)pData, cbData, NONDISPLAYABLE_IN_PRETTY_HEX));
     app_timer_delay(10);
     free(pTemp);
   }
@@ -199,7 +196,7 @@ void app_trace_hex(const char *pHeader, const char *pData, int cbData)
 #endif
     app_trace(pHeader);
     app_trace("\", ");
-    sprintf(tempStr, "%d bytes", cbData);
+    sprintf(tempStr, "%u bytes", cbData);
     app_trace(tempStr);
     app_traceln("<==");
     app_timer_delay(10);
@@ -211,13 +208,14 @@ void app_trace_hexall(const char *pHeader, const unsigned char *pData, unsigned 
   char *pTemp;
   size_t malloc_size;
 
-  // "<=="
-  malloc_size =   (pHeader?strlen(pHeader):0) +       // Space for "%s"
-                + (pHeader?(6+5+2):0) +               // Space for " (len=%d) "
-                + (pHeader?3:0) +                     // Space for "==>"
-                + (cbData*2)                          // Space for 2 hex chars per byte eg "EF"
-                + (pHeader?strlen(pHeader)+4+3:0) +   // Space for "<=="
-                + 1;                                  // Space for trailing NULL
+  malloc_size = (cbData*2);           // Space for 2 hex chars per byte eg "EF"
+  if (pHeader)
+  {
+      malloc_size += strlen(pHeader); // Space for "%s"
+      malloc_size += 18;              // Space for " (len=4294967295) "
+      malloc_size += 6;               // Space for "==>" and "<=="
+  }
+  malloc_size += 1;                   // Space for trailing NULL
 
   pTemp = (char *)malloc(malloc_size);
   if (pTemp)
@@ -501,11 +499,11 @@ int my_getToken(const char *pSrcData, char *pDstField, int nFieldNum, int nDstFi
   my_trimLeading(pDstField,(char *)" [");
   my_trimTrailing(pDstField,(char *)" ]");
 
-  app_trace_hex ("TRACE: GetToken pSrcData=",pSrcData, (int)strlen(pSrcData));
+  app_trace_hex ("TRACE: GetToken pSrcData=", (unsigned char *)pSrcData, strlen(pSrcData));
   char buf[20];
   my_itoa (nFieldNum, buf, 10);
-  app_trace_hex ("TRACE: GetToken nFieldNum=", buf, (int)strlen(buf));
-  app_trace_hex ("TRACE: GetToken pDstField=", pDstField, (int)strlen(pDstField));
+  app_trace_hex ("TRACE: GetToken nFieldNum=", (unsigned char *)buf, strlen(buf));
+  app_trace_hex ("TRACE: GetToken pDstField=", (unsigned char *)pDstField, strlen(pDstField));
   app_timer_delay(10);
 
   return TRUE;

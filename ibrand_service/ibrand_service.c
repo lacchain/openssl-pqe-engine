@@ -200,7 +200,7 @@ size_t ReceiveDataHandler_login(char *buffer, size_t size, size_t nmemb, void *u
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
     {
         app_tracef("INFO: Login: %u bytes received", inboundData.cbData);
-        app_trace_hexall("DEBUG: ReceiveDataHandler_login:", (unsigned char *)inboundData.pData, inboundData.cbData);
+        app_trace_hex("DEBUG: ReceiveDataHandler_login:", (unsigned char *)inboundData.pData, inboundData.cbData);
     }
 
     // Free up the old buffer, if there is one
@@ -261,7 +261,7 @@ size_t ReceiveDataHandler_rng(char *buffer, size_t size, size_t nmemb, void *use
         app_tracef("INFO: rng request: %u bytes received (segment %d)",
                    inboundData.cbData,
                    pIBRand->encryptedRng_RcvdSegments);
-        app_trace_hexall("DEBUG: ReceiveDataHandler_rng:", (unsigned char *)inboundData.pData, inboundData.cbData);
+        app_trace_hex("DEBUG: ReceiveDataHandler_rng: ", (unsigned char *)inboundData.pData, inboundData.cbData);
     }
 
     size_t prevLen = pIBRand->ResultantData.cbData;
@@ -318,7 +318,7 @@ size_t ReceiveDataHandler_RequestNewKeyPair(char *buffer, size_t size, size_t nm
         app_tracef("INFO: RequestNewKeyPair: %u bytes received (segment %d)",
                    inboundData.cbData,
                    pIBRand->encryptedKemSecretKey_RcvdSegments);
-        app_trace_hexall("DEBUG: ReceiveDataHandler_RequestNewKeyPair:", (unsigned char *)inboundData.pData, inboundData.cbData);
+        app_trace_hex("DEBUG: ReceiveDataHandler_RequestNewKeyPair:", (unsigned char *)inboundData.pData, inboundData.cbData);
     }
 
     size_t prevLen = pIBRand->encryptedKemSecretKey.cbData;
@@ -383,7 +383,7 @@ size_t ReceiveDataHandler_SharedSecret(char *buffer, size_t size, size_t nmemb, 
         app_tracef("INFO: SharedSecret: %u bytes received (segment %d)",
                    inboundData.cbData,
                    pIBRand->encapsulatedSharedSecret_RcvdSegments);
-        app_trace_hexall("DEBUG: ReceiveDataHandler_SharedSecret:", (unsigned char *)inboundData.pData, inboundData.cbData);
+        app_trace_hex("DEBUG: ReceiveDataHandler_SharedSecret:", (unsigned char *)inboundData.pData, inboundData.cbData);
     }
 
     size_t prevLen = pIBRand->encapsulatedSharedSecret.cbData;
@@ -971,8 +971,6 @@ int getNewKemKeyPair(tIB_INSTANCEDATA *pIBRand)
     free(pUrl);
     return 0;
 }
-
-
 
 
 //-----------------------------------------------------------------------
