@@ -56,5 +56,7 @@ extern void   app_trace(const char *szString);
 extern int    app_tracef(const char *formatStr, ...);
 extern int    my_getToken(const char *pSrcData, char *pDstField, int nFieldNum, int nDstFieldMaxLen);
 extern void   my_dumpToFile(const char *szFilename, const unsigned char *p, size_t n);
+extern const char *HttpResponseCodeCategory(int httpResponseCode);
+extern const char *HttpResponseCodeDescription(int httpResponseCode);
 
 #endif // _INCLUDE_MY_LOGGING_H_
