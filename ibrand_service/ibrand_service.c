@@ -75,7 +75,7 @@ typedef enum tagSERVICE_STATE
 //#define HTTP_RESP_SHAREDSECRETEXPIRED  (424) // Failed Dependency (WebDAV)
 //#define HTTP_RESP_PRECONDITIONFAILED   (412) // PreconditionFailed 412
 #define HTTP_RESP_TOKENEXPIREDORINVALID  (498) // TokenExpiredOrInvalid 498
-#define HTTP_RESP_KEMKEYPAIREXPIRED      (498) // TokenExpiredOrInvalid 498
+#define HTTP_RESP_KEMKEYPAIREXPIRED      (499) // TokenExpiredOrInvalid 498
 #define HTTP_RESP_SHAREDSECRETEXPIRED    (498) // TokenExpiredOrInvalid 498
 
 
@@ -791,6 +791,20 @@ int getRandomBytes(tIB_INSTANCEDATA *pIBRand)
     }
     if (curlResultCode != CURLE_OK)
     {
+        if (httpResponseCode == HTTP_RESP_SHAREDSECRETEXPIRED)
+        {
+            curl_slist_free_all(headers); // Free custom header list
+            if (pAuthHeader) free(pAuthHeader);
+            free(pUrl);
+            return ERC_OopsSharedSecretExpired;
+        }
+        if (httpResponseCode == HTTP_RESP_KEMKEYPAIREXPIRED)
+        {
+            curl_slist_free_all(headers); // Free custom header list
+            if (pAuthHeader) free(pAuthHeader);
+            free(pUrl);
+            return ERC_OopsKemKeyPairExpired;
+        }
         app_tracef("ERROR: %s perform failed: curl:%ld [%s] http:%ld [%s]", szEndpoint, curlResultCode, curl_easy_strerror(curlResultCode), httpResponseCode, HttpResponseCodeDescription(httpResponseCode));
         if (pIBRand->ResultantData.pData && pIBRand->ResultantData.cbData)
         {
@@ -806,14 +820,6 @@ int getRandomBytes(tIB_INSTANCEDATA *pIBRand)
     //{
     //    app_tracef("INFO: %s ResultantData = [%*.*s]", szEndpoint, pIBRand->ResultantData.cbData, pIBRand->ResultantData.cbData, pIBRand->ResultantData.pData);
     //}
-
-    if (httpResponseCode == HTTP_RESP_SHAREDSECRETEXPIRED)
-    {
-        curl_slist_free_all(headers); // Free custom header list
-        if (pAuthHeader) free(pAuthHeader);
-        free(pUrl);
-        return ERC_OopsSharedSecretExpired;
-    }
 
     curl_slist_free_all(headers); // Free custom header list
     if (pAuthHeader) free(pAuthHeader);
@@ -915,6 +921,21 @@ int getNewKemKeyPair(tIB_INSTANCEDATA *pIBRand)
     }
     if (curlResultCode != CURLE_OK)
     {
+        if (httpResponseCode == HTTP_RESP_SHAREDSECRETEXPIRED)
+        {
+            curl_slist_free_all(headers); // Free custom header list
+            if (pAuthHeader) free(pAuthHeader);
+            free(pUrl);
+            return ERC_OopsSharedSecretExpired;
+        }
+        if (httpResponseCode == HTTP_RESP_KEMKEYPAIREXPIRED)
+        {
+            curl_slist_free_all(headers); // Free custom header list
+            if (pAuthHeader) free(pAuthHeader);
+            free(pUrl);
+            return ERC_OopsKemKeyPairExpired;
+        }
+
         app_tracef("ERROR: %s perform failed: curl:%ld [%s] http:%ld [%s]", "reqkeypair", curlResultCode, curl_easy_strerror(curlResultCode), httpResponseCode, HttpResponseCodeDescription(httpResponseCode));
         if (pIBRand->encryptedKemSecretKey.pData && pIBRand->encryptedKemSecretKey.cbData)
         {
@@ -930,14 +951,6 @@ int getNewKemKeyPair(tIB_INSTANCEDATA *pIBRand)
     //{
     //    app_tracef("INFO: reqkeypair ResultantData = [%*.*s]", pIBRand->ResultantData.cbData, pIBRand->ResultantData.cbData, pIBRand->ResultantData.pData);
     //}
-
-    if (httpResponseCode == HTTP_RESP_SHAREDSECRETEXPIRED)
-    {
-        curl_slist_free_all(headers); // Free custom header list
-        if (pAuthHeader) free(pAuthHeader);
-        free(pUrl);
-        return ERC_OopsSharedSecretExpired;
-    }
 
     curl_slist_free_all(headers); // Free custom header list
     if (pAuthHeader) free(pAuthHeader);
@@ -1040,6 +1053,20 @@ int getSecureRNGSharedSecret(tIB_INSTANCEDATA *pIBRand)
     }
     if (curlResultCode != CURLE_OK)
     {
+        if (httpResponseCode == HTTP_RESP_SHAREDSECRETEXPIRED)
+        {
+            curl_slist_free_all(headers); // Free custom header list
+            if (pAuthHeader) free(pAuthHeader);
+            free(pUrl);
+            return ERC_OopsSharedSecretExpired;
+        }
+        if (httpResponseCode == HTTP_RESP_KEMKEYPAIREXPIRED)
+        {
+            curl_slist_free_all(headers); // Free custom header list
+            if (pAuthHeader) free(pAuthHeader);
+            free(pUrl);
+            return ERC_OopsKemKeyPairExpired;
+        }
         app_tracef("ERROR: %s perform failed: curl:%ld [%s] http:%ld [%s]", "sharedsecret", curlResultCode, curl_easy_strerror(curlResultCode), httpResponseCode, HttpResponseCodeDescription(httpResponseCode));
         if (pIBRand->encapsulatedSharedSecret.pData && pIBRand->encapsulatedSharedSecret.cbData)
         {
@@ -1055,14 +1082,6 @@ int getSecureRNGSharedSecret(tIB_INSTANCEDATA *pIBRand)
     //{
     //    app_tracef("INFO: sharedsecret ResultantData = [%*.*s]", pIBRand->ResultantData.cbData, pIBRand->ResultantData.cbData, pIBRand->ResultantData.pData);
     //}
-
-    if (httpResponseCode == HTTP_RESP_KEMKEYPAIREXPIRED)
-    {
-        curl_slist_free_all(headers); // Free custom header list
-        if (pAuthHeader) free(pAuthHeader);
-        free(pUrl);
-        return ERC_OopsKemKeyPairExpired;
-    }
 
     curl_slist_free_all(headers); // Free custom header list
     if (pAuthHeader) free(pAuthHeader);
@@ -1806,6 +1825,16 @@ int main(int argc, char * argv[])
                 printProgressToSyslog = true;
                 // Request a new KEM secret key
                 rc = getNewKemKeyPair(pIBRand);
+                if (rc == ERC_OopsSharedSecretExpired)
+                {
+                    currentState = STATE_DESTROYEXISTINGSHAREDSECRET;
+                    continue;
+                }
+                else if (rc == ERC_OopsKemKeyPairExpired)
+                {
+                    currentState = STATE_GETNEWKEMKEYPAIR;
+                    continue;
+                }
                 if (rc != 0)
                 {
                     numberOfAuthFailures++;
@@ -1852,7 +1881,12 @@ int main(int argc, char * argv[])
                 printProgressToSyslog = true;
                 // Get SharedSecret
                 rc = getSecureRNGSharedSecret(pIBRand);
-                if (rc == ERC_OopsKemKeyPairExpired)
+                if (rc == ERC_OopsSharedSecretExpired)
+                {
+                    currentState = STATE_DESTROYEXISTINGSHAREDSECRET;
+                    continue;
+                }
+                else if (rc == ERC_OopsKemKeyPairExpired)
                 {
                     currentState = STATE_GETNEWKEMKEYPAIR;
                     continue;
@@ -1967,6 +2001,11 @@ int main(int argc, char * argv[])
                 if (rc == ERC_OopsSharedSecretExpired)
                 {
                     currentState = STATE_DESTROYEXISTINGSHAREDSECRET;
+                    continue;
+                }
+                else if (rc == ERC_OopsKemKeyPairExpired)
+                {
+                    currentState = STATE_GETNEWKEMKEYPAIR;
                     continue;
                 }
                 else if (rc != 0)
