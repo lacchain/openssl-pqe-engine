@@ -290,10 +290,7 @@ int AESDecryptPackage(tIB_INSTANCEDATA *pIBRand,
 
     if (cbSignificantData != expectedSize)
     {
-        app_tracef("ERROR: Size of significant data (%u) is not as expected (%u) (size of inbound data was %u)", cbSignificantData, expectedSize, cbEncryptedData);
-        //if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
-        //    app_trace_hexall("DEBUG: encryptedKemSecretKey:", (char *)pEncryptedData, decodeSize);
-        return 2105;
+        app_tracef("WARNING: Size of significant data (%u) is not as expected (%u) (size of inbound data was %u)", cbSignificantData, expectedSize, cbEncryptedData);
     }
 
 
