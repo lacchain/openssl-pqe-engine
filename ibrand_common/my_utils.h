@@ -32,14 +32,8 @@
    #define EOL "\r\n"
 #endif
 
-#ifdef __linux__
-   #ifndef _MAX_PATH
-      #ifdef MAX_PATH
-         #define _MAX_PATH MAX_PATH
-      #else
-         #define _MAX_PATH 128
-      #endif
-   #endif
+#ifndef _MAX_PATH
+#define _MAX_PATH 128
 #endif
 
 #ifndef TRUE
