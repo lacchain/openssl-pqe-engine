@@ -49,12 +49,14 @@ extern const char *app_trace_get_logfilename(const char *szFilename);
 extern char * FormatData ( char *szTarget, const char *szTitle, const unsigned char *pData, int cbData, tOUTPUTFORMAT fOutputFormat );
 extern void   app_trace_openlog(const char *ident, int logopt, int facility);
 extern void   app_trace_closelog(void);
-extern void   app_trace_hex(const char *pHeader, const char *pData, int cbData);
+extern void   app_trace_hex(const char *pHeader, const unsigned char *pData, unsigned int cbData);
 extern void   app_trace_hexall(const char *pHeader, const unsigned char *pData, unsigned int cbData);
 extern void   app_traceln(const char *szString);
 extern void   app_trace(const char *szString);
 extern int    app_tracef(const char *formatStr, ...);
 extern int    my_getToken(const char *pSrcData, char *pDstField, int nFieldNum, int nDstFieldMaxLen);
 extern void   my_dumpToFile(const char *szFilename, const unsigned char *p, size_t n);
+extern const char *HttpResponseCodeCategory(int httpResponseCode);
+extern const char *HttpResponseCodeDescription(int httpResponseCode);
 
 #endif // _INCLUDE_MY_LOGGING_H_

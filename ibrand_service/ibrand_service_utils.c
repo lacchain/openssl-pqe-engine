@@ -50,7 +50,7 @@ int ReadContentsOfFile(char *szFilename, tLSTRING *pDest, size_t expectedNumberO
         app_tracef("ERROR: Size of file (%s, %u bytes) is not as expected (%u bytes)", szFilename, sizeOfFileOnDisk, expectedNumberOfBytes);
         return 2282;
     }
-    pDest->pData = malloc(sizeOfFileOnDisk);
+    pDest->pData = (char *)malloc(sizeOfFileOnDisk);
     if (!pDest->pData)
     {
         app_tracef("ERROR: Failed to allocate %u bytes for file contents", sizeOfFileOnDisk);
@@ -168,7 +168,7 @@ bool DecodeHexString(const tLSTRING *pHexData, tLSTRING *pBinaryData)
     }
 
     pSrc = pHexData->pData;
-    pBinaryData->pData = malloc(numberOfHexChars/2);
+    pBinaryData->pData = (char *)malloc(numberOfHexChars/2);
     if (!pBinaryData->pData)
     {
         app_tracef("ERROR: Failed to allocate %u bytes for binary string", numberOfHexChars/2);

@@ -12,7 +12,8 @@
 #ifndef _INCLUDE_IBRAND_SERVICE_DATASTORE_H_
 #define _INCLUDE_IBRAND_SERVICE_DATASTORE_H_
 
-#include "my_utilslib.h"
+#include "../ibrand_common/my_utilslib.h"
+#include "ibrand_service.h"
 #include "ibrand_service_utils.h"
 
 extern bool dataStore_Initialise(tIB_INSTANCEDATA *pIBRand);

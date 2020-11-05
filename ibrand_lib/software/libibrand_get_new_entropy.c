@@ -19,11 +19,7 @@
 #include "libibrand_get_new_entropy.h"
 
 #ifndef _MAX_PATH
-    #ifdef MAX_PATH
-        #define _MAX_PATH MAX_PATH
-    #else
-        #define _MAX_PATH 128
-    #endif
+#define _MAX_PATH 128
 #endif
 
 static const int localDebugTracing = false;
