@@ -47,7 +47,7 @@
 // int crypto_kem_dec_Frodo640     (unsigned char *ss, const unsigned char *ct, const unsigned char *sk);
 
 
-#include "my_utilslib.h"
+#include "../ibrand_common/my_utilslib.h"
 #include "IB_SymmetricEncryption.h"
 
 
@@ -80,8 +80,6 @@ typedef enum tagSERVICE_STATE
 
 
 //#define KAT_KNOWN_ANSWER_TESTING
-
-static const int localDebugTracing = false;
 
 /////////////////////////////////////
 // Forward declarations
@@ -201,8 +199,7 @@ size_t ReceiveDataHandler_login(char *buffer, size_t size, size_t nmemb, void *u
 
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
     {
-        app_tracef("INFO: Login: %u bytes received",
-                   inboundData.cbData);
+        app_tracef("INFO: Login: %u bytes received", inboundData.cbData);
         app_trace_hexall("DEBUG: ReceiveDataHandler_login:", (unsigned char *)inboundData.pData, inboundData.cbData);
     }
 
@@ -235,7 +232,6 @@ size_t ReceiveDataHandler_login(char *buffer, size_t size, size_t nmemb, void *u
     // Job done
     return inboundData.cbData;  // Number of bytes processed
 }
-
 
 //-----------------------------------------------------------------------
 // ReceiveDataHandler_rng
@@ -602,7 +598,7 @@ static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
 }
 
 
-static void SetPreferredRngEngine(tIB_INSTANCEDATA *pIBRand, char *szPreferredRngEngine)
+static void SetPreferredRngEngine(tIB_INSTANCEDATA *pIBRand, const char *szPreferredRngEngine)
 {
     // Force use of non-IronBridge OpenSSL RNG engine
     // Anything except ourselves.
@@ -710,7 +706,7 @@ int authenticateUser(tIB_INSTANCEDATA *pIBRand)
     curlResultCodeB = curl_easy_getinfo(pIBRand->hCurl, CURLINFO_HTTP_CONNECTCODE, &resultCode);
     if (!curlResultCodeB && resultCode)
     {
-        app_tracef("ERROR: authenticateUser: ResultCode=%03ld \"%s\"", resultCode, curl_easy_strerror(resultCode));
+        app_tracef("ERROR: authenticateUser: ResultCode=%03ld \"%s\"", resultCode, curl_easy_strerror(curlResultCodeB));
         return 2220;
     }
 
@@ -741,7 +737,7 @@ int getRandomBytes(tIB_INSTANCEDATA *pIBRand)
 {
     CURLcode curlResultCode;
     char * pUrl;
-    char * szEndpoint;
+    const char * szEndpoint;
     char *pAuthHeader = NULL;
     #define MAXUINT_DIGITS 20 // 0x7FFF FFFF FFFF FFFF = 9,223,372,036,854,775,807 ==> 19 digits for signed, 20 for unsigned.
 
@@ -864,7 +860,7 @@ int getNewKemKeyPair(tIB_INSTANCEDATA *pIBRand)
 {
     CURLcode curlResultCode;
     char * pUrl;
-    char *szEndpoint = "reqkeypair";
+    const char *szEndpoint = "reqkeypair";
     char *pAuthHeader = NULL;
 
     pUrl = (char *)malloc(strlen(pIBRand->cfg.szBaseUrl)+1+strlen(szEndpoint)+1);
@@ -986,7 +982,7 @@ int getSecureRNGSharedSecret(tIB_INSTANCEDATA *pIBRand)
 {
     CURLcode curlResultCode;
     char * pUrl;
-    char *szEndpoint = "sharedsecret";
+    const char *szEndpoint = "sharedsecret";
     char *pAuthHeader = NULL;
 
     pUrl = (char *)malloc(strlen(pIBRand->cfg.szBaseUrl)+1+strlen(szEndpoint)+1);
@@ -1288,7 +1284,7 @@ static bool prepareSRNGBytes(tIB_INSTANCEDATA *pIBRand)
     if (strcmp(pIBRand->cfg.szStorageDataFormat,"RAW")!=0)
     {
         app_tracef("WARNING: Only RAW format is supported for SRNG. Discarding %u bytes.", pIBRand->ResultantData.cbData);
-        return false; // todo cleanup
+        return false;
     }
 
 #ifdef KAT_KNOWN_ANSWER_TESTING
@@ -1629,7 +1625,7 @@ int main(int argc, char * argv[])
     // =========================================================================
     // Create instance storage
     // =========================================================================
-    pIBRand = malloc(sizeof(tIB_INSTANCEDATA));
+    pIBRand = (tIB_INSTANCEDATA *)malloc(sizeof(tIB_INSTANCEDATA));
     if (!pIBRand)
     {
         app_tracef("[ibrand-service] FATAL: Failed to allocate memory for local storage. Aborting.");
@@ -1763,8 +1759,7 @@ int main(int argc, char * argv[])
     }
 
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: Service running");
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
-        app_tracef("INFO: Running");
+    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS)) app_tracef("INFO: Running");
 
     unsigned long numberOfAuthSuccesses =  0;
     unsigned long numberOfAuthFailures =  0;
@@ -1777,7 +1772,7 @@ int main(int argc, char * argv[])
     pIBRand->ResultantData.pData = NULL;
     pIBRand->ResultantData.cbData = 0;
 
-    if (localDebugTracing) app_tracef("DEBUG: Calling dataStore_Initialise");
+    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA)) app_tracef("DEBUG: Calling dataStore_Initialise");
     if (!dataStore_Initialise(pIBRand))
     {
         // Log the failure
@@ -1816,6 +1811,7 @@ int main(int argc, char * argv[])
         switch (currentState)
         {
             case STATE_START:
+            {
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: STATE_START");
 
                 pIBRand->ourKemSecretKey.pData        = NULL;
@@ -1842,8 +1838,9 @@ int main(int argc, char * argv[])
 
                 currentState = STATE_INITIALISECURL;
                 continue;
-
+            }
             case STATE_INITIALISECURL:
+            {
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: STATE_INITIALISECURL");
                 if (pIBRand->fCurlInitialised)
                 {
@@ -1864,8 +1861,9 @@ int main(int argc, char * argv[])
                     app_tracef("INFO: Curl Initialisation OK");
                 currentState = STATE_AUTHENTICATE;
                 break;
-
+            }
             case STATE_AUTHENTICATE:
+            {
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: STATE_AUTHENTICATE");
                 printProgressToSyslog = true;
                 if (pIBRand->fAuthenticated)
@@ -1891,8 +1889,9 @@ int main(int argc, char * argv[])
                 numberOfConsecutiveAuthFailures = 0;
                 currentState = STATE_GETNEWSHAREDSECRET;
                 break;
-
+            }
             case STATE_GETNEWKEMKEYPAIR:
+            {
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: STATE_GETNEWKEMKEYPAIR");
                 printProgressToSyslog = true;
                 // Request a new KEM secret key
@@ -1908,8 +1907,9 @@ int main(int argc, char * argv[])
                 }
                 currentState = STATE_DECRYPTKEMSECRETKEY;
                 break;
-
+            }
             case STATE_DECRYPTKEMSECRETKEY:
+            {
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: STATE_DECRYPTKEMSECRETKEY");
                 // Do we have an encryptedKemSecretKey ?
                 if (pIBRand->encryptedKemSecretKey.pData == NULL)
@@ -1935,8 +1935,9 @@ int main(int argc, char * argv[])
                 numberOfConsecutiveAuthFailures = 0;
                 currentState = STATE_GETNEWSHAREDSECRET;
                 break;
-
+            }
             case STATE_GETNEWSHAREDSECRET:
+            {
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: STATE_GETNEWSHAREDSECRET");
                 printProgressToSyslog = true;
                 // Get SharedSecret
@@ -1959,8 +1960,9 @@ int main(int argc, char * argv[])
                     app_tracef("INFO: Encapsulated SharedSecret OK");
                 currentState = STATE_DECAPSULATESHAREDSECRET;
                 break;
-
+            }
             case STATE_DECAPSULATESHAREDSECRET:
+            {
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: STATE_DECAPSULATESHAREDSECRET");
                 // Do we have an encapsulatedSharedSecret ?
                 if (pIBRand->encapsulatedSharedSecret.pData == NULL)
@@ -1986,8 +1988,9 @@ int main(int argc, char * argv[])
                 numberOfConsecutiveAuthFailures = 0;
                 currentState = STATE_CHECKIFRANDOMNESSISREQUIRED;
                 break;
-
+            }
             case STATE_CHECKIFRANDOMNESSISREQUIRED:
+            {
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: STATE_CHECKIFRANDOMNESSISREQUIRED");
                 // Hysteresis
                 currentWaterLevel = dataStore_GetCurrentWaterLevel(pIBRand);
@@ -2035,8 +2038,9 @@ int main(int argc, char * argv[])
                 printProgressToSyslog = false;
                 currentState = STATE_CHECKIFRANDOMNESSISREQUIRED;
                 break;
-
+            }
             case STATE_GETSOMERANDOMNESS:
+            {
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: STATE_GETSOMERANDOMNESS");
                 printProgressToSyslog = true;
                 printSleepMessageToSyslog = true;
@@ -2076,8 +2080,9 @@ int main(int argc, char * argv[])
                 }
                 currentState = STATE_STORERANDOMNESS;
                 break;
-
+            }
             case STATE_STORERANDOMNESS:
+            {
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: STATE_STORERANDOMNESS");
                 printProgressToSyslog = false;
                 numberOfRetreivalSuccesses++;
@@ -2103,8 +2108,9 @@ int main(int argc, char * argv[])
 
                 currentState = STATE_CHECKIFRANDOMNESSISREQUIRED;
                 break;
-
+            }
             case STATE_DESTROYEXISTINGSHAREDSECRET:
+            {
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: STATE_DESTROYEXISTINGSHAREDSECRET");
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
                     app_tracef("INFO: Destroy SharedSecret, forcing renewal");
@@ -2128,11 +2134,13 @@ int main(int argc, char * argv[])
                 }
                 currentState = STATE_GETNEWSHAREDSECRET;
                 break;
-
+            }
             case STATE_SHUTDOWN:
+            {
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: STATE_SHUTDOWN");
                 continueInMainLoop = false;
                 break;
+            }
         }
     }
 

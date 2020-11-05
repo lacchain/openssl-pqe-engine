@@ -12,14 +12,11 @@
 #ifndef _INCLUDE_LIBIBRAND_CONFIG_H_
 #define _INCLUDE_LIBIBRAND_CONFIG_H_
 
+#include <stdlib.h>
 #include <stdint.h>
 
 #ifndef _MAX_PATH
-    #ifdef MAX_PATH
-        #define _MAX_PATH MAX_PATH
-    #else
-        #define _MAX_PATH 128
-    #endif
+#define _MAX_PATH 128
 #endif
 
 #define DBGBIT_STATUS   0

@@ -24,8 +24,8 @@
 #include <syslog.h>
 #include <libgen.h>
 
-#include "my_utils.h"
-#include "my_logging.h"
+#include "../ibrand_common/my_utils.h"
+#include "../ibrand_common/my_logging.h"
 
 //#define MK_WIN_EMUL
 #define OUTPUT_TO_CONSOLE_ENABLED
@@ -38,12 +38,9 @@
 #endif
 
 #ifndef _MAX_PATH
-    #ifdef MAX_PATH
-        #define _MAX_PATH MAX_PATH
-    #else
-        #define _MAX_PATH 128
-    #endif
+#define _MAX_PATH 128
 #endif
+
 
 
 typedef struct tagAPPTRACECONFIG

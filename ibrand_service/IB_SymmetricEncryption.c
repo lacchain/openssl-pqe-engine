@@ -6,7 +6,7 @@
 #include <openssl/evp.h>
 #include <openssl/aes.h>
 
-#include <my_utilslib.h>
+#include "../ibrand_common/my_utilslib.h"
 
 #include "RFC2898DeriveBytes.h"
 #include "IB_SymmetricEncryption.h"

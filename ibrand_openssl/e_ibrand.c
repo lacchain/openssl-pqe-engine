@@ -131,25 +131,29 @@ typedef struct tagENGINESTATE
   int status;
 } tENGINESTATE;
 
-static int IBRandEngineStateInit(tENGINESTATE *engine_state)
+static int IBRandEngineStateInit(tENGINESTATE *pEngineState)
 {
   app_trace_set_destination(false, false, true); // (toConsole, toLogFile; toSyslog)
   app_trace_openlog(NULL, LOG_PID, LOG_USER );
 
-  memset(engine_state, 0, sizeof(*engine_state));
+  memset(pEngineState, 0, sizeof(*pEngineState));
 #ifdef USE_RINGBUFFER
-  RingBufferInit(&engine_state->ring_buffer);
+  RingBufferInit(&pEngineState->ring_buffer);
 #endif
-  engine_state->status = IBRand_init(&engine_state->trng_context);
-  if (!engine_state->status)
+  pEngineState->status = IBRand_init(&pEngineState->trng_context);
+  if (!pEngineState->status)
   {
-    app_tracef("ERROR: IBRand_init initialization error: %s", engine_state->trng_context.message ? engine_state->trng_context.message : "unknown");
+    app_tracef("ERROR: IBRand_init initialization error: %s", pEngineState->trng_context.message ? pEngineState->trng_context.message : "unknown");
   }
 
-  return engine_state->status;
+  return pEngineState->status;
 }
 
-static tENGINESTATE engine_state = {0};
+#ifdef USE_RINGBUFFER
+static tENGINESTATE engine_state = {{NULL, {0}, 0, 0},{{0},NULL,NULL},0};
+#else
+static tENGINESTATE engine_state = {{NULL, {0}, 0, 0},0};
+#endif
 
 
 static int GetRngMaterial(unsigned char *buf, int num)

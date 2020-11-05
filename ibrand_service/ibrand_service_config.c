@@ -62,13 +62,14 @@ int ValidateSettings(tIB_CONFIGDATA *pIBConfig)
     return 0;
 }
 
+static int localDebugTracing = false;
+
 ////////////////////////////////////////////////////////////////////////////////
 // Config Top Level Functions
 ////////////////////////////////////////////////////////////////////////////////
 static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfig)
 {
     JSONObject *json2;
-    const int localDebugTracing = false;
 
     json2 = my_parseJSON(szJsonConfig);
     if (!json2)
@@ -348,7 +349,6 @@ void PrintConfig(tIB_CONFIGDATA *pIBConfig)
 static bool __ParseJsonOOBData(const char *szJsonString, tIB_OOBDATA *pOobData)
 {
     JSONObject *json2;
-    const int localDebugTracing = false;
 
     json2 = my_parseJSON(szJsonString);
     if (!json2)
@@ -377,7 +377,7 @@ static bool __ParseJsonOOBData(const char *szJsonString, tIB_OOBDATA *pOobData)
                 // json2->pairs[ii].value->stringValue is a malloc'd zstring which will be freed later in my_freeJSONFromMemory(), so we must duplicate here
                 // Essentially, a strdup...
                 size_t buffer_size = strlen(json2->pairs[ii].value->stringValue);
-                pOobData->hexData.pData = malloc(buffer_size);
+                pOobData->hexData.pData = (char *)malloc(buffer_size);
                 if (!pOobData->hexData.pData)
                 {
                     app_tracef("ERROR: Failed to allocate %u bytes for pOobData->hexData", buffer_size);
@@ -391,7 +391,7 @@ static bool __ParseJsonOOBData(const char *szJsonString, tIB_OOBDATA *pOobData)
                 // json2->pairs[ii].value->stringValue is a malloc'd zstring which will be freed later in my_freeJSONFromMemory(), so we must duplicate here
                 // Essentially, a strdup...
                 size_t buffer_size = strlen(json2->pairs[ii].value->stringValue);
-                pOobData->expiryDate.pData = malloc(buffer_size);
+                pOobData->expiryDate.pData = (char *)malloc(buffer_size);
                 if (!pOobData->expiryDate.pData)
                 {
                     app_tracef("ERROR: Failed to allocate %u bytes for pOobData->expiryDate", buffer_size);
@@ -423,7 +423,7 @@ int GetBinaryDataFromOOBFile(char *szSrcFilename, tLSTRING *pDestBinaryData)
         return rc;
     }
     // We need a zstring for the json parser
-    char *szJsonString = malloc(jsonData.cbData+1);
+    char *szJsonString = (char *)malloc(jsonData.cbData+1);
     if (!szJsonString)
     {
         app_tracef("ERROR: Failed to allocate %u bytes for szJsonString", jsonData.cbData+1);
