@@ -1,0 +1,45 @@
+# Text editors and IDES
+.idea
+tags
+*.swp
+*~
+.tags*
+
+# CMake
+/build*
+
+# MSVC
+.vs
+/out*
+
+# CLion
+/cmake-build*
+
+# Misc
+__pycache__
+.pytest_cache
+.cache
+.CMake/a.out
+
+# CMake generated artifacts
+CMakeCache.txt
+CMakeDoxyfile.in
+CMakeDoxygenDefaults.cmake
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+include/
+Makefile
+
+# Build artifacts
+tests/example_kem
+tests/example_sig
+tests/kat_kem
+tests/kat_sig
+tests/speed_kem
+tests/speed_sig
+tests/test_aes
+tests/test_hash
+tests/test_kem
+tests/test_sha3
+tests/test_sig
