@@ -28,7 +28,7 @@ typedef struct tagIB_INSTANCEDATA
     int           fRawOutput;
     CURL *        hCurl;
     char *        pRealToken;
-    tLSTRING      Token;
+    tLSTRING      authToken;
     tLSTRING      ResultantData;
     int           encryptedRng_RcvdSegments;
 
