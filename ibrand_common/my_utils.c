@@ -94,6 +94,47 @@ char *my_strstri(char *pBuffer, char *pSearchStr)
   return NULL;
 }
 
+int my_stricmpL(char const *a, char const *b)
+{
+  while (*a)
+  {
+    int d = tolower(*a) - tolower(*b);
+    if (d)
+    {
+        return d;
+    }
+    a++;
+    b++;
+  }
+  return 0;
+}
+
+int my_stricmpU(char const *a, char const *b)
+{
+  while (*a)
+  {
+    int d = toupper(*a) - toupper(*b);
+    if (d)
+    {
+        return d;
+    }
+    a++;
+    b++;
+  }
+  return 0;
+}
+
+int my_stricmp(char const *a, char const *b)
+{
+    // https://stackoverflow.com/questions/5820810/case-insensitive-string-comp-in-c
+    // Comparing as lower or as upper case:
+    //    Both my_stricmpL and my_stricmpU will return 0 with my_stricmpL("A", "a") and my_stricmpU("A", "a").
+    //    But my_stricmpL("A", "_") and my_stricmpU("A", "_") can return different signed results.
+    //    This is because '_' is often between the upper and lower case letters, as it is in ASCII.
+    // We'll arbitrarily choose lowercase.
+    return my_stricmpL(a, b);
+}
+
 void my_translateCharactersInString(char *szString,char *szOldChars,char *szNewChars)
 {
   unsigned int i;
