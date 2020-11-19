@@ -65,8 +65,8 @@ Files:     CMakeLists.txt
            ibrand_openssl/makefile
            ibrand_service/.gitignore
            ibrand_service/CMakeLists.txt
-           ibrand_service/IB_SymmetricEncryption.c
-           ibrand_service/IB_SymmetricEncryption.h
+           ibrand_service/ibrand_service_aes.c
+           ibrand_service/ibrand_service_aes.h
            ibrand_service/RFC2898DeriveBytes.c
            ibrand_service/RFC2898DeriveBytes.h
            ibrand_service/makefile
