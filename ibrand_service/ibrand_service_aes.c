@@ -288,7 +288,7 @@ int AESDecryptPackage(tIB_INSTANCEDATA *pIBRand,
         cbSignificantData = pAesPackageHeader->packageLength;
     }
 
-    if (cbSignificantData != expectedSize)
+    if ((expectedSize > 0) && (cbSignificantData != expectedSize))
     {
         app_tracef("WARNING: Size of significant data (%u) is not as expected (%u) (size of inbound data was %u)", cbSignificantData, expectedSize, cbEncryptedData);
     }

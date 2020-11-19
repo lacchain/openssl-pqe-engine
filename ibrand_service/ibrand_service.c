@@ -102,7 +102,7 @@ static void KatDataAppend(tLSTRING *pDest, int destOffset, int numBytesToAppend)
 static bool KatDataVerify(tLSTRING *pActualData, size_t expectedLength, char *szTitle)
 {
     tLSTRING expectedData;
-    expectedData.pData = malloc(expectedLength);
+    expectedData.pData = (char *)malloc(expectedLength);
     expectedData.cbData = 0;
     KatDataAppend(&expectedData, 0, expectedLength);
     if (pActualData->cbData != expectedLength)
@@ -433,7 +433,7 @@ static int DecryptAndStoreKemSecretKey(tIB_INSTANCEDATA *pIBRand)
     }
 
     // Persist new KEM secretKey to file
-    errcode = WriteToFile(pIBRand->cfg.ourKemSecretKeyFilename, &(pIBRand->ourKemSecretKey), true);
+    errcode = WriteToFile(pIBRand->cfg.ourKemSecretKeyFilename, &pIBRand->ourKemSecretKey, true);
     if (errcode != 0)
     {
         app_tracef("ERROR: Error %d - Failed to save KEM secret key to file \"%s\"", errcode, pIBRand->cfg.ourKemSecretKeyFilename);
@@ -1135,7 +1135,7 @@ static bool prepareRNGBytes(tIB_INSTANCEDATA *pIBRand)
             // Alloc a new, smaller buffer, copy the data in, and free up the original buffer.
             // Not the most efficient, but simple - for now.
             pIBRand->ResultantData.cbData = cbOriginalData - 2;
-            pIBRand->ResultantData.pData = malloc(pIBRand->ResultantData.cbData);
+            pIBRand->ResultantData.pData = (char *)malloc(pIBRand->ResultantData.cbData);
             if (!pIBRand->ResultantData.pData)
             {
                 app_tracef("WARNING: Failed to clean Base64 data. Discarding %u bytes.", pIBRand->ResultantData.cbData);
