@@ -67,6 +67,8 @@ Files:     CMakeLists.txt
            ibrand_service/CMakeLists.txt
            ibrand_service/ibrand_service_aes.c
            ibrand_service/ibrand_service_aes.h
+           ibrand_service/ibrand_service_kem.c
+           ibrand_service/ibrand_service_kem.h
            ibrand_service/RFC2898DeriveBytes.c
            ibrand_service/RFC2898DeriveBytes.h
            ibrand_service/makefile

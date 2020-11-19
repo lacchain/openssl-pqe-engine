@@ -28,7 +28,7 @@
 #include <curl/curl.h>
 #include <openssl/aes.h>
 
-#include "../PQCrypto-LWEKE/src/api_frodo640.h"
+#include "ibrand_service_kem.h"
 
 #include "../ibrand_common/my_utilslib.h"
 
@@ -36,16 +36,6 @@
 #include "ibrand_service_utils.h"
 #include "ibrand_service_config.h"
 #include "ibrand_service_datastore.h"
-
-#define SYSTEM_NAME    "FrodoKEM-640"
-#define crypto_kem_keypair            crypto_kem_keypair_Frodo640
-#define crypto_kem_enc                crypto_kem_enc_Frodo640
-#define crypto_kem_dec                crypto_kem_dec_Frodo640
-
-// int crypto_kem_keypair_Frodo640 (unsigned char *pk, unsigned char *sk);
-// int crypto_kem_enc_Frodo640     (unsigned char *ct, unsigned char *ss, const unsigned char *pk);
-// int crypto_kem_dec_Frodo640     (unsigned char *ss, const unsigned char *ct, const unsigned char *sk);
-
 
 #include "../ibrand_common/my_utilslib.h"
 #include "ibrand_service_aes.h"
