@@ -62,8 +62,8 @@
 #ifndef UNUSED_PARAM
 #define UNUSED_PARAM(x) (void)(x)
 #endif
-#ifndef UNUSED
-#define UNUSED(x) (void)(x)
+#ifndef UNUSED_ITEM
+#define UNUSED_ITEM(x) (void)(x)
 #endif
 #ifndef NOTUSED
 #define NOTUSED(x) (void)(x)
@@ -110,6 +110,7 @@ extern void   my_itoa(int data,char *dst,char non);
 extern int    my_abs(int x);
 extern char * my_strlcpy( char *strDest, const char *strSource, size_t count );
 extern char * my_strstri(char *pBuffer, char *pSearchStr);
+extern int    my_stricmp(char const *a, char const *b);
 extern void   my_translateCharactersInString(char *szString,char *szOldChars,char *szNewChars);
 extern BOOL   my_isInSetOfChars(int ch, char *szSetOfChars);
 extern char * my_trimTrailing(char *szStr, char *szSetOfChars);
