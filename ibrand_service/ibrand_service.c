@@ -548,27 +548,42 @@ static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
 }
 
 
-static void SetPreferredRngEngine(tIB_INSTANCEDATA *pIBRand, const char *szPreferredRngEngine)
+static bool SetPreferredRngEngine(tIB_INSTANCEDATA *pIBRand)
 {
     // Force use of non-IronBridge OpenSSL RNG engine
-    // Anything except ourselves.
+    // Anything except ourselves (ibrand).
+    CURLcode ret;
+    const char *szPreferredRngEngine = "rdrand"; // options: NULL, "rdrand", "dynamic", "md_rand"
+
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
     {
-        app_tracef("INFO: Set preferred OpenSSL RNG engine: \"%s\"", szPreferredRngEngine);
+        app_tracef("INFO: Set preferred OpenSSL RNG engine: %s", szPreferredRngEngine?szPreferredRngEngine:"NULL");
     }
 
-    // Ideally:
-    //     curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, NULL);
-    // Other options are...
-    //     curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, "dynamic");
-    //     curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, "rdrand");
+    // https://wiki.openssl.org/index.php/Random_Numbers#Generators says...
+    // By default, OpenSSL uses the md_rand generator. md_rand uses the MD5 hash as the pseudorandom function.
+    // The source code is located in crypto/rand/md_rand.c.
 
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, szPreferredRngEngine);
+    ret = curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, szPreferredRngEngine);
+    if (ret != CURLE_OK)
+    {
+        // e.g. CURLE_SSL_ENGINE_INITFAILED (66) : Initiating the SSL Engine failed.
+        //      CURLE_SSL_ENGINE_NOTFOUND   (53) : The specified crypto engine wasn't found.
+        app_tracef("ERROR: CURLOPT_SSLENGINE (%s) failed with ret=%d", szPreferredRngEngine?szPreferredRngEngine:"NULL",ret);
+        return false;
+    }
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CURL))
     {
         app_tracef("INFO: CURLOPT_SSLENGINE_DEFAULT");
     }
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE_DEFAULT, 1L);
+    ret = curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE_DEFAULT, 1L);
+    if (ret != CURLE_OK)
+    {
+        // e.g. CURLE_SSL_ENGINE_SETFAILED  (54) : Failed setting the selected SSL crypto engine as default!
+        app_tracef("ERROR: CURLOPT_SSLENGINE_DEFAULT (%s) failed with ret=%d", szPreferredRngEngine?szPreferredRngEngine:"NULL",ret);
+        return false;
+    }
+    return true;
 }
 
 //-----------------------------------------------------------------------
@@ -595,7 +610,11 @@ int authenticateUser(tIB_INSTANCEDATA *pIBRand)
     }
 
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pIBRand->cfg.szAuthUrl);
-    SetPreferredRngEngine(pIBRand, "rdrand");
+    if (!SetPreferredRngEngine(pIBRand))
+    {
+        app_tracef("ERROR: Failed to set preferred openssl RNG engine for SSL connection");
+        return 2212;
+    }
 
     // Pass our list of custom made headers
     struct curl_slist *headers = NULL;
@@ -701,7 +720,11 @@ int getRandomBytes(tIB_INSTANCEDATA *pIBRand)
         return 22230;
     }
     sprintf(pUrl,"%s/%s/%u", pIBRand->cfg.szBaseUrl, szEndpoint, pIBRand->cfg.bytesPerRequest);
-    SetPreferredRngEngine(pIBRand, "rdrand");
+    if (!SetPreferredRngEngine(pIBRand))
+    {
+        app_tracef("ERROR: Failed to set preferred openssl RNG engine for SSL connection");
+        return 22233;
+    }
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPGET, TRUE );
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pUrl);
 
@@ -831,7 +854,11 @@ int getNewKemKeyPair(tIB_INSTANCEDATA *pIBRand)
         return 2240;
     }
     sprintf(pUrl,"%s/%s", pIBRand->cfg.szBaseUrl, szEndpoint);
-    SetPreferredRngEngine(pIBRand, "rdrand");
+    if (!SetPreferredRngEngine(pIBRand))
+    {
+        app_tracef("ERROR: Failed to set preferred openssl RNG engine for SSL connection");
+        return 22401;
+    }
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPGET, TRUE );
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pUrl);
 
@@ -963,7 +990,11 @@ int getSecureRNGSharedSecret(tIB_INSTANCEDATA *pIBRand)
         return 2240;
     }
     sprintf(pUrl,"%s/%s", pIBRand->cfg.szBaseUrl, szEndpoint);
-    SetPreferredRngEngine(pIBRand, "rdrand");
+    if (!SetPreferredRngEngine(pIBRand))
+    {
+        app_tracef("ERROR: Failed to set preferred openssl RNG engine for SSL connection");
+        return 22402;
+    }
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPGET, TRUE );
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pUrl);
 
