@@ -48,7 +48,7 @@
 
 
 #include "../ibrand_common/my_utilslib.h"
-#include "IB_SymmetricEncryption.h"
+#include "ibrand_service_aes.h"
 
 
 #if LIBCURL_VERSION_NUM < 0x070c03

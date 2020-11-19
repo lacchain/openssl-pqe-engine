@@ -1,9 +1,9 @@
 
-// IB_SymmetricEncryption.h
+// ibrand_service_aes.h
 // Password-Based Key Derivation Function: PBKDF2
 
-#ifndef _INCLUDE_IB_SYMMETRICENCRYPTION_H_
-#define _INCLUDE_IB_SYMMETRICENCRYPTION_H_
+#ifndef _INCLUDE_IBRAND_SERVICE_AES_H_
+#define _INCLUDE_IBRAND_SERVICE_AES_H_
 
 #include <stdint.h> // For uint8_t etc
 
@@ -27,4 +27,4 @@ extern int AESDecryptPackage(tIB_INSTANCEDATA *pIBRand,
 
 extern int testSymmetricEncryption(void);
 
-#endif // _INCLUDE_IB_SYMMETRICENCRYPTION_H_
+#endif // _INCLUDE_IBRAND_SERVICE_AES_H_
