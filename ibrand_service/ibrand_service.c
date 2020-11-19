@@ -397,6 +397,15 @@ size_t ReceiveDataHandler_SharedSecret(char *buffer, size_t size, size_t nmemb, 
     return inboundData.cbData; // Number of bytes processed
 }
 
+#if (WHICH_PQCRYPTO == PQCRYPTO_LWEKE)
+// CRYPTO_CIPHERTEXTBYTES
+// CRYPTO_SECRETKEYBYTES
+// CRYPTO_PUBLICKEYBYTES
+// CRYPTO_BYTES
+#define LWEKE_CRYPTO_BYTES (CRYPTO_BYTES)
+#else
+#define LWEKE_CRYPTO_BYTES (0)  // TODO
+#endif
 
 //-----------------------------------------------------------------------
 // DecryptAndStoreKemSecretKey
@@ -411,7 +420,11 @@ static int DecryptAndStoreKemSecretKey(tIB_INSTANCEDATA *pIBRand)
     errcode = AESDecryptPackage(pIBRand,
                                 &pIBRand->encryptedKemSecretKey, // Source
                                 &pIBRand->ourKemSecretKey,       // Destination
+#if (WHICH_PQCRYPTO == PQCRYPTO_LWEKE)
                                 CRYPTO_CIPHERTEXTBYTES,          // expectedSize
+#else
+                                0,                              // expectedSize not specified (TODO)
+#endif
                                 true);                           // hasHeader
     if (errcode)
     {
@@ -454,12 +467,13 @@ static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
         app_tracef("ERROR: KEM secret key error (size=%d)", pIBRand->ourKemSecretKey.cbData);
         return 2201;
     }
+#if (WHICH_PQCRYPTO == PQCRYPTO_LWEKE)
     if (pIBRand->ourKemSecretKey.cbData != CRYPTO_SECRETKEYBYTES)
     {
         app_tracef("WARNING: Size of KEM secret key (%d) is not as expected (%d)", pIBRand->ourKemSecretKey.cbData, CRYPTO_SECRETKEYBYTES);
         //return 2202;
     }
-
+#endif
     // Check that we have the encapsulated key
     if (!pIBRand->encapsulatedSharedSecret.pData || pIBRand->encapsulatedSharedSecret.cbData == 0)
     {
@@ -477,9 +491,10 @@ static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
     //app_trace_hexall("DEBUG: p:", p, n);
 
     // base64_decode the encapsulate key
-    size_t decodeSize = 0;
-    unsigned char *rawEncapsulatedSharedSecret = base64_decode((char *)p, n, (size_t *)&(decodeSize));
-    if (!rawEncapsulatedSharedSecret)
+    tLSTRING rawEncapsulatedSharedSecret;
+    rawEncapsulatedSharedSecret.cbData = 0;
+    rawEncapsulatedSharedSecret.pData = (char *)base64_decode((char *)p, n, &rawEncapsulatedSharedSecret.cbData);
+    if (!rawEncapsulatedSharedSecret.pData)
     {
        app_tracef("WARNING: Failed to decode Base64 encapsulatedSharedSecret");
        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
@@ -489,33 +504,40 @@ static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
        return 2204;
     }
 
-    if (decodeSize != CRYPTO_CIPHERTEXTBYTES)
+#if (WHICH_PQCRYPTO == PQCRYPTO_LWEKE)
+    if (rawEncapsulatedSharedSecret.cbData != CRYPTO_CIPHERTEXTBYTES)
     {
-        app_tracef("ERROR: Size of decoded encapsulated key (%u) is not as expected (%u)", decodeSize, CRYPTO_CIPHERTEXTBYTES);
-        //app_trace_hexall("DEBUG: encapsulatedSharedSecret:", (char *)rawEncapsulatedSharedSecret, decodeSize);
+        app_tracef("ERROR: Size of decoded encapsulated key (%u) is not as expected (%u)", rawEncapsulatedSharedSecret.cbData, CRYPTO_CIPHERTEXTBYTES);
+        //app_trace_hexall("DEBUG: encapsulatedSharedSecret:", (char *)rawEncapsulatedSharedSecret.pData, rawEncapsulatedSharedSecret.cbData);
         return 2205;
     }
+#endif
 
     // Allocate a new buffer
-    pIBRand->symmetricSharedSecret.pData = (char *)malloc(CRYPTO_BYTES);
+    pIBRand->symmetricSharedSecret.pData = (char *)malloc(LWEKE_CRYPTO_BYTES);
     if (pIBRand->symmetricSharedSecret.pData == NULL)
     {
         app_tracef("ERROR: Failed to allocate storage for new SharedSecret");
         return 2206;
     }
     // Initialise with something recognisable, so that we can ensure that it has worked
-    memset(pIBRand->symmetricSharedSecret.pData, 0xAA, CRYPTO_BYTES);
+    memset(pIBRand->symmetricSharedSecret.pData, 0xAA, LWEKE_CRYPTO_BYTES);
 
     // Do the KEM decapsulation
-    crypto_kem_dec((unsigned char *)pIBRand->symmetricSharedSecret.pData,
-                   (unsigned char *)rawEncapsulatedSharedSecret,
-                   (unsigned char *)pIBRand->ourKemSecretKey.pData);
-
+    int rc = KemDecapsulateSharedSecret("FrodoKEM-640",
+                                        &pIBRand->symmetricSharedSecret,
+                                        &rawEncapsulatedSharedSecret,
+                                        &pIBRand->ourKemSecretKey);
+    if (rc != 0)
+    {
+        app_tracef("ERROR: Failed to decapsulate new SharedSecret");
+        return 2207;
+    }
     // We will set the size once we know it has completed
-    pIBRand->symmetricSharedSecret.cbData = CRYPTO_BYTES;
+    pIBRand->symmetricSharedSecret.cbData = LWEKE_CRYPTO_BYTES;
 
 #ifdef KAT_KNOWN_ANSWER_TESTING
-    size_t expectedLength = CRYPTO_BYTES; // Size of the SharedSecret
+    size_t expectedLength = LWEKE_CRYPTO_BYTES; // Size of the SharedSecret
     KatDataVerify(&(pIBRand->symmetricSharedSecret), expectedLength, "SharedSecret");
 #endif // KAT_KNOWN_ANSWER_TESTING
 
@@ -1521,7 +1543,11 @@ int main(int argc, char * argv[])
     app_tracef("===ibrand_service==================================================================================================");
 
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: ReadConfig \"%s\"", pIBRand->szConfigFilename);
+#if (WHICH_PQCRYPTO == PQCRYPTO_LWEKE)
     rc = ReadConfig(pIBRand->szConfigFilename, &(pIBRand->cfg), CRYPTO_SECRETKEYBYTES, CRYPTO_PUBLICKEYBYTES);
+#else
+    rc = ReadConfig(pIBRand->szConfigFilename, &(pIBRand->cfg), 0, 0);
+#endif
     if (rc != 0)
     {
         app_tracef("FATAL: Configuration error while processing \"%s\". Aborting. rc=%d", pIBRand->szConfigFilename, rc);
@@ -1672,7 +1698,11 @@ int main(int argc, char * argv[])
 
                 pIBRand->ourKemSecretKey.pData        = NULL;
                 pIBRand->ourKemSecretKey.cbData       = 0;
+#if (WHICH_PQCRYPTO == PQCRYPTO_LWEKE)
                 rc = ReadOurKemPrivateKey(pIBRand, CRYPTO_SECRETKEYBYTES);
+#else
+                rc = ReadOurKemPrivateKey(pIBRand, 0);
+#endif
                 if (rc != 0)
                 {
                     app_tracef("FATAL: Configuration error. Aborting. rc=%d", rc);
