@@ -8,7 +8,7 @@
 
 #include "my_utilslib.h"
 #include "RFC2898DeriveBytes.h"
-#include "IB_SymmetricEncryption.h"
+#include "ibrand_service_aes.h"
 
 int main(int argc, char *argv[])
 {
