@@ -7,14 +7,6 @@ RUN apt-get update && apt-get install --no-install-recommends -yV \
 
 WORKDIR /openssl-pqe-engine-0.1.0/
 
-COPY CMakeLists.txt                ./
-COPY ibrand_common                 ./ibrand_common/
-COPY ibrand_lib/CMakeLists.txt     ./ibrand_lib/
-COPY ibrand_lib/software           ./ibrand_lib/software/
-COPY ibrand_service                ./ibrand_service/
-COPY ibrand_openssl                ./ibrand_openssl/
-COPY PQCrypto-LWEKE/CMakeLists.txt ./PQCrypto-LWEKE/
-COPY PQCrypto-LWEKE/src            ./PQCrypto-LWEKE/src/
 COPY debian                        ./debian/
 
 ENV DEBIAN_FRONTEND noninteractive
@@ -23,6 +15,16 @@ ENV DEBCONF_NOWARNINGS yes
 
 RUN mk-build-deps -irt 'apt-get --no-install-recommends -yV' ./debian/control
 RUN rm -rf /var/lib/apt/lists/*
+
+COPY CMakeLists.txt                ./
+COPY ibrand_common                 ./ibrand_common/
+COPY ibrand_lib/CMakeLists.txt     ./ibrand_lib/
+COPY ibrand_lib/software           ./ibrand_lib/software/
+COPY ibrand_service                ./ibrand_service/
+COPY ibrand_openssl                ./ibrand_openssl/
+COPY PQCrypto-LWEKE/CMakeLists.txt ./PQCrypto-LWEKE/
+COPY PQCrypto-LWEKE/src            ./PQCrypto-LWEKE/src/
+
 RUN debuild -b -uc -us -nc
 
 FROM debian:testing-slim as runner
