@@ -1,4 +1,18 @@
-FROM debian:testing-slim as builder
+FROM debian:testing-slim as base
+
+RUN apt-get update && apt-get install --no-install-recommends -yV \
+    dpkg-dev \
+    wget \
+    ca-certificates
+
+RUN mkdir /debs/
+RUN wget --directory-prefix=/debs/ https://github.com/lacchain/liboqs-debian/releases/download/0.4.0/liboqs-dev_0.4.0_amd64.deb
+RUN wget --directory-prefix=/debs/ https://github.com/lacchain/liboqs-debian/releases/download/0.4.0/liboqs_0.4.0_amd64.deb
+RUN wget --directory-prefix=/debs/ https://github.com/lacchain/liboqs-debian/releases/download/0.4.0/SHA256SUMS
+RUN cd /debs/ && sha256sum --check --ignore-missing --status SHA256SUMS && dpkg-scanpackages . /dev/null | gzip -9c > Packages.gz
+RUN echo "deb [trusted=yes] file:/debs ./" >> /etc/apt/sources.list
+
+FROM base as builder
 
 RUN apt-get update && apt-get install --no-install-recommends -yV \
     build-essential \
@@ -27,7 +41,7 @@ COPY PQCrypto-LWEKE/src            ./PQCrypto-LWEKE/src/
 
 RUN debuild -b -uc -us -nc
 
-FROM debian:testing-slim as runner
+FROM base as runner
 
 ENV SERVER_HOST=ironbridgeapi.com
 
@@ -40,6 +54,7 @@ RUN apt-get update && apt-get install --no-install-recommends -yV \
     jq \
     wait-for-it \
     file \
+    liboqs \
  && rm -rf /var/lib/apt/lists/*
 
 COPY ./_sample_data/ibrand_openssl.cnf /usr/lib/ssl/
