@@ -63,7 +63,7 @@ ret=$?\n\
 if [ $ret -ne 0 ] ; then\n\
   exit 1\n\
 fi\n\
-curl --http1.1 --silent --fail --show-error --cert /certs/client.crt --key /certs/client.key --header "Content-Type: application/json" --data-raw "{\"clientCertName\":\"monarca.iadb.org\", \"clientCertSerialNumber\":\"$certSerial\", \"countryCode\":\"GB\", \"smsNumber\":\"10000000001\", \"email\":\"diegol@iadb.org\", \"keyparts\": \"2\", \"kemAlgorithm\":\"222\"}" https://$SERVER_HOST/api/setupclient -o /ironbridge_clientsetup_OOB.json\n\
+curl --http1.1 --silent --fail --show-error --cert /certs/client.crt --key /certs/client.key --header "Content-Type: application/json" --data-raw "{\"clientCertName\":\"monarca.iadb.org\", \"clientCertSerialNumber\":\"$certSerial\", \"countryCode\":\"GB\", \"channels\":[{\"type\":\"sms\", \"value\":\"10000000001\\"}, {\"type\":\"email\", \"value\":\"diegol@iadb.org\"}], \"kemAlgorithm\":\"222\"}" https://$SERVER_HOST/api/clientsetupdata -o /ironbridge_clientsetup_OOB.json\n\
 ret=$?\n\
 if [ $ret -ne 0 ] ; then\n\
   exit 1\n\
