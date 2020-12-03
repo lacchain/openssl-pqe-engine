@@ -59,16 +59,6 @@ int KemDecapsulateSharedSecret(char *kemAlgorithm,
                                const tLSTRING *pKemSecretKey)
 {
     // Do the KEM decapsulation
-#if (WHICH_PQCRYPTO == PQCRYPTO_LWEKE)
-    int retcode = 0;
-    unsigned char *ss;
-    const unsigned char *ct;
-    const unsigned char *sk;
-    ss = (unsigned char *)pSharedSecret->pData,
-    ct = (unsigned char *)pEncapsulatedSharedSecret->pData,
-    sk = (unsigned char *)pKemSecretKey->pData);
-    retcode = crypto_kem_dec(ss,ct,sk);
-#else
     OQS_KEM *pOQSInstance;
     bool isSupported = false;
     bool isEnabled = false;
@@ -113,7 +103,7 @@ int KemDecapsulateSharedSecret(char *kemAlgorithm,
         return 9993;
     }
     OQS_KEM_free(pOQSInstance);
-#endif
+
     return 0;
 }
 

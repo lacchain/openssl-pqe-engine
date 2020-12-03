@@ -39,28 +39,12 @@ $ docker run -v `pwd`/client.crt:/certs/client.pem -v `pwd`/client.key:/certs/cl
 
 (TODO)
 
-### Frodo KEM
+### LibOQS
 
-FrodoKEM: Learning with Errors Key Encapsulation.
+This project uses post-quantum/quantum-resistant crypto algorithms from the open source LibOQS implementation.
 
-FrodoKEM is a family of key-encapsulation mechanisms that are designed to be
-conservative yet practical post-quantum constructions whose security derives
-from cautious parameterizations of the well-studied learning with errors
-problem.
+Specifically, we use the shared library as built by the [liboqs-debian](https://github.com/lacchain/liboqs-debian/) project.
 
-We are using the PQCrypto-LWEKE reference implementation:
-    https://github.com/microsoft/PQCrypto-LWEKE
-Sources retrieved from...
-    https://github.com/microsoft/PQCrypto-LWEKE/archive/master.zip
-Resulting in...
-    PQCrypto-LWEKE-master.zip	30,995,776	15/07/2020 17:42	-a--
-
-We could also use...
-    git clone https://github.com/microsoft/PQCrypto-LWEKE.git
-
-Modifications: 
- * Makefile modified to be less noisy (no news is good news - tell me if things go wrong, not if things go right)
- * Makefile modified ti highlight option choices - primarily use of OpenSSL for the AES calls.
 
 ## Tips, Traps and Gotchas
 

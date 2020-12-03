@@ -36,8 +36,6 @@ COPY ibrand_lib/CMakeLists.txt     ./ibrand_lib/
 COPY ibrand_lib/software           ./ibrand_lib/software/
 COPY ibrand_service                ./ibrand_service/
 COPY ibrand_openssl                ./ibrand_openssl/
-COPY PQCrypto-LWEKE/CMakeLists.txt ./PQCrypto-LWEKE/
-COPY PQCrypto-LWEKE/src            ./PQCrypto-LWEKE/src/
 
 RUN debuild -b -uc -us -nc
 
