@@ -553,7 +553,7 @@ static bool SetPreferredRngEngine(tIB_INSTANCEDATA *pIBRand)
     // Force use of non-IronBridge OpenSSL RNG engine
     // Anything except ourselves (ibrand).
     CURLcode ret;
-    const char *szPreferredRngEngine = "rdrand"; // options: NULL, "rdrand", "dynamic", "md_rand"
+    const char *szPreferredRngEngine = NULL; // options: NULL, "rdrand", "dynamic", "md_rand"
 
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
     {
