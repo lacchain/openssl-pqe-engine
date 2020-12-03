@@ -313,7 +313,7 @@ int AESDecryptPackage(tIB_INSTANCEDATA *pIBRand,
                               &cbDecryptedData);                               // pcbDecryptedData
     if (errcode)
     {
-        app_tracef("ERROR: AESDecryptBytes failed with rc=%d\n", errcode);
+        app_tracef("ERROR: AESDecryptBytes failed with rc=%d", errcode);
         return errcode;
     }
     pDestBuffer->pData = (char *)pDecryptedData;

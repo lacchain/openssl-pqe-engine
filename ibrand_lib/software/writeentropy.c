@@ -27,7 +27,7 @@ static bool readNumberFromFile(char *fileName, uint32_t *pValue)
     FILE *file = fopen(fileName, "r");
     if (file == NULL)
     {
-        app_tracef("[ibrand_lib] FATAL: Unable to open %s\n", fileName);
+        app_tracef("[ibrand_lib] FATAL: Unable to open %s", fileName);
         return false;
     }
 
@@ -53,27 +53,27 @@ bool inmWriteEntropyStart(uint32_t bufLen, bool debug)
     pfd.fd = open("/dev/random", O_RDWR);
     if (pfd.fd < 0)
     {
-        app_tracef("[ibrand_lib] FATAL: Unable to open /dev/random\n");
+        app_tracef("[ibrand_lib] FATAL: Unable to open /dev/random");
         return false;
     }
 
     inmPoolInfo = calloc(1, sizeof(struct rand_pool_info) + bufLen);
     if (inmPoolInfo == NULL)
     {
-        app_tracef("[ibrand_lib] FATAL: Unable to allocate memory\n");
+        app_tracef("[ibrand_lib] FATAL: Unable to allocate memory");
         return false;
     }
 
     rc = readNumberFromFile(FILL_PROC_FILENAME, &inmFillWatermark);
     if (!rc)
     {
-        app_tracef("[ibrand_lib] FATAL: readNumberFromFile failed\n");
+        app_tracef("[ibrand_lib] FATAL: readNumberFromFile failed");
         return false;
     }
 
     if (debug)
     {
-        app_tracef("Entropy pool size:%u, fill watermark:%u\n", readNumberFromFile(SIZE_PROC_FILENAME), inmFillWatermark);
+        app_tracef("Entropy pool size:%u, fill watermark:%u", readNumberFromFile(SIZE_PROC_FILENAME), inmFillWatermark);
     }
     return true;
 }
@@ -103,7 +103,7 @@ void inmWriteEntropyToPool(uint8_t *bytes, uint32_t length, uint32_t entropy)
     inmPoolInfo->entropy_count = entropy;
     inmPoolInfo->buf_size = length;
     memcpy(inmPoolInfo->buf, bytes, length);
-    //app_tracef("Writing %u bytes with %u bits of entropy to /dev/random\n", length, entropy);
+    //app_tracef("Writing %u bytes with %u bits of entropy to /dev/random", length, entropy);
     ioctl(pfd.fd, RNDADDENTROPY, inmPoolInfo);
 }
 

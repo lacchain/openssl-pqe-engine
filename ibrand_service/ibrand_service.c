@@ -1361,8 +1361,8 @@ int DoSimpleAuthentication(tIB_INSTANCEDATA *pIBRand)
         app_tracef("INFO: pRealToken = [%s]", pIBRand->pRealToken);
     }
 
-    //app_tracef("[ibrand-service] DEBUG: authToken.pData=[%s]\n", pIBRand->authToken.pData);
-    //app_tracef("[ibrand-service] DEBUG: pRealToken=[%s]\n", pIBRand->pRealToken);
+    //app_tracef("[ibrand-service] DEBUG: authToken.pData=[%s]", pIBRand->authToken.pData);
+    //app_tracef("[ibrand-service] DEBUG: pRealToken=[%s]", pIBRand->pRealToken);
 
     pIBRand->fAuthenticated = TRUE;
     return 0;

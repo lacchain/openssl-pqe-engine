@@ -42,7 +42,7 @@ tIB_INSTANCEDATA *cfgInitConfig (void)
     }
     if (strlen(pIBRand->szConfigFilename) == 0)
     {
-        app_tracef("[ibrand_lib] FATAL: Configuration not specified, neither on commandline nor via an environment variable.\n");
+        app_tracef("[ibrand_lib] FATAL: Configuration not specified, neither on commandline nor via an environment variable.");
         free(pIBRand);
         return NULL;
     }
@@ -80,14 +80,14 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_INSTANCEDATA *pIBRan
     json2 = my_parseJSON(szJsonConfig);
     if (!json2)
     {
-        app_tracef("ERROR: Failed to parse JSON string\n");
+        app_tracef("ERROR: Failed to parse JSON string");
         return false;
     }
 
     for (int ii=0; ii<json2->count; ii++)
     {
         if (localDebugTracing)
-            app_tracef("DEBUG: Found json item[%d] %s=%s\n", ii, json2->pairs[ii].key, (json2->pairs[ii].type == JSON_STRING)?(json2->pairs[ii].value->stringValue):"[JSON object]");
+            app_tracef("DEBUG: Found json item[%d] %s=%s", ii, json2->pairs[ii].key, (json2->pairs[ii].type == JSON_STRING)?(json2->pairs[ii].value->stringValue):"[JSON object]");
 
         if (strcmp(json2->pairs[ii].key,"AuthSettings") == 0 && json2->pairs[ii].type == JSON_OBJECT)
         {
@@ -96,7 +96,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_INSTANCEDATA *pIBRan
             for (int jj=0; jj<childJson->count; jj++)
             {
                 if (localDebugTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
+                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
                 {
@@ -111,7 +111,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_INSTANCEDATA *pIBRan
             for (int jj=0; jj<childJson->count; jj++)
             {
                 if (localDebugTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
+                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
                 {
@@ -126,7 +126,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_INSTANCEDATA *pIBRan
             for (int jj=0; jj<childJson->count; jj++)
             {
                 if (localDebugTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
+                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
                 {
@@ -182,7 +182,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_INSTANCEDATA *pIBRan
             for (int jj=0; jj<childJson->count; jj++)
             {
                 if (localDebugTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
+                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
                 {
@@ -238,14 +238,14 @@ char *cfgGetValue(char *szEnvVariableWithFilename, char *szKey)
     szConfigfilePath = getenv(szEnvVariableWithFilename);
     if (!szConfigfilePath)
     {
-        app_tracef("ERROR: Cannot find environment variable: %s\n", szEnvVariableWithFilename);
+        app_tracef("ERROR: Cannot find environment variable: %s", szEnvVariableWithFilename);
         return NULL;
     }
 
     fConfFile = fopen(szConfigfilePath, "rt");
     if (fConfFile == NULL)
     {
-        app_tracef("ERROR: Cannot open config file: %s\n", szConfigfilePath);
+        app_tracef("ERROR: Cannot open config file: %s", szConfigfilePath);
         return NULL;
     }
 
@@ -281,14 +281,14 @@ char *cfgGetValue(char *szEnvVariableWithFilename, char *szKey)
         strncpy(key, line, pos-line);
         strncpy(val, pos+1, line+len-offset-pos);
 
-        //app_tracef("INFO: Found Key:Value pair:  %s:%s\n", key, val);
+        //app_tracef("INFO: Found Key:Value pair:  %s:%s", key, val);
 
         if (strcmp(key, szKey) == 0)
         {
             szRetVal = malloc(strlen(val+1));
             if (!szRetVal)
             {
-                app_tracef("ERROR: Out of memory\n");
+                app_tracef("ERROR: Out of memory");
                 fclose(fConfFile);
                 return NULL;
             }
@@ -298,7 +298,7 @@ char *cfgGetValue(char *szEnvVariableWithFilename, char *szKey)
     }
     if (!szRetVal)
     {
-        app_tracef("ERROR: Cannot find config key: %s\n", szKey);
+        app_tracef("ERROR: Cannot find config key: %s", szKey);
     }
     fclose(fConfFile);
     return szRetVal;

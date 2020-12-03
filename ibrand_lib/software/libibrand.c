@@ -33,7 +33,7 @@ bool IBRand_init(struct ibrand_context *context)
     pIBRand = cfgInitConfig();
     if (!pIBRand)
     {
-        app_tracef("FATAL: Failed to initialise config. Aborting.\n");
+        app_tracef("FATAL: Failed to initialise config. Aborting.");
         return false;
     }
 
@@ -70,7 +70,7 @@ uint32_t IBRand_readData(struct ibrand_context *context, uint8_t *pResult, size_
         return 0;
     }
 
-    if (localDebugTracing) app_tracef("DEBUG: IBRand_readData - requesting %lu bytes\n", (unsigned long)cbResult);
+    if (localDebugTracing) app_tracef("DEBUG: IBRand_readData - requesting %lu bytes", (unsigned long)cbResult);
 
     fReadDataIsBusy++;
     do
@@ -78,7 +78,7 @@ uint32_t IBRand_readData(struct ibrand_context *context, uint8_t *pResult, size_
         context->errorCode = 0;
         if (!GetNewEntropy(context, pIBRand, pResult, cbResult))
         {
-            app_tracef("ERROR: GetNewEntropy failed. errorCode=%d: msg=%s\n", context->errorCode, context->message?context->message:"<No message supplied>");
+            app_tracef("ERROR: GetNewEntropy failed. errorCode=%d: msg=%s", context->errorCode, context->message?context->message:"<No message supplied>");
             quantitySupplied = 0;
             break;
         }
