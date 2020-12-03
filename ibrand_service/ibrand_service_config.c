@@ -64,6 +64,17 @@ int ValidateSettings(tIB_CONFIGDATA *pIBConfig)
 
 static int localDebugTracing = false;
 
+static bool __StringLengthExceeded(JSONPair *item, size_t maxLen)
+{
+    size_t itemLen = strlen(item->value->stringValue);
+    if (itemLen > maxLen)
+    {
+        app_tracef("ERROR: Length of item %s (%d) exceeds maxlen (%d)", item->key, itemLen, maxLen);
+        return true;
+    }
+    return false;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Config Top Level Functions
 ////////////////////////////////////////////////////////////////////////////////
@@ -96,30 +107,58 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
                 {
                     if (strcmp(childJson->pairs[jj].key,"AUTHTYPE")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->szAuthType)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->szAuthType, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szAuthType));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"AUTHURL")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->szAuthUrl)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->szAuthUrl, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szAuthUrl));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"AUTHUSER")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->szUsername)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->szUsername, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szUsername));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"AUTHPSWD")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->szPassword)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->szPassword, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szPassword));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"AUTHSSLCERTFILE")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->szAuthSSLCertFile)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->szAuthSSLCertFile, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szAuthSSLCertFile));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"AUTHSSLCERTTYPE")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->szAuthSSLCertType)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->szAuthSSLCertType, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szAuthSSLCertType));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"AUTHSSLKEYFILE" )==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->szAuthSSLKeyFile)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->szAuthSSLKeyFile , childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szAuthSSLKeyFile ));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"AUTHRETRYDELAY")==0)
@@ -146,10 +185,18 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
                     }
                     else if (strcmp(childJson->pairs[jj].key,"CLIENTSETUPOOBFILENAME")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->clientSetupOOBFilename)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->clientSetupOOBFilename, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->clientSetupOOBFilename));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"OURKEMSECRETKEYFILENAME")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->ourKemSecretKeyFilename)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->ourKemSecretKeyFilename, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->ourKemSecretKeyFilename));
                     }
                     //else if (strcmp(childJson->pairs[jj].key,"THEIRSIGNINGPUBLICKEYFILENAME")==0)
@@ -172,6 +219,10 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
                 {
                     if (strcmp(childJson->pairs[jj].key,"BASEURL")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->szBaseUrl)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->szBaseUrl, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szBaseUrl));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"BYTESPERREQUEST")==0)
@@ -198,19 +249,35 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
                 {
                     if (strcmp(childJson->pairs[jj].key,"STORAGETYPE")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->szStorageType)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->szStorageType, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szStorageType));
                     }
 
                     else if (strcmp(childJson->pairs[jj].key,"FILE_DATAFORMAT")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->szStorageDataFormat)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->szStorageDataFormat, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szStorageDataFormat));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"FILE_FILENAME")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->szStorageFilename)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->szStorageFilename, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szStorageFilename));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"FILE_LOCKFILEPATH")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->szStorageLockfilePath)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->szStorageLockfilePath, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szStorageLockfilePath));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"FILE_HIGHWATERMARK")==0)
@@ -224,10 +291,18 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
 
                     else if (strcmp(childJson->pairs[jj].key,"SHMEM_BACKINGFILENAME")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->shMemBackingFilename)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->shMemBackingFilename, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->shMemBackingFilename));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"SHMEM_SEMAPHORENAME")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->shMemSemaphoreName)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->shMemSemaphoreName, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->shMemSemaphoreName));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"SHMEM_STORAGESIZE")==0)
@@ -287,9 +362,9 @@ int ReadConfig(char *szConfigFilename, tIB_CONFIGDATA *pIBConfig, size_t secretK
     rc = __ParseJsonConfig(szJsonConfig, pIBConfig);
     if (!rc)
     {
-        app_tracef("ERROR: Error %d parsing JSON config\n", rc);
+        app_tracef("ERROR: Error parsing JSON config");
         if (szJsonConfig) free(szJsonConfig);
-        return rc;
+        return 10117;
     }
     if (szJsonConfig) free(szJsonConfig);
 

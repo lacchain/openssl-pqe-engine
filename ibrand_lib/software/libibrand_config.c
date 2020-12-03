@@ -216,9 +216,9 @@ int cfgReadConfig(char *szConfigFilename, tIB_INSTANCEDATA *pIBRand)
     rc = __ParseJsonConfig(szJsonConfig, pIBRand);
     if (!rc)
     {
-        app_tracef("ERROR: Error %d parsing JSON config\n", rc);
+        app_tracef("ERROR: Error parsing JSON config");
         if (szJsonConfig) free(szJsonConfig);
-        return rc;
+        return 20117;
     }
     if (szJsonConfig) free(szJsonConfig);
 
