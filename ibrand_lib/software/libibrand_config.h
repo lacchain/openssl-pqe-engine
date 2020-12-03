@@ -15,9 +15,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#ifndef _MAX_PATH
-#define _MAX_PATH 128
-#endif
+#include "../../ibrand_common/my_utils.h"
 
 #define DBGBIT_STATUS   0
 #define DBGBIT_CONFIG   1

@@ -36,6 +36,10 @@
 #define _MAX_PATH 128
 #endif
 
+#ifndef _MAX_URL
+#define _MAX_URL 128
+#endif
+
 #ifndef TRUE
 #define TRUE 1
 #define FALSE 0

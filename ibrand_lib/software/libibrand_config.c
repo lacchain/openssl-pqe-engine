@@ -61,9 +61,9 @@ tIB_INSTANCEDATA *cfgInitConfig (void)
     //    cfgPrintConfig(pIBRand);
     //}
 
-    ShMem_SetBackingFilename (pIBRand->cfg.shMemBackingFilename); // char[128] // "shmem_ibrand01" e.g. /dev/shm/shmem_ibrand01
-    ShMem_SetStorageSize     (pIBRand->cfg.shMemStorageSize    ); // long      // (100*1024)
-    ShMem_SetSemaphoreName   (pIBRand->cfg.shMemSemaphoreName  ); // char[16]  // "sem_ibrand01"
+    ShMem_SetBackingFilename (pIBRand->cfg.shMemBackingFilename); // char[_MAX_PATH] // "shmem_ibrand01" e.g. /dev/shm/shmem_ibrand01
+    ShMem_SetStorageSize     (pIBRand->cfg.shMemStorageSize    ); // long            // (100*1024)
+    ShMem_SetSemaphoreName   (pIBRand->cfg.shMemSemaphoreName  ); // char[16]        // "sem_ibrand01"
 
     return pIBRand;
 }
@@ -312,15 +312,15 @@ void cfgGetDatafilename(char *pIBDatafilename, size_t cbIBDatafilename, tIB_INST
 
 void cfgPrintConfig(tIB_INSTANCEDATA *pIBRand)
 {
-    app_tracef("fVerbose              =[%u]" , pIBRand->cfg.fVerbose              ); // unsigned char  // Bitmapped field
-    app_tracef("szStorageType         =[%s]" , pIBRand->cfg.szStorageType         ); // char[16]       // "FILE", "SHMEM"
-    app_tracef("szStorageDataFormat   =[%s]" , pIBRand->cfg.szStorageDataFormat   ); // char[16]       // RAW, BASE64, HEX
-    app_tracef("szStorageFilename     =[%s]" , pIBRand->cfg.szStorageFilename     ); // char[128]      // "/var/lib/ibrand/ibrand_data.bin"
-    app_tracef("szStorageLockfilePath =[%s]" , pIBRand->cfg.szStorageLockfilePath ); // char[128]      // "/tmp"
-    app_tracef("storageHighWaterMark  =[%ld]", pIBRand->cfg.storageHighWaterMark  ); // long           // 1038336 // 1MB
-    app_tracef("storageLowWaterMark   =[%ld]", pIBRand->cfg.storageLowWaterMark   ); // long           // 102400 // 100KB
-    app_tracef("shMemBackingFilename  =[%s]" , pIBRand->cfg.shMemBackingFilename  ); // char[128]      // "shmem_ibrand01" e.g. /dev/shm/shmem_ibrand01
-    app_tracef("shMemSemaphoreName    =[%s]" , pIBRand->cfg.shMemSemaphoreName    ); // char[16]       // "sem_ibrand01"
-    app_tracef("shMemStorageSize      =[%ld]", pIBRand->cfg.shMemStorageSize      ); // long           // (100*1024)
-    app_tracef("shMemLowWaterMark     =[%ld]", pIBRand->cfg.shMemLowWaterMark     ); // long           // 102400 // 100KB
+    app_tracef("fVerbose              =[%u]" , pIBRand->cfg.fVerbose              ); // unsigned char   // Bitmapped field
+    app_tracef("szStorageType         =[%s]" , pIBRand->cfg.szStorageType         ); // char[16]        // "FILE", "SHMEM"
+    app_tracef("szStorageDataFormat   =[%s]" , pIBRand->cfg.szStorageDataFormat   ); // char[16]        // RAW, BASE64, HEX
+    app_tracef("szStorageFilename     =[%s]" , pIBRand->cfg.szStorageFilename     ); // char[_MAX_PATH] // "/var/lib/ibrand/ibrand_data.bin"
+    app_tracef("szStorageLockfilePath =[%s]" , pIBRand->cfg.szStorageLockfilePath ); // char[_MAX_PATH] // "/tmp"
+    app_tracef("storageHighWaterMark  =[%ld]", pIBRand->cfg.storageHighWaterMark  ); // long            // 1038336 // 1MB
+    app_tracef("storageLowWaterMark   =[%ld]", pIBRand->cfg.storageLowWaterMark   ); // long            // 102400 // 100KB
+    app_tracef("shMemBackingFilename  =[%s]" , pIBRand->cfg.shMemBackingFilename  ); // char[_MAX_PATH] // "shmem_ibrand01" e.g. /dev/shm/shmem_ibrand01
+    app_tracef("shMemSemaphoreName    =[%s]" , pIBRand->cfg.shMemSemaphoreName    ); // char[16]        // "sem_ibrand01"
+    app_tracef("shMemStorageSize      =[%ld]", pIBRand->cfg.shMemStorageSize      ); // long            // (100*1024)
+    app_tracef("shMemLowWaterMark     =[%ld]", pIBRand->cfg.shMemLowWaterMark     ); // long            // 102400 // 100KB
 }
