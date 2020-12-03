@@ -24,7 +24,7 @@
 #include "../PQCrypto-LWEKE/src/api_frodo640.h"
 #endif
 #if (WHICH_PQCRYPTO == PQCRYPTO_OQS)
-#include "../PQCrypto-OQS/include/oqs/kem.h"
+#include "oqs/kem.h"
 #endif
 
 
