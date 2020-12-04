@@ -34,7 +34,3 @@ install(TARGETS ibrand_openssl
         LIBRARY
           DESTINATION ${OPENSSL_ENGINES_DESTINATION}
        )
-install(TARGETS frodokem
-        LIBRARY
-          DESTINATION ${CMAKE_INSTALL_LIBDIR}
-       )
