@@ -59,6 +59,7 @@ typedef struct tagIB_CONFIGDATA
     size_t        publicKeyBytes;
     // SRNG Config
     unsigned char useSecureRng;
+    int           preferredKemAlgorithm;
     char          clientSetupOOBFilename[_MAX_PATH];
     char          ourKemSecretKeyFilename[_MAX_PATH];
     //char          theirSigningPublicKeyFilename[_MAX_PATH];

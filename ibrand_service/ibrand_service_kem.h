@@ -18,7 +18,9 @@
 #include "oqs/kem.h"
 
 
-extern int KemDecapsulateSharedSecret(char *kemAlgorithm,
+extern const char *KemLookupOqsAlgorithmName(int CqcAlgorithmId);
+extern bool KemAlgorithmIsValid(const char *algorithmName, bool *pIsSupported, bool *pIsEnabled);
+extern int KemDecapsulateSharedSecret(int cqcKemAlgorithmId,
                                       tLSTRING *pSharedSecret,
                                       const tLSTRING *pEncapsulatedSharedSecret,
                                       const tLSTRING *pKemSecretKey);

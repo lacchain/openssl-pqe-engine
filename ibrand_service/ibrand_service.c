@@ -397,7 +397,10 @@ size_t ReceiveDataHandler_SharedSecret(char *buffer, size_t size, size_t nmemb, 
     return inboundData.cbData; // Number of bytes processed
 }
 
-#define SHAREDSECRET_CRYPTO_BYTES (123)  // (CRYPTO_BYTES) TODO
+// A search of OQS headers for "_length_shared_secret" reveals that
+// the algorith with the largest "maximum shared secret length" is
+// OQS_KEM_sidh_p751_length_shared_secret at 188 bytes
+#define CRYPTO_MAXSHAREDSECRETBYTES (OQS_KEM_sidh_p751_length_shared_secret)
 
 //-----------------------------------------------------------------------
 // DecryptAndStoreKemSecretKey
@@ -485,18 +488,20 @@ static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
        return 2204;
     }
 
-    // Allocate a new buffer
-    pIBRand->symmetricSharedSecret.pData = (char *)malloc(SHAREDSECRET_CRYPTO_BYTES);
+
+    // Allocate a new buffer large enough for the maximum shared secret length
+    pIBRand->symmetricSharedSecret.pData = (char *)malloc(CRYPTO_MAXSHAREDSECRETBYTES);
     if (pIBRand->symmetricSharedSecret.pData == NULL)
     {
         app_tracef("ERROR: Failed to allocate storage for new SharedSecret");
         return 2206;
     }
     // Initialise with something recognisable, so that we can ensure that it has worked
-    memset(pIBRand->symmetricSharedSecret.pData, 0xAA, SHAREDSECRET_CRYPTO_BYTES);
+    memset(pIBRand->symmetricSharedSecret.pData, 0xAA, CRYPTO_MAXSHAREDSECRETBYTES);
+    pIBRand->symmetricSharedSecret.cbData = CRYPTO_MAXSHAREDSECRETBYTES; // NB This is the maxlength, not actual length.
 
     // Do the KEM decapsulation
-    int rc = KemDecapsulateSharedSecret("FrodoKEM-640",
+    int rc = KemDecapsulateSharedSecret(pIBRand->cfg.preferredKemAlgorithm, // e.g. 222 = "FrodoKEM-640-AES"
                                         &pIBRand->symmetricSharedSecret,
                                         &rawEncapsulatedSharedSecret,
                                         &pIBRand->ourKemSecretKey);
@@ -506,10 +511,10 @@ static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
         return 2207;
     }
     // We will set the size once we know it has completed
-    pIBRand->symmetricSharedSecret.cbData = SHAREDSECRET_CRYPTO_BYTES;
+    pIBRand->symmetricSharedSecret.cbData = CRYPTO_MAXSHAREDSECRETBYTES; // TODO - This is the maxlength, not actual length
 
 #ifdef KAT_KNOWN_ANSWER_TESTING
-    size_t expectedLength = SHAREDSECRET_CRYPTO_BYTES; // Size of the SharedSecret
+    size_t expectedLength = CRYPTO_MAXSHAREDSECRETBYTES; // TODO - This is the maxlength, not expected length
     KatDataVerify(&(pIBRand->symmetricSharedSecret), expectedLength, "SharedSecret");
 #endif // KAT_KNOWN_ANSWER_TESTING
 

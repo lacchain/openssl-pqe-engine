@@ -183,6 +183,10 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
                     {
                         pIBConfig->useSecureRng = atoi(childJson->pairs[jj].value->stringValue);
                     }
+                    else if (strcmp(childJson->pairs[jj].key,"PREFERRED_KEM_ALGORITHM")==0)
+                    {
+                        pIBConfig->preferredKemAlgorithm = atoi(childJson->pairs[jj].value->stringValue);
+                    }
                     else if (strcmp(childJson->pairs[jj].key,"CLIENTSETUPOOBFILENAME")==0)
                     {
                         if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->clientSetupOOBFilename)-1))
