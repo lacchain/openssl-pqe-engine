@@ -15,7 +15,6 @@ add_executable(ibrand_service ibrand_service.c ibrand_service_config.c ibrand_se
 
 target_link_libraries(ibrand_service ibrand_service_shmem)
 target_link_libraries(ibrand_service ibrand_common)
-target_link_libraries(ibrand_service frodokem)
 target_link_libraries(ibrand_service ${CURL_LIBRARIES})
 target_link_libraries(ibrand_service ${OPENSSL_LIBRARIES})
 target_link_libraries(ibrand_service ${CMAKE_THREAD_LIBS_INIT})
