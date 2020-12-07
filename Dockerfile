@@ -36,6 +36,7 @@ COPY ibrand_lib/CMakeLists.txt     ./ibrand_lib/
 COPY ibrand_lib/software           ./ibrand_lib/software/
 COPY ibrand_service                ./ibrand_service/
 COPY ibrand_openssl                ./ibrand_openssl/
+COPY stdrand_engine                ./stdrand_engine/
 
 RUN debuild -b -uc -us -nc
 
@@ -102,6 +103,7 @@ JSON:{\n\
   "SecuritySettings":\n\
   {\n\
     "USESECURERNG":"1",\n\
+    "PREFERRED_KEM_ALGORITHM":"222",\n\
     "CLIENTSETUPOOBFILENAME":"/ironbridge_clientsetup_OOB.json",\n\
     "OURKEMSECRETKEYFILENAME":"/ibrand_sk.bin"\n\
   },\n\
@@ -117,8 +119,8 @@ JSON:{\n\
     "FILE_DATAFORMAT":"RAW",\n\
     "FILE_FILENAME":"/ibrand_data.bin",\n\
     "FILE_LOCKFILEPATH":"/tmp",\n\
-    "FILE_HIGHWATERMARK":"20480",\n\
-    "FILE_LOWWATERMARK":"5120",\n\
+    "FILE_HIGHWATERMARK":"30000",\n\
+    "FILE_LOWWATERMARK":"20000",\n\
     "SHMEM_BACKINGFILENAME":"shmem_ibrand01",\n\
     "SHMEM_SEMAPHORENAME":"sem_ibrand01",\n\
     "SHMEM_STORAGESIZE":"102400",\n\

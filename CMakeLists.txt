@@ -9,6 +9,7 @@ add_subdirectory(ibrand_common)
 add_subdirectory(ibrand_lib)
 add_subdirectory(ibrand_service)
 add_subdirectory(ibrand_openssl)
+add_subdirectory(stdrand_engine)
 
 pkg_get_variable(OPENSSL_ENGINES_DIR libcrypto enginesdir)
 pkg_get_variable(OPENSSL_PREFIX libcrypto prefix)
@@ -31,6 +32,10 @@ install(TARGETS ibrand_service
           DESTINATION ${CMAKE_INSTALL_BINDIR}
        )
 install(TARGETS ibrand_openssl
+        LIBRARY
+          DESTINATION ${OPENSSL_ENGINES_DESTINATION}
+       )
+install(TARGETS stdrand_engine
         LIBRARY
           DESTINATION ${OPENSSL_ENGINES_DESTINATION}
        )

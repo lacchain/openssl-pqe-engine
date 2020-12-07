@@ -1,0 +1,128 @@
+PREFIX = $(DESTDIR)/usr/local
+COMMON_DIR = ../ibrand_common
+
+# A) Linking static libraries...
+#     $ cc -c -I$LIBFOO_HOME/include main.c           # compile step
+#     $ cc -o main main.o $LIBFOO_HOME/lib/libfoo.a   # link step
+#    Note that the full path to "libfoo.a" is provided during the link step, without
+#    any additional command line flags (such as "-L" or "-l").
+#
+# B) Linking dynamic libraries, setting the RPATH
+#     $ icc -c -I$LIBFOO_HOME/include main.c
+#     $ icc -o main main.o -L$LIBFOO_HOME/lib -lfoo -Wl,-rpath,$LIBFOO_HOME/lib
+#    Note that three command line arguments are involved in the link step:
+#      -L : path where the compiler looks for libraries at link time.
+#      -l : name of the library to be linked (i.e. the file name without "lib" and ".so").
+#      -Wl,-rpath, : path where the executable needs to look for shared libraries at run time.
+#    Without the -Wl,-rpath,$LIBFOO_HOME/lib command line argument, the program would be
+#    linked correctly, but, at runtime, the executable would not be able to find the shared
+#    library because of lacking path information.
+#    This is the reason why that information must be added which is called the RPATH.
+#    Note that there's no whitespace in the argument.
+#    Note, in addition, that the environment variable LD_LIBRARY_PATH overrides the RPATH.
+#    Setting the LD_LIBRARY_PATH should be avoided, if possible.
+
+
+#DYNAMIC_LIBS = -L/usr/local/lib/
+#STATIC_LIBS =
+
+#DYNAMIC_LIBS =
+#STATIC_LIBS = $(COMMON_DIR)/my_utilslib.a
+
+
+CC = gcc
+CFLAGS = -g -Wall -Wextra -Werror -fPIC -O2 -L/usr/local/lib/ \
+ -I $(COMMON_DIR) \
+ -DLINUX
+
+LDFLAGS = -shared -lcrypto -librand -L/usr/local/lib/
+RM = rm -f
+
+TARGET_NAME = stdrand_engine
+ifeq ($(OS),Windows_NT)
+	TARGET_LIB = $(TARGET_NAME).dll
+else
+	UNAME_S := $(shell uname -s)
+	ifeq ($(UNAME_S),Linux)
+		TARGET_LIB = $(TARGET_NAME).so
+		CFLAGS += -I/usr/local/include/ -librand
+	else
+		ifeq ($(UNAME_S),Darwin)
+			TARGET_LIB =$(TARGET_NAME).dylib
+		else
+			$(error Unknown platform $(UNAME_S))
+		endif
+	endif
+endif
+
+SRCS = stdrand_engine.c
+OBJS = $(SRCS:.c=.o)
+
+.PHONY: all
+all: ${TARGET_LIB} install
+	@echo --- $@ Done
+
+$(TARGET_LIB): $(OBJS) $(COMMON_DIR)/my_utilslib.a
+	@$(CC) -o $@ $^ ${LDFLAGS}
+	@echo --- $@ Done
+
+# Create a dependancy make rule for the specified source file
+$(SRCS:.c=.d):%.d:%.c
+	@$(CC) $(CFLAGS) -MM $< >$@
+	@echo --- $@ Done
+
+$(SRCS:.c=.o):%.o:%.c
+	@$(CC) $(CFLAGS) -c -o $@ $<
+	@echo --- $@ Done
+
+$(COMMON_DIR)/my_utilslib.a:
+	@make -s -C $(COMMON_DIR) -f Makefile.linux
+	@echo --- $@ Done
+
+# Each source file is dependent on it's auto-generated dependancy make rule
+include $(SRCS:.c=.d)
+
+.PHONY: clean
+clean:
+	-${RM} ${TARGET_LIB} ${OBJS} $(SRCS:.c=.d)
+	@echo --- $@ Done
+
+# We use "install" to do the following...
+#	install -d <DEST_PATH>                      # mkdir <DEST_PATH>, including and parents as required.
+#	install -m <ATTRS> <FILES> <DEST_PATH>      # copy <FILES> to <DEST_PATH>, and do a chmod <ATTRS> on each.
+#	ldconfig <LIB_PATH>                         # Configure Dynamic Linker Run Time Bindings
+
+# openssl version -e
+# ENGINESDIR: "/usr/local/lib/engines-3"
+# openssl version -d
+# OPENSSLDIR: "/usr/local/ssl"
+
+install: install-lib
+	@echo --- $@ Done
+
+install-lib: ${TARGET_LIB}
+	@sudo install -d                             $(PREFIX)/lib/engines-3/
+	@sudo install -m 0644 ${TARGET_LIB}          $(PREFIX)/lib/engines-3/
+	@sudo install -d                             $(PREFIX)/lib/x86_64-linux-gnu/engines-1.1/
+	@sudo install -m 0644 ${TARGET_LIB}          $(PREFIX)/lib/x86_64-linux-gnu/engines-1.1/
+	@sudo install -d                             /usr/lib/x86_64-linux-gnu/engines-1.1/
+	@sudo install -m 0644 ${TARGET_LIB}          /usr/lib/x86_64-linux-gnu/engines-1.1/
+	@sudo ldconfig                               $(PREFIX)/lib
+	@sudo ldconfig                               /usr/lib
+	@sudo ldconfig                               $(PREFIX)/lib/engines-3/
+	@sudo ldconfig                               $(PREFIX)/lib/x86_64-linux-gnu/engines-1.1/
+	@sudo install -d                             $(PREFIX)/ssl
+	@sudo install -m 0644 ./stdrand_openssl.cnf  $(PREFIX)/ssl
+	@echo --- $@ Done
+
+uninstall:
+	-sudo $(RM) /usr/local/lib/engines-3/${TARGET_LIB}
+	-sudo $(RM) /usr/local/lib/x86_64-linux-gnu/engines-1.1/${TARGET_LIB}
+	-sudo $(RM) /usr/local/ssl/stdrand_openssl.cnf
+	@echo --- $@ Done
+
+show-installed:
+	-sudo find /var | grep -i ibrand
+	-sudo find /usr | grep -i ibrand
+	@#printenv OPENSSL_CONF
+	@echo --- $@ Done
