@@ -382,18 +382,10 @@ size_t ReceiveDataHandler_SharedSecret(char *buffer, size_t size, size_t nmemb, 
     return inboundData.cbData; // Number of bytes processed
 }
 
-#if (WHICH_PQCRYPTO == PQCRYPTO_LWEKE)
-// CRYPTO_CIPHERTEXTBYTES
-// CRYPTO_SECRETKEYBYTES
-// CRYPTO_PUBLICKEYBYTES
-// CRYPTO_MAXSHAREDSECRETBYTES
-#define CRYPTO_MAXSHAREDSECRETBYTES (CRYPTO_BYTES) // 16 (for Frodo640)
-#else
 // A search of OQS headers for "_length_shared_secret" reveals that
 // the algorith with the largest "maximum shared secret length" is
 // OQS_KEM_sidh_p751_length_shared_secret at 188 bytes
 #define CRYPTO_MAXSHAREDSECRETBYTES (OQS_KEM_sidh_p751_length_shared_secret)
-#endif
 
 //-----------------------------------------------------------------------
 // DecryptAndStoreKemSecretKey
@@ -408,11 +400,7 @@ static tERRORCODE DecryptAndStoreKemSecretKey(tIB_INSTANCEDATA *pIBRand)
     errcode = AESDecryptPackage(pIBRand,
                                 &pIBRand->encryptedKemSecretKey, // Source
                                 &pIBRand->ourKemSecretKey,       // Destination
-#if (WHICH_PQCRYPTO == PQCRYPTO_LWEKE)
-                                CRYPTO_CIPHERTEXTBYTES,          // expectedSize
-#else
                                 0,                              // expectedSize not specified (TODO)
-#endif
                                 true);                           // hasHeader
     if (errcode)
     {
@@ -455,13 +443,6 @@ static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
         app_tracef("ERROR: KEM secret key error (size=%d)", pIBRand->ourKemSecretKey.cbData);
         return ERC_IBSVC_PARAMERR_KEM_SECRETKEY_NOT_SPECIFIED;
     }
-#if (WHICH_PQCRYPTO == PQCRYPTO_LWEKE)
-    if (pIBRand->ourKemSecretKey.cbData != CRYPTO_SECRETKEYBYTES)
-    {
-        app_tracef("WARNING: Size of KEM secret key (%d) is not as expected (%d)", pIBRand->ourKemSecretKey.cbData, CRYPTO_SECRETKEYBYTES);
-        //return ERC_IBSVC_PARAMERR_KEM_SECRETKEY_SIZE_ERROR;
-    }
-#endif
     // Check that we have the encapsulated key
     if (!pIBRand->encapsulatedSharedSecret.pData || pIBRand->encapsulatedSharedSecret.cbData == 0)
     {
@@ -491,15 +472,6 @@ static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
        }
        return ERC_IBSVC_BASE64_DECODE_FAILURE_OF_SHAREDSECRET;
     }
-
-#if (WHICH_PQCRYPTO == PQCRYPTO_LWEKE)
-    if (rawEncapsulatedSharedSecret.cbData != CRYPTO_CIPHERTEXTBYTES)
-    {
-        app_tracef("ERROR: Size of decoded encapsulated SharedSecret (%u) is not as expected (%u)", rawEncapsulatedSharedSecret.cbData, CRYPTO_CIPHERTEXTBYTES);
-        //app_trace_hexall("DEBUG: encapsulatedSharedSecret:", (char *)rawEncapsulatedSharedSecret.pData, rawEncapsulatedSharedSecret.cbData);
-        return ERC_IBSVC_PARAMERR_ENCAP_SHARED_SECRET_SIZE_ERROR;
-    }
-#endif
 
     // Allocate a new buffer large enough for the maximum shared secret length
     pIBRand->symmetricSharedSecret.pData = (char *)malloc(CRYPTO_MAXSHAREDSECRETBYTES);
@@ -1101,11 +1073,7 @@ int main(int argc, char * argv[])
     app_tracef("===ibrand_service==================================================================================================");
 
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: ReadConfig \"%s\"", pIBRand->szConfigFilename);
-#if (WHICH_PQCRYPTO == PQCRYPTO_LWEKE)
-    rc = ReadConfig(pIBRand->szConfigFilename, &(pIBRand->cfg), CRYPTO_SECRETKEYBYTES, CRYPTO_PUBLICKEYBYTES);
-#else
     rc = ReadConfig(pIBRand->szConfigFilename, &(pIBRand->cfg), 0, 0);
-#endif
     if (rc != ERC_OK)
     {
         app_tracef("FATAL: Configuration error while processing \"%s\". Aborting. rc=%d", pIBRand->szConfigFilename, rc);
@@ -1256,11 +1224,7 @@ int main(int argc, char * argv[])
 
                 pIBRand->ourKemSecretKey.pData        = NULL;
                 pIBRand->ourKemSecretKey.cbData       = 0;
-#if (WHICH_PQCRYPTO == PQCRYPTO_LWEKE)
-                rc = ReadOurKemPrivateKey(pIBRand, CRYPTO_SECRETKEYBYTES);
-#else
                 rc = ReadOurKemPrivateKey(pIBRand, 0);
-#endif
                 if (rc != ERC_OK)
                 {
                     app_tracef("FATAL: Configuration error. Aborting. rc=%d", rc);

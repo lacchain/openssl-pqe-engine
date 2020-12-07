@@ -35,30 +35,7 @@
 #define ERC_IBKEM_KEMKEY_SIZE_ERROR                          19280
 #define ERC_IBKEM_KEM_DECAP_FAILED                           19290
 
-
-#define PQCRYPTO_LWEKE 1
-#define PQCRYPTO_OQS   2
-//#define WHICH_PQCRYPTO PQCRYPTO_LWEKE
-#define WHICH_PQCRYPTO PQCRYPTO_OQS
-
-#if (WHICH_PQCRYPTO == PQCRYPTO_LWEKE)
-#include "pqcrypto_lweke/api_frodo640.h"
-#endif
-#if (WHICH_PQCRYPTO == PQCRYPTO_OQS)
 #include "oqs/kem.h"
-#endif
-
-
-#if (WHICH_PQCRYPTO == PQCRYPTO_LWEKE)
-#define SYSTEM_NAME    "FrodoKEM-640"
-#define crypto_kem_keypair            crypto_kem_keypair_Frodo640
-#define crypto_kem_enc                crypto_kem_enc_Frodo640
-#define crypto_kem_dec                crypto_kem_dec_Frodo640
-
-// int crypto_kem_keypair_Frodo640 (unsigned char *pk, unsigned char *sk);
-// int crypto_kem_enc_Frodo640     (unsigned char *ct, unsigned char *ss, const unsigned char *pk);
-// int crypto_kem_dec_Frodo640     (unsigned char *ss, const unsigned char *ct, const unsigned char *sk);
-#endif
 
 extern const char *KemLookupOqsAlgorithmName(int CqcAlgorithmId);
 extern bool KemAlgorithmIsValid(const char *algorithmName, bool *pIsSupported, bool *pIsEnabled);
