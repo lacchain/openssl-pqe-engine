@@ -18,6 +18,7 @@ JSON:{
   "SecuritySettings":
   {
     "USESECURERNG":"1",
+    "PREFERRED_KEM_ALGORITHM":"222",
     "CLIENTSETUPOOBFILENAME":"/usr/local/ssl/IBClientSetup_client.ironbridgeapi.com_SN-005ea23d4725755e5a__OOB.json",
     "OURKEMSECRETKEYFILENAME":"/usr/local/ssl/ibrand_sk.bin",
   },

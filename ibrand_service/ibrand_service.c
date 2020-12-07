@@ -28,7 +28,7 @@
 #include <curl/curl.h>
 #include <openssl/aes.h>
 
-#include "../PQCrypto-LWEKE/src/api_frodo640.h"
+#include "ibrand_service_kem.h"
 
 #include "../ibrand_common/my_utilslib.h"
 
@@ -37,18 +37,8 @@
 #include "ibrand_service_config.h"
 #include "ibrand_service_datastore.h"
 
-#define SYSTEM_NAME    "FrodoKEM-640"
-#define crypto_kem_keypair            crypto_kem_keypair_Frodo640
-#define crypto_kem_enc                crypto_kem_enc_Frodo640
-#define crypto_kem_dec                crypto_kem_dec_Frodo640
-
-// int crypto_kem_keypair_Frodo640 (unsigned char *pk, unsigned char *sk);
-// int crypto_kem_enc_Frodo640     (unsigned char *ct, unsigned char *ss, const unsigned char *pk);
-// int crypto_kem_dec_Frodo640     (unsigned char *ss, const unsigned char *ct, const unsigned char *sk);
-
-
 #include "../ibrand_common/my_utilslib.h"
-#include "IB_SymmetricEncryption.h"
+#include "ibrand_service_aes.h"
 
 
 #if LIBCURL_VERSION_NUM < 0x070c03
@@ -112,7 +102,7 @@ static void KatDataAppend(tLSTRING *pDest, int destOffset, int numBytesToAppend)
 static bool KatDataVerify(tLSTRING *pActualData, size_t expectedLength, char *szTitle)
 {
     tLSTRING expectedData;
-    expectedData.pData = malloc(expectedLength);
+    expectedData.pData = (char *)malloc(expectedLength);
     expectedData.cbData = 0;
     KatDataAppend(&expectedData, 0, expectedLength);
     if (pActualData->cbData != expectedLength)
@@ -128,6 +118,17 @@ static bool KatDataVerify(tLSTRING *pActualData, size_t expectedLength, char *sz
     return true;
 }
 #endif // KAT_KNOWN_ANSWER_TESTING
+
+void DestroyAndFreeExistingItem(tLSTRING *pItem)
+{
+    if (pItem->pData)
+    {
+        memset(pItem->pData, 0, pItem->cbData);
+        free(pItem->pData);
+        pItem->pData = NULL;
+        pItem->cbData = 0;
+    }
+}
 
 static bool copyToNewBuffer (tLSTRING *pDest, tLSTRING *pSrc, bool appendToExistingData)
 {
@@ -161,13 +162,7 @@ static bool copyToNewBuffer (tLSTRING *pDest, tLSTRING *pSrc, bool appendToExist
     memcpy(result.pData + existingData.cbData, pSrc->pData, pSrc->cbData);
 
     // Free up the old buffer, if there is one
-    if (freeMe.pData)
-    {
-        memset(freeMe.pData, 0, freeMe.cbData);
-        free(freeMe.pData);
-        freeMe.pData = NULL;
-        freeMe.cbData = 0;
-    }
+    DestroyAndFreeExistingItem(&freeMe);
 
     // We will set the size once we know it has completed
     pDest->pData = result.pData;
@@ -179,7 +174,7 @@ static bool copyToNewBuffer (tLSTRING *pDest, tLSTRING *pSrc, bool appendToExist
 //-----------------------------------------------------------------------
 // ReceiveDataHandler_login
 // This is our CURLOPT_WRITEFUNCTION
-// and userp is our CURLOPT_WRITEDATA (&pIBRand->Token)
+// and userp is our CURLOPT_WRITEDATA (&pIBRand->authToken)
 //-----------------------------------------------------------------------
 size_t ReceiveDataHandler_login(char *buffer, size_t size, size_t nmemb, void *userp)
 {
@@ -204,29 +199,23 @@ size_t ReceiveDataHandler_login(char *buffer, size_t size, size_t nmemb, void *u
     }
 
     // Free up the old buffer, if there is one
-    if (pIBRand->Token.pData && pIBRand->Token.cbData)
-    {
-        memset(pIBRand->Token.pData, 0, pIBRand->Token.cbData);
-        free(pIBRand->Token.pData);
-        pIBRand->Token.pData = NULL;
-        pIBRand->Token.cbData = 0;
-    }
+    DestroyAndFreeExistingItem(&pIBRand->authToken);
 
     // Allocate a new buffer
-    pIBRand->Token.pData = (char *)malloc(inboundData.cbData);
-    if (pIBRand->Token.pData == NULL)
+    pIBRand->authToken.pData = (char *)malloc(inboundData.cbData);
+    if (pIBRand->authToken.pData == NULL)
     {
         app_tracef("ERROR: ReceiveDataHandler_login() malloc failure");
         return 0; // Zero bytes processed
     }
 
     // Copy in the new data
-    memcpy(pIBRand->Token.pData, inboundData.pData, inboundData.cbData);
-    pIBRand->Token.cbData = inboundData.cbData;
+    memcpy(pIBRand->authToken.pData, inboundData.pData, inboundData.cbData);
+    pIBRand->authToken.cbData = inboundData.cbData;
 
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
     {
-        app_tracef("INFO: ReceiveDataHandler_login() Saved %lu bytes", pIBRand->Token.cbData);
+        app_tracef("INFO: ReceiveDataHandler_login() Saved %lu bytes", pIBRand->authToken.cbData);
     }
 
     // Job done
@@ -236,7 +225,7 @@ size_t ReceiveDataHandler_login(char *buffer, size_t size, size_t nmemb, void *u
 //-----------------------------------------------------------------------
 // ReceiveDataHandler_rng
 // This is our CURLOPT_WRITEFUNCTION
-// and userp is our CURLOPT_WRITEDATA (&pIBRand->Token)
+// and userp is our CURLOPT_WRITEDATA (&pIBRand->authToken)
 //-----------------------------------------------------------------------
 size_t ReceiveDataHandler_rng(char *buffer, size_t size, size_t nmemb, void *userp)
 {
@@ -343,13 +332,7 @@ size_t ReceiveDataHandler_RequestNewKeyPair(char *buffer, size_t size, size_t nm
     }
 
     // Destroy any existing KEM secret key, forcing the new one to be decrypted and used as and when needed.
-    if (pIBRand->ourKemSecretKey.pData)
-    {
-        memset(pIBRand->ourKemSecretKey.pData, 0, pIBRand->ourKemSecretKey.cbData);
-        free(pIBRand->ourKemSecretKey.pData);
-        pIBRand->ourKemSecretKey.pData = NULL;
-        pIBRand->ourKemSecretKey.cbData = 0;
-    }
+    DestroyAndFreeExistingItem(&pIBRand->ourKemSecretKey);
 
     // Job done
     return inboundData.cbData; // Number of bytes processed
@@ -408,18 +391,16 @@ size_t ReceiveDataHandler_SharedSecret(char *buffer, size_t size, size_t nmemb, 
     }
 
     // Destroy any existing SharedSecret, forcing the new one to be decapsulated and used as and when needed.
-    if (pIBRand->symmetricSharedSecret.pData)
-    {
-        memset(pIBRand->symmetricSharedSecret.pData, 0, pIBRand->symmetricSharedSecret.cbData);
-        free(pIBRand->symmetricSharedSecret.pData);
-        pIBRand->symmetricSharedSecret.pData = NULL;
-        pIBRand->symmetricSharedSecret.cbData = 0;
-    }
+    DestroyAndFreeExistingItem(&pIBRand->symmetricSharedSecret);
 
     // Job done
     return inboundData.cbData; // Number of bytes processed
 }
 
+// A search of OQS headers for "_length_shared_secret" reveals that
+// the algorith with the largest "maximum shared secret length" is
+// OQS_KEM_sidh_p751_length_shared_secret at 188 bytes
+#define CRYPTO_MAXSHAREDSECRETBYTES (OQS_KEM_sidh_p751_length_shared_secret)
 
 //-----------------------------------------------------------------------
 // DecryptAndStoreKemSecretKey
@@ -429,18 +410,12 @@ static int DecryptAndStoreKemSecretKey(tIB_INSTANCEDATA *pIBRand)
     int errcode;
 
     // If there is already a KEM secret key stored, then clear and free it.
-    if (pIBRand->ourKemSecretKey.pData)
-    {
-        memset(pIBRand->ourKemSecretKey.pData, 0, pIBRand->ourKemSecretKey.cbData);
-        free(pIBRand->ourKemSecretKey.pData);
-        pIBRand->ourKemSecretKey.pData = NULL;
-        pIBRand->ourKemSecretKey.cbData = 0;
-    }
+    DestroyAndFreeExistingItem(&pIBRand->ourKemSecretKey);
 
     errcode = AESDecryptPackage(pIBRand,
                                 &pIBRand->encryptedKemSecretKey, // Source
                                 &pIBRand->ourKemSecretKey,       // Destination
-                                CRYPTO_CIPHERTEXTBYTES,          // expectedSize
+                                0,                               // expectedSize not specified (CRYPTO_CIPHERTEXTBYTES) (TODO)
                                 true);                           // hasHeader
     if (errcode)
     {
@@ -449,7 +424,7 @@ static int DecryptAndStoreKemSecretKey(tIB_INSTANCEDATA *pIBRand)
     }
 
     // Persist new KEM secretKey to file
-    errcode = WriteToFile(pIBRand->cfg.ourKemSecretKeyFilename, &(pIBRand->ourKemSecretKey), true);
+    errcode = WriteToFile(pIBRand->cfg.ourKemSecretKeyFilename, &pIBRand->ourKemSecretKey, true);
     if (errcode != 0)
     {
         app_tracef("ERROR: Error %d - Failed to save KEM secret key to file \"%s\"", errcode, pIBRand->cfg.ourKemSecretKeyFilename);
@@ -474,13 +449,7 @@ static int DecryptAndStoreKemSecretKey(tIB_INSTANCEDATA *pIBRand)
 static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
 {
     // If there is already a SharedSecret stored, then clear and free it.
-    if (pIBRand->symmetricSharedSecret.pData)
-    {
-        memset(pIBRand->symmetricSharedSecret.pData, 0, pIBRand->symmetricSharedSecret.cbData);
-        free(pIBRand->symmetricSharedSecret.pData);
-        pIBRand->symmetricSharedSecret.pData = NULL;
-        pIBRand->symmetricSharedSecret.cbData = 0;
-    }
+    DestroyAndFreeExistingItem(&pIBRand->symmetricSharedSecret);
 
     // Check that we have the KEM secret key needed for the KEM decapsulation
     if (!pIBRand->ourKemSecretKey.pData || pIBRand->ourKemSecretKey.cbData == 0)
@@ -489,12 +458,6 @@ static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
         app_tracef("ERROR: KEM secret key error (size=%d)", pIBRand->ourKemSecretKey.cbData);
         return 2201;
     }
-    if (pIBRand->ourKemSecretKey.cbData != CRYPTO_SECRETKEYBYTES)
-    {
-        app_tracef("WARNING: Size of KEM secret key (%d) is not as expected (%d)", pIBRand->ourKemSecretKey.cbData, CRYPTO_SECRETKEYBYTES);
-        //return 2202;
-    }
-
     // Check that we have the encapsulated key
     if (!pIBRand->encapsulatedSharedSecret.pData || pIBRand->encapsulatedSharedSecret.cbData == 0)
     {
@@ -512,9 +475,10 @@ static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
     //app_trace_hexall("DEBUG: p:", p, n);
 
     // base64_decode the encapsulate key
-    size_t decodeSize = 0;
-    unsigned char *rawEncapsulatedSharedSecret = base64_decode((char *)p, n, (size_t *)&(decodeSize));
-    if (!rawEncapsulatedSharedSecret)
+    tLSTRING rawEncapsulatedSharedSecret;
+    rawEncapsulatedSharedSecret.cbData = 0;
+    rawEncapsulatedSharedSecret.pData = (char *)base64_decode((char *)p, n, &rawEncapsulatedSharedSecret.cbData);
+    if (!rawEncapsulatedSharedSecret.pData)
     {
        app_tracef("WARNING: Failed to decode Base64 encapsulatedSharedSecret");
        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_STATUS))
@@ -524,33 +488,33 @@ static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
        return 2204;
     }
 
-    if (decodeSize != CRYPTO_CIPHERTEXTBYTES)
-    {
-        app_tracef("ERROR: Size of decoded encapsulated key (%u) is not as expected (%u)", decodeSize, CRYPTO_CIPHERTEXTBYTES);
-        //app_trace_hexall("DEBUG: encapsulatedSharedSecret:", (char *)rawEncapsulatedSharedSecret, decodeSize);
-        return 2205;
-    }
 
-    // Allocate a new buffer
-    pIBRand->symmetricSharedSecret.pData = (char *)malloc(CRYPTO_BYTES);
+    // Allocate a new buffer large enough for the maximum shared secret length
+    pIBRand->symmetricSharedSecret.pData = (char *)malloc(CRYPTO_MAXSHAREDSECRETBYTES);
     if (pIBRand->symmetricSharedSecret.pData == NULL)
     {
         app_tracef("ERROR: Failed to allocate storage for new SharedSecret");
         return 2206;
     }
     // Initialise with something recognisable, so that we can ensure that it has worked
-    memset(pIBRand->symmetricSharedSecret.pData, 0xAA, CRYPTO_BYTES);
+    memset(pIBRand->symmetricSharedSecret.pData, 0xAA, CRYPTO_MAXSHAREDSECRETBYTES);
+    pIBRand->symmetricSharedSecret.cbData = CRYPTO_MAXSHAREDSECRETBYTES; // NB This is the maxlength, not actual length.
 
     // Do the KEM decapsulation
-    crypto_kem_dec((unsigned char *)pIBRand->symmetricSharedSecret.pData,
-                   (unsigned char *)rawEncapsulatedSharedSecret,
-                   (unsigned char *)pIBRand->ourKemSecretKey.pData);
-
+    int rc = KemDecapsulateSharedSecret(pIBRand->cfg.preferredKemAlgorithm, // e.g. 222 = "FrodoKEM-640-AES"
+                                        &pIBRand->symmetricSharedSecret,
+                                        &rawEncapsulatedSharedSecret,
+                                        &pIBRand->ourKemSecretKey);
+    if (rc != 0)
+    {
+        app_tracef("ERROR: Failed to decapsulate new SharedSecret");
+        return 2207;
+    }
     // We will set the size once we know it has completed
-    pIBRand->symmetricSharedSecret.cbData = CRYPTO_BYTES;
+    pIBRand->symmetricSharedSecret.cbData = CRYPTO_MAXSHAREDSECRETBYTES; // TODO - This is the maxlength, not actual length
 
 #ifdef KAT_KNOWN_ANSWER_TESTING
-    size_t expectedLength = CRYPTO_BYTES; // Size of the SharedSecret
+    size_t expectedLength = CRYPTO_MAXSHAREDSECRETBYTES; // TODO - This is the maxlength, not expected length
     KatDataVerify(&(pIBRand->symmetricSharedSecret), expectedLength, "SharedSecret");
 #endif // KAT_KNOWN_ANSWER_TESTING
 
@@ -561,27 +525,42 @@ static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
 }
 
 
-static void SetPreferredRngEngine(tIB_INSTANCEDATA *pIBRand, const char *szPreferredRngEngine)
+static bool SetPreferredRngEngine(tIB_INSTANCEDATA *pIBRand)
 {
     // Force use of non-IronBridge OpenSSL RNG engine
-    // Anything except ourselves.
+    // Anything except ourselves (ibrand).
+    CURLcode ret;
+    const char *szPreferredRngEngine = NULL; // options: NULL, "rdrand", "dynamic", "md_rand"
+
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
     {
-        app_tracef("INFO: Set preferred OpenSSL RNG engine: \"%s\"", szPreferredRngEngine);
+        app_tracef("INFO: Set preferred OpenSSL RNG engine: %s", szPreferredRngEngine?szPreferredRngEngine:"NULL");
     }
 
-    // Ideally:
-    //     curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, NULL);
-    // Other options are...
-    //     curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, "dynamic");
-    //     curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, "rdrand");
+    // https://wiki.openssl.org/index.php/Random_Numbers#Generators says...
+    // By default, OpenSSL uses the md_rand generator. md_rand uses the MD5 hash as the pseudorandom function.
+    // The source code is located in crypto/rand/md_rand.c.
 
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, szPreferredRngEngine);
+    ret = curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, szPreferredRngEngine);
+    if (ret != CURLE_OK)
+    {
+        // e.g. CURLE_SSL_ENGINE_INITFAILED (66) : Initiating the SSL Engine failed.
+        //      CURLE_SSL_ENGINE_NOTFOUND   (53) : The specified crypto engine wasn't found.
+        app_tracef("ERROR: CURLOPT_SSLENGINE (%s) failed with ret=%d", szPreferredRngEngine?szPreferredRngEngine:"NULL",ret);
+        return false;
+    }
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CURL))
     {
         app_tracef("INFO: CURLOPT_SSLENGINE_DEFAULT");
     }
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE_DEFAULT, 1L);
+    ret = curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE_DEFAULT, 1L);
+    if (ret != CURLE_OK)
+    {
+        // e.g. CURLE_SSL_ENGINE_SETFAILED  (54) : Failed setting the selected SSL crypto engine as default!
+        app_tracef("ERROR: CURLOPT_SSLENGINE_DEFAULT (%s) failed with ret=%d", szPreferredRngEngine?szPreferredRngEngine:"NULL",ret);
+        return false;
+    }
+    return true;
 }
 
 //-----------------------------------------------------------------------
@@ -608,7 +587,11 @@ int authenticateUser(tIB_INSTANCEDATA *pIBRand)
     }
 
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pIBRand->cfg.szAuthUrl);
-    SetPreferredRngEngine(pIBRand, "rdrand");
+    if (!SetPreferredRngEngine(pIBRand))
+    {
+        app_tracef("ERROR: Failed to set preferred openssl RNG engine for SSL connection");
+        return 2212;
+    }
 
     // Pass our list of custom made headers
     struct curl_slist *headers = NULL;
@@ -686,7 +669,7 @@ int authenticateUser(tIB_INSTANCEDATA *pIBRand)
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
     {
         if (strcmp(pIBRand->cfg.szAuthType, "SIMPLE") == 0)
-            app_tracef("INFO: authenticateUser() Token = [%s]"            , pIBRand->Token.pData);
+            app_tracef("INFO: authenticateUser() authToken = [%s]"            , pIBRand->authToken.pData);
     }
 
     curl_slist_free_all(headers); // Free custom header list
@@ -714,7 +697,11 @@ int getRandomBytes(tIB_INSTANCEDATA *pIBRand)
         return 22230;
     }
     sprintf(pUrl,"%s/%s/%u", pIBRand->cfg.szBaseUrl, szEndpoint, pIBRand->cfg.bytesPerRequest);
-    SetPreferredRngEngine(pIBRand, "rdrand");
+    if (!SetPreferredRngEngine(pIBRand))
+    {
+        app_tracef("ERROR: Failed to set preferred openssl RNG engine for SSL connection");
+        return 22233;
+    }
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPGET, TRUE );
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pUrl);
 
@@ -844,7 +831,11 @@ int getNewKemKeyPair(tIB_INSTANCEDATA *pIBRand)
         return 2240;
     }
     sprintf(pUrl,"%s/%s", pIBRand->cfg.szBaseUrl, szEndpoint);
-    SetPreferredRngEngine(pIBRand, "rdrand");
+    if (!SetPreferredRngEngine(pIBRand))
+    {
+        app_tracef("ERROR: Failed to set preferred openssl RNG engine for SSL connection");
+        return 22401;
+    }
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPGET, TRUE );
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pUrl);
 
@@ -976,7 +967,11 @@ int getSecureRNGSharedSecret(tIB_INSTANCEDATA *pIBRand)
         return 2240;
     }
     sprintf(pUrl,"%s/%s", pIBRand->cfg.szBaseUrl, szEndpoint);
-    SetPreferredRngEngine(pIBRand, "rdrand");
+    if (!SetPreferredRngEngine(pIBRand))
+    {
+        app_tracef("ERROR: Failed to set preferred openssl RNG engine for SSL connection");
+        return 22402;
+    }
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPGET, TRUE );
     curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pUrl);
 
@@ -1148,7 +1143,7 @@ static bool prepareRNGBytes(tIB_INSTANCEDATA *pIBRand)
             // Alloc a new, smaller buffer, copy the data in, and free up the original buffer.
             // Not the most efficient, but simple - for now.
             pIBRand->ResultantData.cbData = cbOriginalData - 2;
-            pIBRand->ResultantData.pData = malloc(pIBRand->ResultantData.cbData);
+            pIBRand->ResultantData.pData = (char *)malloc(pIBRand->ResultantData.cbData);
             if (!pIBRand->ResultantData.pData)
             {
                 app_tracef("WARNING: Failed to clean Base64 data. Discarding %u bytes.", pIBRand->ResultantData.cbData);
@@ -1198,13 +1193,7 @@ static bool prepareSRNGBytes(tIB_INSTANCEDATA *pIBRand)
     }
 
     // Destroy and free inbound encrypted material
-    if (pIBRand->ResultantData.pData && pIBRand->ResultantData.cbData)
-    {
-        memset(pIBRand->ResultantData.pData, 0, pIBRand->ResultantData.cbData);
-        free(pIBRand->ResultantData.pData);
-        pIBRand->ResultantData.pData = NULL;
-        pIBRand->ResultantData.cbData = 0;
-    }
+    DestroyAndFreeExistingItem(&pIBRand->ResultantData);
 
     // And take on the buffer containing the newly decrypted data
     pIBRand->ResultantData = decryptedData;
@@ -1317,8 +1306,8 @@ int DoSimpleAuthentication(tIB_INSTANCEDATA *pIBRand)
     //////////////////////////////
     // Authenticate the user
     //////////////////////////////
-    pIBRand->Token.pData = NULL;
-    pIBRand->Token.cbData = 0;
+    pIBRand->authToken.pData = NULL;
+    pIBRand->authToken.cbData = 0;
     rc = authenticateUser ( pIBRand );
     if (rc != 0)
     {
@@ -1332,14 +1321,14 @@ int DoSimpleAuthentication(tIB_INSTANCEDATA *pIBRand)
     //  "notAfter":"2019-12-04T14:38:49.10979Z"}
 
     // Todo: Use strtok or regex or similar
-    pIBRand->pRealToken = ExtractSubstring(pIBRand->Token.pData, "\"token\":\"", "\"");
+    pIBRand->pRealToken = ExtractSubstring(pIBRand->authToken.pData, "\"token\":\"", "\"");
     if (!pIBRand->pRealToken)
     {
         // Check with space after colon
-        pIBRand->pRealToken = ExtractSubstring(pIBRand->Token.pData, "\"token\": \"", "\"");
+        pIBRand->pRealToken = ExtractSubstring(pIBRand->authToken.pData, "\"token\": \"", "\"");
         if (!pIBRand->pRealToken)
         {
-          app_tracef("ERROR: Cannot find token in TokenData pData=[%s]", pIBRand->Token.pData);
+          app_tracef("ERROR: Cannot find token in TokenData pData=[%s]", pIBRand->authToken.pData);
           return 2270;
         }
     }
@@ -1349,8 +1338,8 @@ int DoSimpleAuthentication(tIB_INSTANCEDATA *pIBRand)
         app_tracef("INFO: pRealToken = [%s]", pIBRand->pRealToken);
     }
 
-    //app_tracef("[ibrand-service] DEBUG: Token.pData=[%s]\n", pIBRand->Token.pData);
-    //app_tracef("[ibrand-service] DEBUG: pRealToken=[%s]\n", pIBRand->pRealToken);
+    //app_tracef("[ibrand-service] DEBUG: authToken.pData=[%s]", pIBRand->authToken.pData);
+    //app_tracef("[ibrand-service] DEBUG: pRealToken=[%s]", pIBRand->pRealToken);
 
     pIBRand->fAuthenticated = TRUE;
     return 0;
@@ -1407,41 +1396,13 @@ void ironbridge_api_finalise(tIB_INSTANCEDATA *pIBRand)
         free(pIBRand->pRealToken);
         pIBRand->pRealToken = NULL;
     }
-    if (pIBRand->ResultantData.pData)
-    {
-        memset(pIBRand->ResultantData.pData, 0, pIBRand->ResultantData.cbData);
-        free(pIBRand->ResultantData.pData);
-        pIBRand->ResultantData.cbData = 0;
-        pIBRand->ResultantData.pData = NULL;
-    }
-    if (pIBRand->Token.pData)
-    {
-        memset(pIBRand->Token.pData, 0, pIBRand->Token.cbData);
-        free(pIBRand->Token.pData);
-        pIBRand->Token.cbData = 0;
-        pIBRand->Token.pData = NULL;
-    }
-    if (pIBRand->symmetricSharedSecret.pData)
-    {
-        memset(pIBRand->symmetricSharedSecret.pData, 0, pIBRand->symmetricSharedSecret.cbData);
-        free(pIBRand->symmetricSharedSecret.pData);
-        pIBRand->symmetricSharedSecret.cbData = 0;
-        pIBRand->symmetricSharedSecret.pData = NULL;
-    }
-    if (pIBRand->ourKemSecretKey.pData)
-    {
-        memset(pIBRand->ourKemSecretKey.pData, 0, pIBRand->ourKemSecretKey.cbData);
-        free(pIBRand->ourKemSecretKey.pData);
-        pIBRand->ourKemSecretKey.cbData = 0;
-        pIBRand->ourKemSecretKey.pData = NULL;
-    }
-    // if (pIBRand->theirSigningPublicKey.pData)
-    // {
-    //     memset(pIBRand->theirSigningPublicKey.pData, 0, pIBRand->theirSigningPublicKey.cbData);
-    //     free(pIBRand->theirSigningPublicKey.pData);
-    //     pIBRand->theirSigningPublicKey.cbData = 0;
-    //     pIBRand->theirSigningPublicKey.pData = NULL;
-    // }
+
+    DestroyAndFreeExistingItem(&pIBRand->ResultantData);
+    DestroyAndFreeExistingItem(&pIBRand->authToken);
+    DestroyAndFreeExistingItem(&pIBRand->symmetricSharedSecret);
+    DestroyAndFreeExistingItem(&pIBRand->ourKemSecretKey);
+    //DestroyAndFreeExistingItem(&pIBRand->theirSigningPublicKey);
+
     curl_easy_cleanup(pIBRand->hCurl);
     curl_global_cleanup();
 
@@ -1472,15 +1433,11 @@ static int ImportKemSecretKeyFromClientSetupOOBFile(tIB_INSTANCEDATA *pIBRand)
     if (rc != 0)
     {
         app_tracef("ERROR: Failed to write KEM secret key to file \"%s\"", pIBRand->cfg.ourKemSecretKeyFilename);
-        free(binaryData.pData);
-        binaryData.pData = NULL;
-        binaryData.cbData = 0;
+        DestroyAndFreeExistingItem(&binaryData);
         return rc;
     }
 
-    free(binaryData.pData);
-    binaryData.pData = NULL;
-    binaryData.cbData = 0;
+    DestroyAndFreeExistingItem(&binaryData);
     return 0;
 }
 
@@ -1594,7 +1551,9 @@ int main(int argc, char * argv[])
     app_tracef("===ibrand_service==================================================================================================");
 
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: ReadConfig \"%s\"", pIBRand->szConfigFilename);
-    rc = ReadConfig(pIBRand->szConfigFilename, &(pIBRand->cfg), CRYPTO_SECRETKEYBYTES, CRYPTO_PUBLICKEYBYTES);
+
+    //rc = ReadConfig(pIBRand->szConfigFilename, &(pIBRand->cfg), CRYPTO_SECRETKEYBYTES, CRYPTO_PUBLICKEYBYTES);
+    rc = ReadConfig(pIBRand->szConfigFilename, &(pIBRand->cfg), 0, 0);
     if (rc != 0)
     {
         app_tracef("FATAL: Configuration error while processing \"%s\". Aborting. rc=%d", pIBRand->szConfigFilename, rc);
@@ -1745,7 +1704,9 @@ int main(int argc, char * argv[])
 
                 pIBRand->ourKemSecretKey.pData        = NULL;
                 pIBRand->ourKemSecretKey.cbData       = 0;
-                rc = ReadOurKemPrivateKey(pIBRand, CRYPTO_SECRETKEYBYTES);
+
+                //rc = ReadOurKemPrivateKey(pIBRand, CRYPTO_SECRETKEYBYTES);
+                rc = ReadOurKemPrivateKey(pIBRand, 0);
                 if (rc != 0)
                 {
                     app_tracef("FATAL: Configuration error. Aborting. rc=%d", rc);
@@ -2039,12 +2000,7 @@ int main(int argc, char * argv[])
                 // pIBRand->ResultantData.pData must be freed by the caller
                 bool success = storeRandomBytes(pIBRand, &(pIBRand->ResultantData));
                 // Should be freed already, but just in case...
-                if (pIBRand->ResultantData.pData)
-                {
-                    free(pIBRand->ResultantData.pData);
-                    pIBRand->ResultantData.pData = NULL;
-                }
-                pIBRand->ResultantData.cbData = 0;
+                DestroyAndFreeExistingItem(&pIBRand->ResultantData);
 
                 // If there was a problem accessing the datastore, let's pause
                 // and reflect for a few seconds instead of burning up the network.
@@ -2065,22 +2021,10 @@ int main(int argc, char * argv[])
                     app_tracef("INFO: Destroy SharedSecret, forcing renewal");
 
                 // Destroy any existing encapsulatedSharedSecret, forcing the new one to be retrieved on next iteration on the main loop.
-                if (pIBRand->encapsulatedSharedSecret.pData)
-                {
-                    memset(pIBRand->encapsulatedSharedSecret.pData, 0, pIBRand->encapsulatedSharedSecret.cbData);
-                    free(pIBRand->encapsulatedSharedSecret.pData);
-                    pIBRand->encapsulatedSharedSecret.pData = NULL;
-                    pIBRand->encapsulatedSharedSecret.cbData = 0;
-                }
-
+                DestroyAndFreeExistingItem(&pIBRand->encapsulatedSharedSecret);
                 // Destroy any existing SharedSecret, forcing the new one to be decapsulated and used as and when needed.
-                if (pIBRand->symmetricSharedSecret.pData)
-                {
-                    memset(pIBRand->symmetricSharedSecret.pData, 0, pIBRand->symmetricSharedSecret.cbData);
-                    free(pIBRand->symmetricSharedSecret.pData);
-                    pIBRand->symmetricSharedSecret.pData = NULL;
-                    pIBRand->symmetricSharedSecret.cbData = 0;
-                }
+                DestroyAndFreeExistingItem(&pIBRand->symmetricSharedSecret);
+
                 currentState = STATE_GETNEWSHAREDSECRET;
                 break;
             }

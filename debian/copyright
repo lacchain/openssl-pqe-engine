@@ -5,36 +5,6 @@ Source: <url://example.com>
 # Please double check copyright with the licensecheck(1) command.
 
 Files:     CMakeLists.txt
-           PQCrypto-LWEKE/CMakeLists.txt
-           PQCrypto-LWEKE/aes/aes.c
-           PQCrypto-LWEKE/aes/aes.h
-           PQCrypto-LWEKE/aes/aes_c.c
-           PQCrypto-LWEKE/aes/aes_local.h
-           PQCrypto-LWEKE/aes/aes_ni.c
-           PQCrypto-LWEKE/api_frodo1344.h
-           PQCrypto-LWEKE/api_frodo640.h
-           PQCrypto-LWEKE/api_frodo976.h
-           PQCrypto-LWEKE/config.h
-           PQCrypto-LWEKE/frodo1344.c
-           PQCrypto-LWEKE/frodo640.c
-           PQCrypto-LWEKE/frodo976.c
-           PQCrypto-LWEKE/frodo_macrify.c
-           PQCrypto-LWEKE/frodo_macrify.h
-           PQCrypto-LWEKE/frodo_macrify_reference.c
-           PQCrypto-LWEKE/kem.c
-           PQCrypto-LWEKE/noise.c
-           PQCrypto-LWEKE/random/random.c
-           PQCrypto-LWEKE/random/random.h
-           PQCrypto-LWEKE/sha3/fips202.c
-           PQCrypto-LWEKE/sha3/fips202.h
-           PQCrypto-LWEKE/sha3/fips202x4.c
-           PQCrypto-LWEKE/sha3/fips202x4.h
-           PQCrypto-LWEKE/sha3/keccak4x/KeccakP-1600-times4-SIMD256.c
-           PQCrypto-LWEKE/sha3/keccak4x/KeccakP-1600-times4-SnP.h
-           PQCrypto-LWEKE/sha3/keccak4x/KeccakP-1600-unrolling.macros
-           PQCrypto-LWEKE/sha3/keccak4x/SIMD256-config.h
-           PQCrypto-LWEKE/sha3/keccak4x/align.h
-           PQCrypto-LWEKE/util.c
            ibrand_common/.vscode/launch.json
            ibrand_common/CMakeLists.txt
            ibrand_common/Makefile.linux
@@ -65,8 +35,10 @@ Files:     CMakeLists.txt
            ibrand_openssl/makefile
            ibrand_service/.gitignore
            ibrand_service/CMakeLists.txt
-           ibrand_service/IB_SymmetricEncryption.c
-           ibrand_service/IB_SymmetricEncryption.h
+           ibrand_service/ibrand_service_aes.c
+           ibrand_service/ibrand_service_aes.h
+           ibrand_service/ibrand_service_kem.c
+           ibrand_service/ibrand_service_kem.h
            ibrand_service/RFC2898DeriveBytes.c
            ibrand_service/RFC2898DeriveBytes.h
            ibrand_service/makefile
@@ -94,8 +66,7 @@ License:   __UNKNOWN__
  in the file LICENSE in the source distribution or at
  https://www.openssl.org/source/license.html
 
-Files:     PQCrypto-LWEKE/sha3/keccak4x/brg_endian.h
-           ibrand_lib/Keccak/brg_endian.h
+Files:     ibrand_lib/Keccak/brg_endian.h
 Copyright: 1998-2008 Brian Gladman, Worcester, UK.
 License:   __UNKNOWN__
  LICENSE TERMS

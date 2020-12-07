@@ -64,6 +64,17 @@ int ValidateSettings(tIB_CONFIGDATA *pIBConfig)
 
 static int localDebugTracing = false;
 
+static bool __StringLengthExceeded(JSONPair *item, size_t maxLen)
+{
+    size_t itemLen = strlen(item->value->stringValue);
+    if (itemLen > maxLen)
+    {
+        app_tracef("ERROR: Length of item %s (%d) exceeds maxlen (%d)", item->key, itemLen, maxLen);
+        return true;
+    }
+    return false;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Config Top Level Functions
 ////////////////////////////////////////////////////////////////////////////////
@@ -74,14 +85,14 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
     json2 = my_parseJSON(szJsonConfig);
     if (!json2)
     {
-        app_tracef("ERROR: Failed to parse JSON string\n");
+        app_tracef("ERROR: Failed to parse JSON string");
         return false;
     }
 
     for (int ii=0; ii<json2->count; ii++)
     {
         if (localDebugTracing)
-            app_tracef("DEBUG: Found json item[%d] %s=%s\n", ii, json2->pairs[ii].key, (json2->pairs[ii].type == JSON_STRING)?(json2->pairs[ii].value->stringValue):"[JSON object]");
+            app_tracef("DEBUG: Found json item[%d] %s=%s", ii, json2->pairs[ii].key, (json2->pairs[ii].type == JSON_STRING)?(json2->pairs[ii].value->stringValue):"[JSON object]");
 
         if (strcmp(json2->pairs[ii].key,"AuthSettings") == 0 && json2->pairs[ii].type == JSON_OBJECT)
         {
@@ -90,36 +101,64 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
             for (int jj=0; jj<childJson->count; jj++)
             {
                 if (localDebugTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
+                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
                 {
                     if (strcmp(childJson->pairs[jj].key,"AUTHTYPE")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->szAuthType)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->szAuthType, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szAuthType));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"AUTHURL")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->szAuthUrl)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->szAuthUrl, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szAuthUrl));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"AUTHUSER")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->szUsername)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->szUsername, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szUsername));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"AUTHPSWD")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->szPassword)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->szPassword, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szPassword));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"AUTHSSLCERTFILE")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->szAuthSSLCertFile)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->szAuthSSLCertFile, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szAuthSSLCertFile));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"AUTHSSLCERTTYPE")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->szAuthSSLCertType)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->szAuthSSLCertType, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szAuthSSLCertType));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"AUTHSSLKEYFILE" )==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->szAuthSSLKeyFile)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->szAuthSSLKeyFile , childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szAuthSSLKeyFile ));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"AUTHRETRYDELAY")==0)
@@ -136,7 +175,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
             for (int jj=0; jj<childJson->count; jj++)
             {
                 if (localDebugTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
+                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
                 {
@@ -144,12 +183,24 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
                     {
                         pIBConfig->useSecureRng = atoi(childJson->pairs[jj].value->stringValue);
                     }
+                    else if (strcmp(childJson->pairs[jj].key,"PREFERRED_KEM_ALGORITHM")==0)
+                    {
+                        pIBConfig->preferredKemAlgorithm = atoi(childJson->pairs[jj].value->stringValue);
+                    }
                     else if (strcmp(childJson->pairs[jj].key,"CLIENTSETUPOOBFILENAME")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->clientSetupOOBFilename)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->clientSetupOOBFilename, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->clientSetupOOBFilename));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"OURKEMSECRETKEYFILENAME")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->ourKemSecretKeyFilename)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->ourKemSecretKeyFilename, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->ourKemSecretKeyFilename));
                     }
                     //else if (strcmp(childJson->pairs[jj].key,"THEIRSIGNINGPUBLICKEYFILENAME")==0)
@@ -166,12 +217,16 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
             for (int jj=0; jj<childJson->count; jj++)
             {
                 if (localDebugTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
+                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
                 {
                     if (strcmp(childJson->pairs[jj].key,"BASEURL")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->szBaseUrl)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->szBaseUrl, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szBaseUrl));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"BYTESPERREQUEST")==0)
@@ -192,25 +247,41 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
             for (int jj=0; jj<childJson->count; jj++)
             {
                 if (localDebugTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
+                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
                 {
                     if (strcmp(childJson->pairs[jj].key,"STORAGETYPE")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->szStorageType)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->szStorageType, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szStorageType));
                     }
 
                     else if (strcmp(childJson->pairs[jj].key,"FILE_DATAFORMAT")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->szStorageDataFormat)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->szStorageDataFormat, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szStorageDataFormat));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"FILE_FILENAME")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->szStorageFilename)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->szStorageFilename, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szStorageFilename));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"FILE_LOCKFILEPATH")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->szStorageLockfilePath)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->szStorageLockfilePath, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->szStorageLockfilePath));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"FILE_HIGHWATERMARK")==0)
@@ -224,10 +295,18 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
 
                     else if (strcmp(childJson->pairs[jj].key,"SHMEM_BACKINGFILENAME")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->shMemBackingFilename)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->shMemBackingFilename, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->shMemBackingFilename));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"SHMEM_SEMAPHORENAME")==0)
                     {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->shMemSemaphoreName)-1))
+                        {
+                            return false;
+                        }
                         my_strlcpy(pIBConfig->shMemSemaphoreName, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->shMemSemaphoreName));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"SHMEM_STORAGESIZE")==0)
@@ -253,7 +332,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
             for (int jj=0; jj<childJson->count; jj++)
             {
                 if (localDebugTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
+                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
                 {
@@ -287,9 +366,9 @@ int ReadConfig(char *szConfigFilename, tIB_CONFIGDATA *pIBConfig, size_t secretK
     rc = __ParseJsonConfig(szJsonConfig, pIBConfig);
     if (!rc)
     {
-        app_tracef("ERROR: Error %d parsing JSON config\n", rc);
+        app_tracef("ERROR: Error parsing JSON config");
         if (szJsonConfig) free(szJsonConfig);
-        return rc;
+        return 10117;
     }
     if (szJsonConfig) free(szJsonConfig);
 
@@ -316,27 +395,27 @@ void PrintConfig(tIB_CONFIGDATA *pIBConfig)
        hiddenPassword[ii] = '*';
 
     app_tracef("fVerbose              =[%u]" , pIBConfig->fVerbose              ); // Bitmapped field
-    app_tracef("szAuthType            =[%s]" , pIBConfig->szAuthType            ); // char          szAuthType               [16]   // "SIMPLE";
-    app_tracef("szAuthUrl             =[%s]" , pIBConfig->szAuthUrl             ); // char          szAuthUrl                [128]  // "https://ironbridgeapi.com/login";
+    app_tracef("szAuthType            =[%s]" , pIBConfig->szAuthType            ); // char          szAuthType               [16]        // "SIMPLE";
+    app_tracef("szAuthUrl             =[%s]" , pIBConfig->szAuthUrl             ); // char          szAuthUrl                [_MAX_URL]  // "https://ironbridgeapi.com/login";
     app_tracef("szUsername            =[%s]" , pIBConfig->szUsername            ); // char          szUsername               [32]
-    app_tracef("szPassword            =[%s]" , hiddenPassword                 ); // char          szPassword               [32]
-    app_tracef("szAuthSSLCertFile     =[%s]" , pIBConfig->szAuthSSLCertFile     ); // char          szAuthSSLCertFile        [128]  // "/etc/ssl/certs/client_cert.pem"
-    app_tracef("szAuthSSLCertType     =[%s]" , pIBConfig->szAuthSSLCertType     ); // char          szAuthSSLCertType        [32]   // "PEM"
-    app_tracef("szAuthSSLKeyFile      =[%s]" , pIBConfig->szAuthSSLKeyFile      ); // char          szAuthSSLKeyFile         [128]  // "/etc/ssl/private/client_key.pem"
+    app_tracef("szPassword            =[%s]" , hiddenPassword                   ); // char          szPassword               [32]
+    app_tracef("szAuthSSLCertFile     =[%s]" , pIBConfig->szAuthSSLCertFile     ); // char          szAuthSSLCertFile        [_MAX_PATH] // "/etc/ssl/certs/client_cert.pem"
+    app_tracef("szAuthSSLCertType     =[%s]" , pIBConfig->szAuthSSLCertType     ); // char          szAuthSSLCertType        [32]        // "PEM"
+    app_tracef("szAuthSSLKeyFile      =[%s]" , pIBConfig->szAuthSSLKeyFile      ); // char          szAuthSSLKeyFile         [_MAX_PATH] // "/etc/ssl/private/client_key.pem"
     app_tracef("authRetryDelay        =[%d]" , pIBConfig->authRetryDelay        ); // int           authRetryDelay
     //app_tracef("ourKemSecretKey       =[%s]" , hiddenKemSecretKey             );
     //app_tracef("theirSigningPublicKey =[%s]" , pIBRand->theirSigningPublicKey );
     app_tracef("useSecureRng          =[%u]" , pIBConfig->useSecureRng          );
-    app_tracef("szBaseUrl             =[%s]" , pIBConfig->szBaseUrl             ); // char          szBaseUrl                [128]  // "https://ironbridgeapi.com/api"; // http://192.168.9.128:6502/v1/ironbridge/api
-    app_tracef("bytesPerRequest       =[%d]" , pIBConfig->bytesPerRequest       ); // int           bytesPerRequest                 // 16
-    app_tracef("retrievalRetryDelay   =[%d]" , pIBConfig->retrievalRetryDelay   ); // int           retrievalRetryDelay             //
+    app_tracef("szBaseUrl             =[%s]" , pIBConfig->szBaseUrl             ); // char          szBaseUrl                [_MAX_URL]  // "https://ironbridgeapi.com/api"; // http://192.168.9.128:6502/v1/ironbridge/api
+    app_tracef("bytesPerRequest       =[%d]" , pIBConfig->bytesPerRequest       ); // int           bytesPerRequest                      // 16
+    app_tracef("retrievalRetryDelay   =[%d]" , pIBConfig->retrievalRetryDelay   ); // int           retrievalRetryDelay                  //
     app_tracef("szStorageType         =[%s]" , pIBConfig->szStorageType         ); // char[16]      // "FILE", "SHMEM"
     app_tracef("szStorageDataFormat   =[%s]" , pIBConfig->szStorageDataFormat   ); // char[16]      // RAW, BASE64, HEX
-    app_tracef("szStorageFilename     =[%s]" , pIBConfig->szStorageFilename     ); // char[128]     // "/var/lib/ibrand/ibrand_data.bin"
-    app_tracef("szStorageLockfilePath =[%s]" , pIBConfig->szStorageLockfilePath ); // char[128]     // "/tmp"
+    app_tracef("szStorageFilename     =[%s]" , pIBConfig->szStorageFilename     ); // char[_MAX_PATH] // "/var/lib/ibrand/ibrand_data.bin"
+    app_tracef("szStorageLockfilePath =[%s]" , pIBConfig->szStorageLockfilePath ); // char[_MAX_PATH] // "/tmp"
     app_tracef("storageHighWaterMark  =[%ld]", pIBConfig->storageHighWaterMark  ); // long          // 1038336; // 1MB
     app_tracef("storageLowWaterMark   =[%ld]", pIBConfig->storageLowWaterMark   ); // long          // 102400; // 100KB
-    app_tracef("shMemBackingFilename  =[%s]" , pIBConfig->shMemBackingFilename  ); // char[128]     // "shmem_ibrand01" e.g. /dev/shm/shmem_ibrand01
+    app_tracef("shMemBackingFilename  =[%s]" , pIBConfig->shMemBackingFilename  ); // char[_MAX_PATH] // "shmem_ibrand01" e.g. /dev/shm/shmem_ibrand01
     app_tracef("shMemSemaphoreName    =[%s]" , pIBConfig->shMemSemaphoreName    ); // char[16]      // "sem_ibrand01"
     app_tracef("shMemStorageSize      =[%ld]", pIBConfig->shMemStorageSize      ); // long          // (100*1024)
     app_tracef("shMemLowWaterMark     =[%ld]", pIBConfig->shMemLowWaterMark     ); // long          // 102400; // 100KB
@@ -353,14 +432,14 @@ static bool __ParseJsonOOBData(const char *szJsonString, tIB_OOBDATA *pOobData)
     json2 = my_parseJSON(szJsonString);
     if (!json2)
     {
-        app_tracef("ERROR: Failed to parse OOB JSON string\n");
+        app_tracef("ERROR: Failed to parse OOB JSON string");
         return false;
     }
 
     for (int ii=0; ii<json2->count; ii++)
     {
         if (localDebugTracing)
-            app_tracef("DEBUG: Found json item[%d] %s=%s\n", ii, json2->pairs[ii].key, (json2->pairs[ii].type == JSON_STRING)?(json2->pairs[ii].value->stringValue):"[JSON object]");
+            app_tracef("DEBUG: Found json item[%d] %s=%s", ii, json2->pairs[ii].key, (json2->pairs[ii].type == JSON_STRING)?(json2->pairs[ii].value->stringValue):"[JSON object]");
 
         if (json2->pairs[ii].type == JSON_STRING)
         {

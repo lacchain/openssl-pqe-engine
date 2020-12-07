@@ -37,12 +37,6 @@
 #include <syslog.h>
 #endif
 
-#ifndef _MAX_PATH
-#define _MAX_PATH 128
-#endif
-
-
-
 typedef struct tagAPPTRACECONFIG
 {
     char logFilePath[_MAX_PATH];

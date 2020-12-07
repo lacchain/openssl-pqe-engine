@@ -34,14 +34,14 @@ int my_getFilenameFromEnvVar(const char *szConfigEnvVar, char **pszFilename)
 
     if (!szConfigEnvVar)
     {
-        //app_tracef("ERROR: Parameter error\n");
+        //app_tracef("ERROR: Parameter error");
         return 6000;
     }
 
     szConfigfilePath = getenv(szConfigEnvVar); // Returns a pointer into the current environment
     if (!szConfigfilePath)
     {
-        app_tracef("ERROR: Cannot find environment variable: %s\n", szConfigEnvVar);
+        app_tracef("ERROR: Cannot find environment variable: %s", szConfigEnvVar);
         return 6001;
     }
 
@@ -49,7 +49,7 @@ int my_getFilenameFromEnvVar(const char *szConfigEnvVar, char **pszFilename)
     *pszFilename = malloc(strlen(szConfigfilePath));
     if (*pszFilename == NULL)
     {
-        app_tracef("ERROR: Out of memory\n");
+        app_tracef("ERROR: Out of memory");
         return 6002;
     }
     strcpy(*pszFilename, szConfigfilePath);
@@ -72,20 +72,20 @@ static int __Config_ReadEntireFileIntoMemory (const char *szFilename, void *pDat
     fIn = fopen(szFilename, "rb");
     if (!fIn)
     {
-        app_tracef("ERROR: Error %d opening file \"%s\" for reading\n", errno, szFilename);
+        app_tracef("ERROR: Error %d opening file \"%s\" for reading", errno, szFilename);
         return 6008;
     }
 
     bytesRead = fread(pData, 1, bytesToRead, fIn);
     if (bytesRead == -1)
     {
-        app_tracef("ERROR: Error %u attempting to read %u bytes from file \"%s\"\n", errno, bytesToRead, szFilename);
+        app_tracef("ERROR: Error %u attempting to read %u bytes from file \"%s\"", errno, bytesToRead, szFilename);
         fclose(fIn);
         return 6009;
     }
 
     fclose(fIn);
-    //app_tracef("INFO: Configuration successfully read from \"%s\" (%d bytes)\n", szFilename, bytesRead );
+    //app_tracef("INFO: Configuration successfully read from \"%s\" (%d bytes)", szFilename, bytesRead );
     return 0;
 }
 
@@ -98,21 +98,21 @@ static int __getFileInfo(const char *szFilename, long *pRetFilesize)
 
     if (!szFilename)
     {
-        app_tracef("ERROR: Parameter error\n");
+        app_tracef("ERROR: Parameter error");
         return 6001;
     }
 
     rc = my_fileExists(szFilename);
     if (rc == false)
     {
-        app_tracef("ERROR: File not found: %s\n", szFilename);
+        app_tracef("ERROR: File not found: %s", szFilename);
         return 6004;
     }
 
     *pRetFilesize = my_getFilesize(szFilename);
     if (*pRetFilesize < 0)
     {
-        app_tracef("ERROR: Unable to determine size of file: %s\n", szFilename);
+        app_tracef("ERROR: Unable to determine size of file: %s", szFilename);
         return 6005;
     }
     return 0;
@@ -127,7 +127,7 @@ int my_readEntireConfigFileIntoMemory(const char *szConfigFilename, char **pszCo
 
     if (!szConfigFilename)
     {
-        app_tracef("ERROR: Parameter error\n");
+        app_tracef("ERROR: Parameter error");
         return 6000;
     }
 
@@ -136,21 +136,21 @@ int my_readEntireConfigFileIntoMemory(const char *szConfigFilename, char **pszCo
         return rc;
     if (filesize == 0)
     {
-        app_tracef("ERROR: Empty file\n");
+        app_tracef("ERROR: Empty file");
         return 6006;
     }
 
     *pszConfigFileContents = malloc(filesize+1); // We will terminate the json string
     if (*pszConfigFileContents == NULL)
     {
-        app_tracef("ERROR: Out of memory\n");
+        app_tracef("ERROR: Out of memory");
         return 6007;
     }
 
     rc = __Config_ReadEntireFileIntoMemory(szConfigFilename, (unsigned char *)(*pszConfigFileContents), (unsigned int)filesize);
     if (rc != 0)
     {
-        app_tracef("ERROR: Read failed\n");
+        app_tracef("ERROR: Read failed");
         free(*pszConfigFileContents);
         return rc;
     }

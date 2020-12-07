@@ -31,7 +31,7 @@ typedef struct tagIB_CONFIGDATA
     unsigned char  fVerbose;                        // bit 0=general, bit1=config bit2=auth, bit3=data, bit4=curl:
     // Auth
     char          szAuthType[16];                   // "SIMPLE";
-    char          szAuthUrl[128];                   // "https://ironbridgeapi.com/login";
+    char          szAuthUrl[_MAX_URL];              // "https://ironbridgeapi.com/login";
     char          szUsername[32];
     char          szPassword[32];
     char          szAuthSSLCertFile[_MAX_PATH];     // "/etc/ssl/certs/client_cert.pem"
@@ -39,7 +39,7 @@ typedef struct tagIB_CONFIGDATA
     char          szAuthSSLKeyFile[_MAX_PATH];      // "/etc/ssl/private/client_key.pem"
     int           authRetryDelay;
     // Connection
-    char          szBaseUrl[128];                   // "https://ironbridgeapi.com/api"; // http://192.168.9.128:6502/v1/ironbridge/api
+    char          szBaseUrl[_MAX_URL];              // "https://ironbridgeapi.com/api"; // http://192.168.9.128:6502/v1/ironbridge/api
     int           bytesPerRequest;                  // Tested with 16 & 256
     int           retrievalRetryDelay;
     // Storage
@@ -59,6 +59,7 @@ typedef struct tagIB_CONFIGDATA
     size_t        publicKeyBytes;
     // SRNG Config
     unsigned char useSecureRng;
+    int           preferredKemAlgorithm;
     char          clientSetupOOBFilename[_MAX_PATH];
     char          ourKemSecretKeyFilename[_MAX_PATH];
     //char          theirSigningPublicKeyFilename[_MAX_PATH];

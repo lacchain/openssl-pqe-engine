@@ -12,6 +12,8 @@
 #endif
 #include <time.h>
 
+#include "libibrand_config.h"
+
 #define BUFLEN 512u
 
 #ifdef __cplusplus
@@ -22,7 +24,7 @@ extern "C" {
 struct ibrand_context
 {
     const char *message;
-    char tempMessageBuffer200[200];
+    char tempMessageBuffer200[200];  // must be _MAX_PATH + some
     int errorCode;
     int32_t recentWaterLevel;
 };

@@ -9,7 +9,6 @@ add_subdirectory(ibrand_common)
 add_subdirectory(ibrand_lib)
 add_subdirectory(ibrand_service)
 add_subdirectory(ibrand_openssl)
-add_subdirectory(PQCrypto-LWEKE)
 
 pkg_get_variable(OPENSSL_ENGINES_DIR libcrypto enginesdir)
 pkg_get_variable(OPENSSL_PREFIX libcrypto prefix)
@@ -34,8 +33,4 @@ install(TARGETS ibrand_service
 install(TARGETS ibrand_openssl
         LIBRARY
           DESTINATION ${OPENSSL_ENGINES_DESTINATION}
-       )
-install(TARGETS frodokem
-        LIBRARY
-          DESTINATION ${CMAKE_INSTALL_LIBDIR}
        )

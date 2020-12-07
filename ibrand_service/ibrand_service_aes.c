@@ -11,7 +11,7 @@
 #include "../ibrand_common/my_utilslib.h"
 
 #include "RFC2898DeriveBytes.h"
-#include "IB_SymmetricEncryption.h"
+#include "ibrand_service_aes.h"
 
 
 #define PADDING_BYTE 0x00
@@ -288,7 +288,7 @@ int AESDecryptPackage(tIB_INSTANCEDATA *pIBRand,
         cbSignificantData = pAesPackageHeader->packageLength;
     }
 
-    if (cbSignificantData != expectedSize)
+    if ((expectedSize > 0) && (cbSignificantData != expectedSize))
     {
         app_tracef("WARNING: Size of significant data (%u) is not as expected (%u) (size of inbound data was %u)", cbSignificantData, expectedSize, cbEncryptedData);
     }
@@ -313,7 +313,7 @@ int AESDecryptPackage(tIB_INSTANCEDATA *pIBRand,
                               &cbDecryptedData);                               // pcbDecryptedData
     if (errcode)
     {
-        app_tracef("ERROR: AESDecryptBytes failed with rc=%d\n", errcode);
+        app_tracef("ERROR: AESDecryptBytes failed with rc=%d", errcode);
         return errcode;
     }
     pDestBuffer->pData = (char *)pDecryptedData;

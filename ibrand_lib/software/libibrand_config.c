@@ -42,7 +42,7 @@ tIB_INSTANCEDATA *cfgInitConfig (void)
     }
     if (strlen(pIBRand->szConfigFilename) == 0)
     {
-        app_tracef("[ibrand_lib] FATAL: Configuration not specified, neither on commandline nor via an environment variable.\n");
+        app_tracef("[ibrand_lib] FATAL: Configuration not specified, neither on commandline nor via an environment variable.");
         free(pIBRand);
         return NULL;
     }
@@ -61,9 +61,9 @@ tIB_INSTANCEDATA *cfgInitConfig (void)
     //    cfgPrintConfig(pIBRand);
     //}
 
-    ShMem_SetBackingFilename (pIBRand->cfg.shMemBackingFilename); // char[128] // "shmem_ibrand01" e.g. /dev/shm/shmem_ibrand01
-    ShMem_SetStorageSize     (pIBRand->cfg.shMemStorageSize    ); // long      // (100*1024)
-    ShMem_SetSemaphoreName   (pIBRand->cfg.shMemSemaphoreName  ); // char[16]  // "sem_ibrand01"
+    ShMem_SetBackingFilename (pIBRand->cfg.shMemBackingFilename); // char[_MAX_PATH] // "shmem_ibrand01" e.g. /dev/shm/shmem_ibrand01
+    ShMem_SetStorageSize     (pIBRand->cfg.shMemStorageSize    ); // long            // (100*1024)
+    ShMem_SetSemaphoreName   (pIBRand->cfg.shMemSemaphoreName  ); // char[16]        // "sem_ibrand01"
 
     return pIBRand;
 }
@@ -80,14 +80,14 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_INSTANCEDATA *pIBRan
     json2 = my_parseJSON(szJsonConfig);
     if (!json2)
     {
-        app_tracef("ERROR: Failed to parse JSON string\n");
+        app_tracef("ERROR: Failed to parse JSON string");
         return false;
     }
 
     for (int ii=0; ii<json2->count; ii++)
     {
         if (localDebugTracing)
-            app_tracef("DEBUG: Found json item[%d] %s=%s\n", ii, json2->pairs[ii].key, (json2->pairs[ii].type == JSON_STRING)?(json2->pairs[ii].value->stringValue):"[JSON object]");
+            app_tracef("DEBUG: Found json item[%d] %s=%s", ii, json2->pairs[ii].key, (json2->pairs[ii].type == JSON_STRING)?(json2->pairs[ii].value->stringValue):"[JSON object]");
 
         if (strcmp(json2->pairs[ii].key,"AuthSettings") == 0 && json2->pairs[ii].type == JSON_OBJECT)
         {
@@ -96,7 +96,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_INSTANCEDATA *pIBRan
             for (int jj=0; jj<childJson->count; jj++)
             {
                 if (localDebugTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
+                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
                 {
@@ -111,7 +111,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_INSTANCEDATA *pIBRan
             for (int jj=0; jj<childJson->count; jj++)
             {
                 if (localDebugTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
+                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
                 {
@@ -126,7 +126,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_INSTANCEDATA *pIBRan
             for (int jj=0; jj<childJson->count; jj++)
             {
                 if (localDebugTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
+                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
                 {
@@ -182,7 +182,7 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_INSTANCEDATA *pIBRan
             for (int jj=0; jj<childJson->count; jj++)
             {
                 if (localDebugTracing)
-                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s\n", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
+                    app_tracef("DEBUG: Found json item[%d,%d] %s=%s", ii, jj, childJson->pairs[jj].key, (childJson->pairs[jj].type == JSON_STRING)?(childJson->pairs[jj].value->stringValue):"[JSON object]");
 
                 if (childJson->pairs[jj].type == JSON_STRING)
                 {
@@ -216,9 +216,9 @@ int cfgReadConfig(char *szConfigFilename, tIB_INSTANCEDATA *pIBRand)
     rc = __ParseJsonConfig(szJsonConfig, pIBRand);
     if (!rc)
     {
-        app_tracef("ERROR: Error %d parsing JSON config\n", rc);
+        app_tracef("ERROR: Error parsing JSON config");
         if (szJsonConfig) free(szJsonConfig);
-        return rc;
+        return 20117;
     }
     if (szJsonConfig) free(szJsonConfig);
 
@@ -238,14 +238,14 @@ char *cfgGetValue(char *szEnvVariableWithFilename, char *szKey)
     szConfigfilePath = getenv(szEnvVariableWithFilename);
     if (!szConfigfilePath)
     {
-        app_tracef("ERROR: Cannot find environment variable: %s\n", szEnvVariableWithFilename);
+        app_tracef("ERROR: Cannot find environment variable: %s", szEnvVariableWithFilename);
         return NULL;
     }
 
     fConfFile = fopen(szConfigfilePath, "rt");
     if (fConfFile == NULL)
     {
-        app_tracef("ERROR: Cannot open config file: %s\n", szConfigfilePath);
+        app_tracef("ERROR: Cannot open config file: %s", szConfigfilePath);
         return NULL;
     }
 
@@ -281,14 +281,14 @@ char *cfgGetValue(char *szEnvVariableWithFilename, char *szKey)
         strncpy(key, line, pos-line);
         strncpy(val, pos+1, line+len-offset-pos);
 
-        //app_tracef("INFO: Found Key:Value pair:  %s:%s\n", key, val);
+        //app_tracef("INFO: Found Key:Value pair:  %s:%s", key, val);
 
         if (strcmp(key, szKey) == 0)
         {
             szRetVal = malloc(strlen(val+1));
             if (!szRetVal)
             {
-                app_tracef("ERROR: Out of memory\n");
+                app_tracef("ERROR: Out of memory");
                 fclose(fConfFile);
                 return NULL;
             }
@@ -298,7 +298,7 @@ char *cfgGetValue(char *szEnvVariableWithFilename, char *szKey)
     }
     if (!szRetVal)
     {
-        app_tracef("ERROR: Cannot find config key: %s\n", szKey);
+        app_tracef("ERROR: Cannot find config key: %s", szKey);
     }
     fclose(fConfFile);
     return szRetVal;
@@ -312,15 +312,15 @@ void cfgGetDatafilename(char *pIBDatafilename, size_t cbIBDatafilename, tIB_INST
 
 void cfgPrintConfig(tIB_INSTANCEDATA *pIBRand)
 {
-    app_tracef("fVerbose              =[%u]" , pIBRand->cfg.fVerbose              ); // unsigned char  // Bitmapped field
-    app_tracef("szStorageType         =[%s]" , pIBRand->cfg.szStorageType         ); // char[16]       // "FILE", "SHMEM"
-    app_tracef("szStorageDataFormat   =[%s]" , pIBRand->cfg.szStorageDataFormat   ); // char[16]       // RAW, BASE64, HEX
-    app_tracef("szStorageFilename     =[%s]" , pIBRand->cfg.szStorageFilename     ); // char[128]      // "/var/lib/ibrand/ibrand_data.bin"
-    app_tracef("szStorageLockfilePath =[%s]" , pIBRand->cfg.szStorageLockfilePath ); // char[128]      // "/tmp"
-    app_tracef("storageHighWaterMark  =[%ld]", pIBRand->cfg.storageHighWaterMark  ); // long           // 1038336 // 1MB
-    app_tracef("storageLowWaterMark   =[%ld]", pIBRand->cfg.storageLowWaterMark   ); // long           // 102400 // 100KB
-    app_tracef("shMemBackingFilename  =[%s]" , pIBRand->cfg.shMemBackingFilename  ); // char[128]      // "shmem_ibrand01" e.g. /dev/shm/shmem_ibrand01
-    app_tracef("shMemSemaphoreName    =[%s]" , pIBRand->cfg.shMemSemaphoreName    ); // char[16]       // "sem_ibrand01"
-    app_tracef("shMemStorageSize      =[%ld]", pIBRand->cfg.shMemStorageSize      ); // long           // (100*1024)
-    app_tracef("shMemLowWaterMark     =[%ld]", pIBRand->cfg.shMemLowWaterMark     ); // long           // 102400 // 100KB
+    app_tracef("fVerbose              =[%u]" , pIBRand->cfg.fVerbose              ); // unsigned char   // Bitmapped field
+    app_tracef("szStorageType         =[%s]" , pIBRand->cfg.szStorageType         ); // char[16]        // "FILE", "SHMEM"
+    app_tracef("szStorageDataFormat   =[%s]" , pIBRand->cfg.szStorageDataFormat   ); // char[16]        // RAW, BASE64, HEX
+    app_tracef("szStorageFilename     =[%s]" , pIBRand->cfg.szStorageFilename     ); // char[_MAX_PATH] // "/var/lib/ibrand/ibrand_data.bin"
+    app_tracef("szStorageLockfilePath =[%s]" , pIBRand->cfg.szStorageLockfilePath ); // char[_MAX_PATH] // "/tmp"
+    app_tracef("storageHighWaterMark  =[%ld]", pIBRand->cfg.storageHighWaterMark  ); // long            // 1038336 // 1MB
+    app_tracef("storageLowWaterMark   =[%ld]", pIBRand->cfg.storageLowWaterMark   ); // long            // 102400 // 100KB
+    app_tracef("shMemBackingFilename  =[%s]" , pIBRand->cfg.shMemBackingFilename  ); // char[_MAX_PATH] // "shmem_ibrand01" e.g. /dev/shm/shmem_ibrand01
+    app_tracef("shMemSemaphoreName    =[%s]" , pIBRand->cfg.shMemSemaphoreName    ); // char[16]        // "sem_ibrand01"
+    app_tracef("shMemStorageSize      =[%ld]", pIBRand->cfg.shMemStorageSize      ); // long            // (100*1024)
+    app_tracef("shMemLowWaterMark     =[%ld]", pIBRand->cfg.shMemLowWaterMark     ); // long            // 102400 // 100KB
 }
