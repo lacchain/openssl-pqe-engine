@@ -26,7 +26,7 @@
 #include "my_config.h"
 #include "my_logging.h"
 
-int my_getFilenameFromEnvVar(const char *szConfigEnvVar, char **pszFilename)
+tERRORCODE my_getFilenameFromEnvVar(const char *szConfigEnvVar, char **pszFilename)
 {
     const char *szConfigfilePath;
 
@@ -35,14 +35,14 @@ int my_getFilenameFromEnvVar(const char *szConfigEnvVar, char **pszFilename)
     if (!szConfigEnvVar)
     {
         //app_tracef("ERROR: Parameter error");
-        return 6000;
+        return ERC_CFG_PARAMETER_ERROR_CONFIG_ENVVAR;
     }
 
     szConfigfilePath = getenv(szConfigEnvVar); // Returns a pointer into the current environment
     if (!szConfigfilePath)
     {
         app_tracef("ERROR: Cannot find environment variable: %s", szConfigEnvVar);
-        return 6001;
+        return ERC_CFG_NOENT_CONFIG_ENVVAR_NOT_FOUND;
     }
 
     // Effectively, a strdup
@@ -50,11 +50,11 @@ int my_getFilenameFromEnvVar(const char *szConfigEnvVar, char **pszFilename)
     if (*pszFilename == NULL)
     {
         app_tracef("ERROR: Out of memory");
-        return 6002;
+        return ERC_CFG_NOMEM_CONFIG_FILE_PATH;
     }
     strcpy(*pszFilename, szConfigfilePath);
 
-    return 0;
+    return ERC_OK;
 }
 
 /*---------------------------------------------------------------------------
@@ -64,16 +64,16 @@ int my_getFilenameFromEnvVar(const char *szConfigEnvVar, char **pszFilename)
  *                  numByte - the number of byte data to be read
  * Return:          none
  ---------------------------------------------------------------------------*/
-static int __Config_ReadEntireFileIntoMemory (const char *szFilename, void *pData, unsigned int bytesToRead)
+static tERRORCODE __Config_ReadEntireFileIntoMemory (const char *szFilename, void *pData, unsigned int bytesToRead)
 {
-    FILE *       fIn;
+    FILE *fIn;
     int bytesRead = 0;
 
     fIn = fopen(szFilename, "rb");
     if (!fIn)
     {
         app_tracef("ERROR: Error %d opening file \"%s\" for reading", errno, szFilename);
-        return 6008;
+        return ERC_CFG_FILE_OPEN_FAILED;
     }
 
     bytesRead = fread(pData, 1, bytesToRead, fIn);
@@ -81,74 +81,74 @@ static int __Config_ReadEntireFileIntoMemory (const char *szFilename, void *pDat
     {
         app_tracef("ERROR: Error %u attempting to read %u bytes from file \"%s\"", errno, bytesToRead, szFilename);
         fclose(fIn);
-        return 6009;
+        return ERC_CFG_FILE_READ_FAILED;
     }
 
     fclose(fIn);
     //app_tracef("INFO: Configuration successfully read from \"%s\" (%d bytes)", szFilename, bytesRead );
-    return 0;
+    return ERC_OK;
 }
 
 
-static int __getFileInfo(const char *szFilename, long *pRetFilesize)
+static tERRORCODE __getFileInfo(const char *szFilename, long *pRetFilesize)
 {
-    int         rc;
+    tERRORCODE rc;
 
     *pRetFilesize = -1;
 
     if (!szFilename)
     {
         app_tracef("ERROR: Parameter error");
-        return 6001;
+        return ERC_CFG_PARAM_ERROR_FILENAME_NOT_SPECIFIED;
     }
 
     rc = my_fileExists(szFilename);
     if (rc == false)
     {
         app_tracef("ERROR: File not found: %s", szFilename);
-        return 6004;
+        return ERC_CFG_NOENT_FILE_NOT_FOUND;
     }
 
     *pRetFilesize = my_getFilesize(szFilename);
     if (*pRetFilesize < 0)
     {
         app_tracef("ERROR: Unable to determine size of file: %s", szFilename);
-        return 6005;
+        return ERC_CFG_FILE_SIZE_UNKNOWN;
     }
-    return 0;
+    return ERC_OK;
 }
 
-int my_readEntireConfigFileIntoMemory(const char *szConfigFilename, char **pszConfigFileContents)
+tERRORCODE my_readEntireConfigFileIntoMemory(const char *szConfigFilename, char **pszConfigFileContents)
 {
-    long  filesize;
-    int   rc;
+    long filesize;
+    tERRORCODE rc;
 
     *pszConfigFileContents = NULL;
 
     if (!szConfigFilename)
     {
         app_tracef("ERROR: Parameter error");
-        return 6000;
+        return ERC_CFG_PARAM_ERROR_FILENAME_NOT_SPECIFIED;
     }
 
     rc = __getFileInfo(szConfigFilename, &filesize);
-    if (rc)
+    if (rc != ERC_OK)
         return rc;
     if (filesize == 0)
     {
         app_tracef("ERROR: Empty file");
-        return 6006;
+        return ERC_CFG_FILE_IS_EMPTY;
     }
 
     *pszConfigFileContents = malloc(filesize+1); // We will terminate the json string
     if (*pszConfigFileContents == NULL)
     {
         app_tracef("ERROR: Out of memory");
-        return 6007;
+        return ERC_CFG_NOMEM_TO_READ_FILE_CONTENTS;
     }
 
     rc = __Config_ReadEntireFileIntoMemory(szConfigFilename, (unsigned char *)(*pszConfigFileContents), (unsigned int)filesize);
-    if (rc != 0)
+    if (rc != ERC_OK)
     {
         app_tracef("ERROR: Read failed");
         free(*pszConfigFileContents);
@@ -161,5 +161,5 @@ int my_readEntireConfigFileIntoMemory(const char *szConfigFilename, char **pszCo
     // All is good.
     // The *pszConfigFileContents buffer point to malloc'd memory and ultimately needs to be free'd by the caller.
 
-    return 0;
+    return ERC_OK;
 }

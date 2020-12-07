@@ -29,18 +29,18 @@
 //-----------------------------------------------------------------------
 // ReadContentsOfFile
 //-----------------------------------------------------------------------
-int ReadContentsOfFile(char *szFilename, tLSTRING *pDest, size_t expectedNumberOfBytes)
+tERRORCODE ReadContentsOfFile(char *szFilename, tLSTRING *pDest, size_t expectedNumberOfBytes)
 {
     if (szFilename == NULL || strlen(szFilename) == 0)
     {
-        app_tracef("ERROR: Cannot read the contents of a file with no name");
-        return 2280;
+        app_tracef("ERROR: Filename not specified");
+        return ERC_IBUTL_PARAMERR_FILENAME_NOT_SPECIFIED;
     }
 
     if (!my_fileExists(szFilename))
     {
         app_tracef("ERROR: File not found: \"%s\"", szFilename);
-        return 2281;
+        return ERC_IBUTL_PARAMERR_FILE_NOT_FOUND;
     }
 
     size_t sizeOfFileOnDisk = my_getFilesize(szFilename);
@@ -48,13 +48,13 @@ int ReadContentsOfFile(char *szFilename, tLSTRING *pDest, size_t expectedNumberO
     if (expectedNumberOfBytes != NO_EXPECTATION_OF_FILESIZE && sizeOfFileOnDisk != expectedNumberOfBytes)
     {
         app_tracef("ERROR: Size of file (%s, %u bytes) is not as expected (%u bytes)", szFilename, sizeOfFileOnDisk, expectedNumberOfBytes);
-        return 2282;
+        return ERC_IBUTL_FILESIZE_ERROR;
     }
     pDest->pData = (char *)malloc(sizeOfFileOnDisk);
     if (!pDest->pData)
     {
         app_tracef("ERROR: Failed to allocate %u bytes for file contents", sizeOfFileOnDisk);
-        return 2283;
+        return ERC_IBUTL_NOMEM_FOR_CONTENTS;
     }
 
     FILE *fIn = fopen(szFilename, "rb");
@@ -65,7 +65,7 @@ int ReadContentsOfFile(char *szFilename, tLSTRING *pDest, size_t expectedNumberO
         free(pDest->pData);
         pDest->pData = NULL;
         pDest->cbData = 0;
-        return 2284;
+        return ERC_IBUTL_FILE_OPEN_ERROR;
     }
     size_t bytesRead = fread(pDest->pData, 1, sizeOfFileOnDisk, fIn);
     if (bytesRead != sizeOfFileOnDisk)
@@ -76,46 +76,46 @@ int ReadContentsOfFile(char *szFilename, tLSTRING *pDest, size_t expectedNumberO
         free(pDest->pData);
         pDest->pData = NULL;
         pDest->cbData = 0;
-        return 2285;
+        return ERC_IBUTL_FILE_READ_ERROR;
     }
     pDest->cbData = bytesRead;
     fclose(fIn);
 
-    return 0;
+    return ERC_OK;
 }
 
 //-----------------------------------------------------------------------
 // WriteToFile
 //-----------------------------------------------------------------------
-int WriteToFile(char *szFilename, tLSTRING *pSrc, bool mayOverwrite)
+tERRORCODE WriteToFile(char *szFilename, tLSTRING *pSrc, bool mayOverwrite)
 {
     if (szFilename == NULL || strlen(szFilename) == 0)
     {
         app_tracef("ERROR: Cannot write to a file with no name");
-        return 2290;
+        return ERC_IBUTL_PARAMERR_FILENAME_NOT_SPECIFIED;
     }
 
     if (!mayOverwrite && my_fileExists(szFilename))
     {
         app_tracef("ERROR: File exists and overwrite not permitted: \"%s\"", szFilename);
-        return 2291;
+        return ERC_IBUTL_PARAMERR_FILE_ALREADY_EXISTS;
     }
 
     FILE *fOut = fopen(szFilename, "wb");
     if (!fOut)
     {
         app_tracef("ERROR: Failed to open output file: \"%s\"", szFilename);
-        return 2294;
+        return ERC_IBUTL_FILE_OPEN_ERROR;
     }
     size_t bytesWritten = fwrite(pSrc->pData, 1, pSrc->cbData, fOut);
     if (bytesWritten != pSrc->cbData)
     {
         app_tracef("ERROR: Failed to write all data to file: \"%s\"", szFilename);
         fclose(fOut);
-        return 2295;
+        return ERC_IBUTL_FILE_WRITE_ERROR;
     }
     fclose(fOut);
-    return 0;
+    return ERC_OK;
 }
 
 bool IsHexDigit(unsigned char ch)

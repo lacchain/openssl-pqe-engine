@@ -150,9 +150,9 @@ static int IBRandEngineStateInit(tENGINESTATE *pEngineState)
 }
 
 #ifdef USE_RINGBUFFER
-static tENGINESTATE engine_state = {{NULL, {0}, 0, 0},{{0},NULL,NULL},0};
+static tENGINESTATE engine_state = {{NULL, {0}, 0, 0},{{0},NULL,NULL},ENGINE_STATUS_NG};
 #else
-static tENGINESTATE engine_state = {{NULL, {0}, 0, 0},0};
+static tENGINESTATE engine_state = {{NULL, {0}, 0, 0},ENGINE_STATUS_NG};
 #endif
 
 
@@ -221,8 +221,14 @@ static int GetRngMaterial(unsigned char *buf, int num)
 
 static int cb_GetRngMaterial(unsigned char *buf, int num)
 {
-  if (localDebugTracing) app_tracef("INFO: cb_GetRngMaterial(%d)", num);
-  return GetRngMaterial(buf, num);
+  static int depth = 0;
+  int rc;
+
+  depth++;
+  if (localDebugTracing) app_tracef("INFO: cb_GetRngMaterial(%d) (depth=%d)", num, depth);
+  rc = GetRngMaterial(buf, num);
+  depth--;
+  return rc;
 }
 
 static int cb_GetPseudoRandMaterial(unsigned char *buf, int num)
@@ -261,7 +267,7 @@ int ibrand_bind(ENGINE *pEngine, const char *pID)
       ENGINE_set_name(pEngine, ENGINE_NAME             ) != ENGINE_STATUS_OK ||
       ENGINE_set_RAND(pEngine, &engineCallbackFunctions) != ENGINE_STATUS_OK)
   {
-    app_tracef("ERROR: ibrand_lib: Binding failed");
+    app_tracef("ERROR: ibrand_bind: Binding failed");
     return ENGINE_STATUS_NG;
   }
 

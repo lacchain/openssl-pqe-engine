@@ -247,7 +247,7 @@ static const char * WinGetEnv(const char * name)
     }
     else
     {
-        return 0;
+        return NULL;
     }
 }
 #endif // INCLUDE_WINDOWS_TYPE_FUNCTIONS
@@ -399,7 +399,7 @@ int app_tracef(const char *formatStr, ...)
 #define SPRINTF_TRACE_BUFSIZE (32*1024)
     va_list va;
     char *pBuf;
-    int rc;
+    int char_count;
 
     pBuf = (char *)malloc(SPRINTF_TRACE_BUFSIZE);
     if (!pBuf)
@@ -407,8 +407,8 @@ int app_tracef(const char *formatStr, ...)
         return -1;
     }
     va_start(va, formatStr);
-    rc = vsnprintf(pBuf, SPRINTF_TRACE_BUFSIZE, formatStr, va);
-    if (rc == -1 || rc >= SPRINTF_TRACE_BUFSIZE)
+    char_count = vsnprintf(pBuf, SPRINTF_TRACE_BUFSIZE, formatStr, va);
+    if (char_count == -1 || char_count >= SPRINTF_TRACE_BUFSIZE)
     {
         free(pBuf);
         return -1;
@@ -416,14 +416,14 @@ int app_tracef(const char *formatStr, ...)
     app_traceln(pBuf);
     va_end(va);
     free(pBuf);
-    return rc;
+    return char_count;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // GetToken Functions
 ///////////////////////////////////////////////////////////////////////////////
 
-int my_getToken(const char *pSrcData, char *pDstField, int nFieldNum, int nDstFieldMaxLen)
+bool my_getToken(const char *pSrcData, char *pDstField, int nFieldNum, int nDstFieldMaxLen)
 ///////////////////////////////////////////////////////////////////////////////
 // Name:    GetToken
 // Description: This function will get the specified field in a string.

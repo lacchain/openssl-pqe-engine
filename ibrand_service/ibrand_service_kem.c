@@ -134,7 +134,7 @@ bool KemAlgorithmIsValid(const char *algorithmName, bool *pIsSupported, bool *pI
     return *pIsSupported && *pIsEnabled;
 }
 
-int KemDecapsulateSharedSecret(int cqcKemAlgorithmId,
+tERRORCODE KemDecapsulateSharedSecret(int cqcKemAlgorithmId,
                                tLSTRING *pSharedSecret,
                                const tLSTRING *pEncapsulatedSharedSecret,
                                const tLSTRING *pKemSecretKey)
@@ -143,14 +143,27 @@ int KemDecapsulateSharedSecret(int cqcKemAlgorithmId,
     if (!szKemAlgorithm)
     {
         app_tracef("ERROR: Unknown KEM algorithm ID: %d", cqcKemAlgorithmId);
-        return 9989;
+        return ERC_IBKEM_PARAMERR_UNKNOWN_ALGO_ID;
     }
+#if (WHICH_PQCRYPTO == PQCRYPTO_LWEKE)
+    tERRORCODE retcode = ERC_IBKEM_PARAMERR_ALGO_NOT_SUPPORTED; // Algorithm not supported
+
+    if (strcmp(szKemAlgorithm,"FrodoKEM-640-AES") == 0)
+    {
+        // Do the KEM decapsulation
+        unsigned char *ss = (unsigned char *)pSharedSecret->pData, // Pre-allocated buffer of CRYPTO_MAXSHAREDSECRETBYTES
+        const unsigned char *ct = (unsigned char *)pEncapsulatedSharedSecret->pData,
+        const unsigned char *sk = (unsigned char *)pKemSecretKey->pData);
+        retcode = crypto_kem_dec(ss,ct,sk);
+    }
+    return retcode;
+#else
     bool isSupported = false;
     bool isEnabled = false;
     if (!KemAlgorithmIsValid(szKemAlgorithm, &isSupported, &isEnabled))
     {
         app_tracef("ERROR: Mechanism not supported and/or not enabled: %s (supported=%d, enabled=%d)", szKemAlgorithm, isSupported, isEnabled);
-        return 9991;
+        return ERC_IBKEM_PARAMERR_ALGO_NOT_SUPPORTED_OR_NOT_ENABLED;
     }
 
     OQS_KEM *pOQSInstance;
@@ -158,7 +171,7 @@ int KemDecapsulateSharedSecret(int cqcKemAlgorithmId,
     if (pOQSInstance == NULL)
     {
         app_tracef("ERROR: Failed to instantiate KEM Algorithm: %s", szKemAlgorithm);
-        return 9992;
+        return ERC_IBKEM_ALGO_INSTANTIATE_FAILED;
     }
     // pSharedSecret->pData points to a pre-allocated buffer of CRYPTO_MAXSHAREDSECRETBYTES
     // and pSharedSecret->cbData is currently set to the size of that malloc.
@@ -166,7 +179,7 @@ int KemDecapsulateSharedSecret(int cqcKemAlgorithmId,
     {
         app_tracef("ERROR: SharedSecret buffer (%u) too small for maximum length of decapsulated shared secret (%u)", pSharedSecret->cbData, pOQSInstance->length_shared_secret);
         OQS_KEM_free(pOQSInstance);
-        return 9993;
+        return ERC_IBKEM_SHSEC_BUFFER_TOO_SMALL;
     }
     pSharedSecret->cbData = pOQSInstance->length_shared_secret; // We are losing the original size of the malloc, but it shouldn't matter at all.
 
@@ -175,13 +188,13 @@ int KemDecapsulateSharedSecret(int cqcKemAlgorithmId,
     //{
     //    app_tracef("ERROR: Size of EncapsulatedSharedSecret (%u) is not as expected (%u)", pEncapsulatedSharedSecret->cbData, pOQSInstance->length_shared_secret);
     //    OQS_KEM_free(pOQSInstance);
-    //    return 9994;
+    //    return ERC_IBKEM_SHSEC_SIZE_ERROR;
     //}
     if (pKemSecretKey->cbData != pOQSInstance->length_secret_key)
     {
         app_tracef("ERROR: Size of KemSecretKey (%u) is not as expected (%u)", pKemSecretKey->cbData, pOQSInstance->length_secret_key);
         OQS_KEM_free(pOQSInstance);
-        return 9995;
+        return ERC_IBKEM_KEMKEY_SIZE_ERROR;
     }
 
     // Do the KEM decapsulation
@@ -194,9 +207,77 @@ int KemDecapsulateSharedSecret(int cqcKemAlgorithmId,
     {
         app_tracef("ERROR: OQS KEM failed with oqsStatus=%u", oqsStatus);
         OQS_KEM_free(pOQSInstance);
-        return 9996;
+        return ERC_IBKEM_KEM_DECAP_FAILED;
     }
 
     OQS_KEM_free(pOQSInstance);
-    return 0;
+    return ERC_OK;
+#endif
 }
+
+#if 0
+static OQS_STATUS example_heap(void)
+{
+    OQS_KEM *kem = NULL;
+    uint8_t *public_key = NULL;
+    uint8_t *secret_key = NULL;
+    uint8_t *ciphertext = NULL;
+    uint8_t *shared_secret_e = NULL;
+    uint8_t *shared_secret_d = NULL;
+
+    // Create an OQS generic KEM object
+    kem = OQS_KEM_new(OQS_KEM_alg_frodokem_640_aes);
+    if (kem == NULL)
+    {
+        printf("[example_heap]  OQS_KEM_frodokem_640_aes was not enabled at compile-time.\n");
+        return OQS_ERROR;
+    }
+
+    // Malloc the required memory
+    public_key = malloc(kem->length_public_key);
+    secret_key = malloc(kem->length_secret_key);
+    ciphertext = malloc(kem->length_ciphertext);
+    shared_secret_e = malloc(kem->length_shared_secret);
+    shared_secret_d = malloc(kem->length_shared_secret);
+
+    if ((public_key == NULL) || (secret_key == NULL) || (ciphertext == NULL) || (shared_secret_e == NULL) || (shared_secret_d == NULL))
+    {
+        fprintf(stderr, "ERROR: malloc failed!\n");
+        cleanup_heap(secret_key, shared_secret_e, shared_secret_d, public_key, ciphertext, kem);
+        return OQS_ERROR;
+    }
+
+    // Create Key Pair
+    OQS_STATUS rc = OQS_KEM_keypair(kem, public_key, secret_key);
+    if (rc != OQS_SUCCESS)
+    {
+        fprintf(stderr, "ERROR: OQS_KEM_keypair failed!\n");
+        cleanup_heap(secret_key, shared_secret_e, shared_secret_d, public_key, ciphertext, kem);
+        return OQS_ERROR;
+    }
+
+    // Encapsulate Shared Secret
+    rc = OQS_KEM_encaps(kem, ciphertext, shared_secret_e, public_key);
+    if (rc != OQS_SUCCESS)
+    {
+        fprintf(stderr, "ERROR: OQS_KEM_encaps failed!\n");
+        cleanup_heap(secret_key, shared_secret_e, shared_secret_d, public_key, ciphertext, kem);
+        return OQS_ERROR;
+    }
+
+    // Decapsulate Shared Secret
+    rc = OQS_KEM_decaps(kem, shared_secret_d, ciphertext, secret_key);
+    if (rc != OQS_SUCCESS)
+    {
+        fprintf(stderr, "ERROR: OQS_KEM_decaps failed!\n");
+        cleanup_heap(secret_key, shared_secret_e, shared_secret_d, public_key, ciphertext, kem);
+        return OQS_ERROR;
+    }
+
+    // All Done
+    printf("[example_heap]  OQS_KEM_frodokem_640_aes operations completed.\n");
+    cleanup_heap(secret_key, shared_secret_e, shared_secret_d, public_key, ciphertext, kem);
+
+    return OQS_SUCCESS; // success
+}
+#endif
