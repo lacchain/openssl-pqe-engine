@@ -15,6 +15,18 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifndef tERRORCODE
+#define tERRORCODE int
+#endif
+#ifndef ERC_OK
+#define ERC_OK 0
+#endif
+#ifndef ERC_UNSPECIFIED_ERROR
+#define ERC_UNSPECIFIED_ERROR 19999
+#endif
+#define ERC_IBSHM_FLOOR 19400
+#define ERC_IBSHM_PLACEHOLDER         19410
+
 extern void    ShMem_SetBackingFilename    (char *szBackingFilename);
 extern void    ShMem_SetStorageSize        (size_t sizeOfDataStore);
 extern void    ShMem_SetSemaphoreName      (char *szSemaphoreName);
