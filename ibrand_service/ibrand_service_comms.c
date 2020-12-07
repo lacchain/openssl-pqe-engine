@@ -347,34 +347,6 @@ tERRORCODE CommsInitialise(tIB_INSTANCEDATA *pIBRand)
 
         curl_easy_setopt(pIBRand->hCurl, CURLOPT_VERBOSE, 1L);
     }
-
-#if 0
-// ==================================================================================================
-// Set to a file name that contains random data for libcurl to use to seed the random engine when doing SSL connects.
-curl_easy_setopt(pIBRand->hCurl, CURLOPT_RANDOM_FILE, xxx);
-curl_easy_setopt(curl, CURLOPT_RANDOM_FILE, "junk.txt"); // Source of randomness to seed the random engine for SSL and more.
-curl_easy_setopt(curl, CURLOPT_EGDSOCKET, "/var/egd.socket"); // Name of Entropy Gathering Daemon socket
-curl_easy_setopt(curl, CURLOPT_SSLENGINE, "dynamic");
-
-CINIT(RANDOM_FILE         , STRINGPOINT,  76), /* Set to a file name that contains random data for libcurl to use to seed the random engine when doing SSL connects. */
-CINIT(EGDSOCKET           , STRINGPOINT,  77), /* Set to the Entropy Gathering Daemon socket pathname */
-CINIT(SSLENGINE           , STRINGPOINT,  89), /* crypto engine for the SSL-sub system */
-CINIT(SSLENGINE_DEFAULT   , LONG       ,  90), /* set the crypto engine for the SSL-sub system as default the param has no meaning... */
-CINIT(SSL_OPTIONS         , LONG       , 216), /* Enable/disable specific SSL features with a bitmask, see CURLSSLOPT_* */
-
-CURLE_OK - Engine found.
-CURLE_SSL_ENGINE_NOTFOUND - Engine not found, or OpenSSL was not built with engine support.
-CURLE_SSL_ENGINE_INITFAILED - Engine found but initialization failed.
-CURLE_NOT_BUILT_IN - Option not built in, OpenSSL is not the SSL backend.
-CURLE_UNKNOWN_OPTION - Option not recognized.
-CURLE_OUT_OF_MEMORY - Insufficient heap space.
-
-/* disconnect if we can't validate server's cert */
-curl_easy_setopt(curl,CURLOPT_SSL_VERIFYPEER,1);
-
-// ==================================================================================================
-#endif
-
     PrintOpenSSLEngines(pIBRand->hCurl, "Init");
 
     pIBRand->fCurlInitialised = TRUE;
