@@ -79,12 +79,12 @@ static void PrintOpenSSLEngines(CURL *hCurl, char *szTitle)
 
     // Count the number of engines in the list
     for (e=engines, n=0; e != NULL; e = e->next, n++);
-    app_tracef("INFO: OpenSSL Engines found at %s: %d", szTitle, n);
 
+    app_tracef("INFO: OpenSSL Engines found at %s: %d", szTitle, n);
     // Print out the name of each engine in the list
     for (e=engines, n=0; e != NULL; e = e->next, n++)
     {
-        app_tracef("    INFO: OpenSSL Engine[%d]: \"%s\"", n+1, e->data);
+        app_tracef("INFO:   OpenSSL Engine[%d]: \"%s\"", n, e->data);
     }
 
     // Free up the linked-list
@@ -144,7 +144,7 @@ static bool SetOpensslRngEngine(tIB_INSTANCEDATA *pIBRand, char *szWhichEngine)
 
     CURLcode ret;
 
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
+    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CURL)) // We'll use DBGBIT_CURL for stuff that is called often, and DBGBIT_CONFIG for startup one-offs.
     {
         app_tracef("INFO: Set preferred OpenSSL RNG engine: %s", szWhichEngine?szWhichEngine:"NULL");
     }
@@ -206,11 +206,14 @@ static tERRORCODE SetupRNGForSSLConnection(tIB_INSTANCEDATA *pIBRand, bool isBef
         "ACT_ENDMARKER"
     };
 
-    if (!isBeforeConnection)
+    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CURL)) // We'll use DBGBIT_CURL for stuff that is called often, and DBGBIT_CONFIG for startup one-offs.
     {
-        app_tracef("INFO: (exit) OpenSSL ActionTake=%d:%s", *pActionTaken,szActionTakenName[*pActionTaken]);
+        if (!isBeforeConnection)
+        {
+            app_tracef("INFO: (exit) OpenSSL ActionTake=%d:%s", *pActionTaken,szActionTakenName[*pActionTaken]);
+        }
+        PrintOpenSSLEngines(pIBRand->hCurl, "entry");
     }
-    PrintOpenSSLEngines(pIBRand->hCurl, "entry");
     if (isBeforeConnection)
     {
         *pActionTaken = ACT_NO_ACTION_TAKEN;
@@ -250,9 +253,11 @@ static tERRORCODE SetupRNGForSSLConnection(tIB_INSTANCEDATA *pIBRand, bool isBef
         }
         my_strlcpy(saveOpensslEnvVar, pOpenSSLEnvVar, sizeof(saveOpensslEnvVar)-1);
 
-        PrintEnvVar("(BeforeConnection, BeforeUnsetenv)", "OPENSSL_CONF");
+        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CURL))
+            PrintEnvVar("(BeforeConnection, BeforeUnsetenv)", "OPENSSL_CONF");
         int ret = unsetenv("OPENSSL_CONF");
-        PrintEnvVar("(BeforeConnection, AfterUnsetenv)", "OPENSSL_CONF");
+        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CURL))
+            PrintEnvVar("(BeforeConnection, AfterUnsetenv)", "OPENSSL_CONF");
         if (ret == 0)
         {
             *pActionTaken = ACT_IBRAND_ENVVAR_REMOVED;
@@ -260,9 +265,11 @@ static tERRORCODE SetupRNGForSSLConnection(tIB_INSTANCEDATA *pIBRand, bool isBef
             goto CLEANUP_AND_EXIT;
         }
         // Failed to remove envvar
-        PrintEnvVar("(BeforeConnection, BeforeSetenv(dummy))", "OPENSSL_CONF");
+        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CURL))
+            PrintEnvVar("(BeforeConnection, BeforeSetenv(dummy))", "OPENSSL_CONF");
         ret = setenv("OPENSSL_CONF", "dummy", true);
-        PrintEnvVar("(BeforeConnection, AfterSetenv(dummy))", "OPENSSL_CONF");
+        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CURL))
+            PrintEnvVar("(BeforeConnection, AfterSetenv(dummy))", "OPENSSL_CONF");
         if (ret == 0)
         {
             *pActionTaken = ACT_IBRAND_ENVVAR_REMOVED;
@@ -290,9 +297,11 @@ static tERRORCODE SetupRNGForSSLConnection(tIB_INSTANCEDATA *pIBRand, bool isBef
 #ifdef DISABLE_IBRAND_BY_REMOVING_ENVVAR
             case ACT_IBRAND_ENVVAR_REMOVED:
             {
-                PrintEnvVar("(AfterConnection, BeforeSetenv(savedvalue))", "OPENSSL_CONF");
+                if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CURL))
+                    PrintEnvVar("(AfterConnection, BeforeSetenv(savedvalue))", "OPENSSL_CONF");
                 int ret = setenv("OPENSSL_CONF", saveOpensslEnvVar, true);
-                PrintEnvVar("(AfterConnection, AfterSetenv(savedvalue))", "OPENSSL_CONF");
+                if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CURL))
+                    PrintEnvVar("(AfterConnection, AfterSetenv(savedvalue))", "OPENSSL_CONF");
                 if (ret != 0)
                 {
                     // There is not much we can do about this...
@@ -306,11 +315,14 @@ static tERRORCODE SetupRNGForSSLConnection(tIB_INSTANCEDATA *pIBRand, bool isBef
         *pActionTaken = ACT_NO_ACTION_TAKEN;
     }
 CLEANUP_AND_EXIT:
-    if (isBeforeConnection)
+    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CURL))
     {
-        app_tracef("INFO: (entry) OpenSSL ActionTake=%d:%s", *pActionTaken,szActionTakenName[*pActionTaken]);
+        if (isBeforeConnection)
+        {
+            app_tracef("INFO: (entry) OpenSSL ActionTake=%d:%s", *pActionTaken,szActionTakenName[*pActionTaken]);
+        }
+        PrintOpenSSLEngines(pIBRand->hCurl, "exit");
     }
-    PrintOpenSSLEngines(pIBRand->hCurl, "exit");
     return erc;
 }
 
@@ -337,7 +349,6 @@ tERRORCODE CommsInitialise(tIB_INSTANCEDATA *pIBRand)
         //curl_easy_setopt(pIBRand->hCurl, CURLOPT_TIMEOUT, xxx);
         //curl_easy_setopt(pIBRand->hCurl, CURLOPT_FAILONERROR, true);
 
-
         // CURLOPT_STDERR must be set to something specific.
         // Setting curl_setopt($c, CURLOPT_STDERR, fopen('/curl.txt', 'w+')); fixed my issue.
         // As it turns out curl_setopt($c, CURLOPT_VERBOSE, 1); is not printing the output to STDERR for some reason which I have not uncovered. I did not find the output in any of my PHP, Apache, nor Event Viewer logs.
@@ -347,7 +358,11 @@ tERRORCODE CommsInitialise(tIB_INSTANCEDATA *pIBRand)
 
         curl_easy_setopt(pIBRand->hCurl, CURLOPT_VERBOSE, 1L);
     }
-    PrintOpenSSLEngines(pIBRand->hCurl, "Init");
+
+    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CONFIG)) // We'll use DBGBIT_CURL for stuff that is called often, and DBGBIT_CONFIG for startup one-offs.
+    {
+        PrintOpenSSLEngines(pIBRand->hCurl, "Init");
+    }
 
     pIBRand->fCurlInitialised = TRUE;
     return ERC_OK;
