@@ -29,7 +29,7 @@
 // }
 
 
-int AESDecryptBytes(uint8_t *pEncryptedData,
+tERRORCODE AESDecryptBytes(uint8_t *pEncryptedData,
                     size_t cbEncryptedData,
                     size_t cbSignificantData,
                     uint8_t *pSharedSecret,
@@ -48,7 +48,7 @@ int AESDecryptBytes(uint8_t *pEncryptedData,
 
     const unsigned int derivedIVSizeInBytes = 16;
 
-    int retval = 0;
+    int retval = ERC_OK;
     uint8_t *pSalt = NULL;
     size_t cbSalt = 0;
     uint8_t *pCipherText = NULL;
@@ -79,7 +79,7 @@ int AESDecryptBytes(uint8_t *pEncryptedData,
     if (!pSalt)
     {
         app_tracef("ERROR: malloc of pSalt failed");
-        retval = 999;
+        retval = ERC_AES_NOMEM_FOR_SALT;
         goto CLEANUP_AND_RETURN;
     }
     memcpy(pSalt, pEncryptedData, saltSize);
@@ -91,7 +91,7 @@ int AESDecryptBytes(uint8_t *pEncryptedData,
     if (!pCipherText)
     {
         app_tracef("ERROR: malloc of pCipherText failed");
-        retval = 999;
+        retval = ERC_AES_NOMEM_FOR_CIPHERTEXT;
         goto CLEANUP_AND_RETURN;
     }
     memcpy(pCipherText, pEncryptedData+saltSize, cbEncryptedData-saltSize);
@@ -100,12 +100,12 @@ int AESDecryptBytes(uint8_t *pEncryptedData,
 
     // Create a key from the password and salt. We use SHA-1 and 317771 (was 1000) iterations.
     // TODO: Parameterise these parameters
-    // TODO: Th SharedSecret might need to be converted to UTF8
+    // TODO: The SharedSecret might need to be converted to UTF8
     pPBKDF = Rfc2898DeriveBytes_Init(pSharedSecret, cbSharedSecret, pSalt, cbSalt);
     if (!pPBKDF)
     {
         app_tracef("ERROR: Rfc2898DeriveBytes_Init failed");
-        retval = 999;
+        retval = ERC_AES_RFC2898_INIT_FAILED;
         goto CLEANUP_AND_RETURN;
     }
 
@@ -114,7 +114,7 @@ int AESDecryptBytes(uint8_t *pEncryptedData,
     if (!pKey)
     {
         app_tracef("ERROR: Rfc2898DeriveBytes_GetBytes failed");
-        retval = 999;
+        retval = ERC_AES_RFC2898_GETKEY_FAILED;
         goto CLEANUP_AND_RETURN;
     }
     //app_trace_hexall("DEC: pKey", pKey, derivedKeySizeInBytes);
@@ -123,7 +123,7 @@ int AESDecryptBytes(uint8_t *pEncryptedData,
     if (!pIV)
     {
         app_tracef("ERROR: Rfc2898DeriveBytes_GetBytes failed");
-        retval = 999;
+        retval = ERC_AES_RFC2898_GETIV_FAILED;
         goto CLEANUP_AND_RETURN;
     }
     //app_trace_hexall("DEC: pIV", pIV, derivedIVSizeInBytes);
@@ -132,14 +132,14 @@ int AESDecryptBytes(uint8_t *pEncryptedData,
     // Decrypt the data...
     ///////////////////////////////////
     AES_KEY opensslAesKey;
-    int rc;
+    tERRORCODE rc;
 
     rc = AES_set_decrypt_key((uint8_t *)pKey, aes_KeySizeInBits, &opensslAesKey); // Size of key is in bits
     // AES_set_encrypt_key() and AES_set_decrypt_key() return 0 for success, -1 if userKey or key is NULL, or -2 if the number of bits is unsupported.
-    if (rc != 0)
+    if (rc != ERC_OK)
     {
         app_tracef("ERROR: AES_set_decrypt_key failed with rc=%d", rc);
-        retval = 997;
+        retval = ERC_AES_SET_DECRYPT_KEY_FAILED;
         goto CLEANUP_AND_RETURN;
     }
     //app_tracef("INFO: Decrypting %u bytes", pIBRand->symmetricSessionKey.cbData);
@@ -147,7 +147,7 @@ int AESDecryptBytes(uint8_t *pEncryptedData,
     if (!pRawData)
     {
         app_tracef("ERROR: Malloc of pRawData failed");
-        retval = 997;
+        retval = ERC_AES_NOMEM_FOR_RAWDATA;
         goto CLEANUP_AND_RETURN;
     }
     AES_cbc_encrypt(pCipherText, pRawData, cbCipherText, &opensslAesKey, (unsigned char *)pIV, AES_DECRYPT);
@@ -167,7 +167,7 @@ int AESDecryptBytes(uint8_t *pEncryptedData,
     {
         *pcbDecryptedData = cbSignificantData;
     }
-    retval = 0;
+    retval = ERC_OK;
 
 CLEANUP_AND_RETURN:
     if (pIV        ) free(pIV);
@@ -205,26 +205,26 @@ int ispadding(unsigned int cbData1, unsigned int cbData2, unsigned int N, unsign
 //-----------------------------------------------------------------------
 // AESDecryptPackage
 //-----------------------------------------------------------------------
-int AESDecryptPackage(tIB_INSTANCEDATA *pIBRand,
+tERRORCODE AESDecryptPackage(tIB_INSTANCEDATA *pIBRand,
                       tLSTRING *pSourceBuffer,
                       tLSTRING *pDestBuffer,
                       size_t expectedSize,
                       bool hasHeader)
 {
-    int errcode;
+    tERRORCODE errcode;
 
     // Check that we have the sharedsecret needed for the decryption
     if (pIBRand->symmetricSharedSecret.pData == NULL || pIBRand->symmetricSharedSecret.cbData <= 0)
     {
         app_tracef("ERROR: Shared Secret not found");
-        return 2101;
+        return ERC_AES_NOENT_SHARED_SECRET_NOT_FOUND;
     }
 
     // Check that we have something to decrypt
     if (!pSourceBuffer->pData || pSourceBuffer->cbData == 0)
     {
         app_tracef("ERROR: No encrypted data found to decrypt");
-        return 2102;
+        return ERC_AES_NOENT_CIPHERTEXT_NOT_FOUND;
     }
 
     // The data is currently Base64 encoded encrypted data
@@ -250,7 +250,7 @@ int AESDecryptPackage(tIB_INSTANCEDATA *pIBRand,
     {
         const char *pReason = (my_errno == EINVAL) ? "Length not mod4" : (my_errno == ENOMEM) ? "Out of memory" : "Unspecified";
         app_tracef("WARNING: Failed to decode Base64 data (%s)", pReason);
-       return 2103;
+        return ERC_AES_BASE64_DECODE_FAILURE;
     }
 
     ///////////////////////////////////
@@ -274,7 +274,7 @@ int AESDecryptPackage(tIB_INSTANCEDATA *pIBRand,
         if (sizeof(tAESPACKAGE_HEADER) != expectedHeaderLength)
         {
             app_tracef("ERROR: sizeof(tAESPACKAGE_HEADER)(%lu) != expectedHeaderLength(%lu)", sizeof(tAESPACKAGE_HEADER), expectedHeaderLength);
-            return 2104; // Attention Developer: Compile/packing problem
+            return ERC_AES_HEADER_SIZE_ERROR; // Attention Developer: Compile/packing problem
         }
 
         pAesPackageHeader->packageLength = ntohl(pAesPackageHeader->packageLength);
@@ -301,7 +301,7 @@ int AESDecryptPackage(tIB_INSTANCEDATA *pIBRand,
 
     // USE_PBKDF2
     unsigned char *pDecryptedData = NULL;
-    size_t         cbDecryptedData = 0;
+    size_t cbDecryptedData = 0;
     const int SALTSIZE = 32;
     errcode = AESDecryptBytes(pEncryptedData,                                  // pEncryptedData
                               cbEncryptedData,
@@ -319,14 +319,14 @@ int AESDecryptPackage(tIB_INSTANCEDATA *pIBRand,
     pDestBuffer->pData = (char *)pDecryptedData;
     pDestBuffer->cbData = cbDecryptedData;
 
-    return 0;
+    return ERC_OK;
 }
 
 #ifdef INCLUDE_KNOWN_ANSWER_TESTS
 int testSymmetricEncryption(void)
 {
     int failed_tests = 0;
-    bool rc;
+    tERRORCODE rc;
     int testno = 1;
 
     app_trace_set_destination(true, false, false); // (toConsole, toLogFile; toSyslog)
@@ -367,7 +367,7 @@ int testSymmetricEncryption(void)
     memset(pEncryptedData, 0x55, cbEncryptedData);
 
     rc = AESDecryptBytes(pEncryptedData, cbEncryptedData, cbEncryptedData, pSessionKey, cbSessionKey, saltSize, &pDecryptedData, &cbDecryptedData);
-    if (rc != 0)
+    if (rc != ERC_OK)
     {
         fprintf(stderr, "AESDecryptBytes failed with rc=%d\n", rc);
         free(pEncryptedData);
@@ -400,7 +400,7 @@ int testSymmetricEncryption(void)
     unsigned char *pTransmittedData = base64_decode(pTransmittedDataB64, cbTransmittedDataB64, &cbTransmittedData);
 
     rc = AESDecryptBytes(pTransmittedData, cbTransmittedData, 1000, pIronBridgeSessionKey, cbIronBridgeSessionKey, 16, &pDecryptedData, &cbDecryptedData);
-    if (rc)
+    if (rc != ERC_OK)
     {
         fprintf(stderr, "AESDecryptBytes failed with rc=%d\n", rc);
     }

@@ -20,8 +20,8 @@
 tIB_INSTANCEDATA *cfgInitConfig (void)
 {
     tIB_INSTANCEDATA *pIBRand;
+    tERRORCODE rc;
 
-    int rc;
     // =========================================================================
     // Create instance storage
     // =========================================================================
@@ -35,7 +35,7 @@ tIB_INSTANCEDATA *cfgInitConfig (void)
 
     char *tempPtr;
     rc = my_getFilenameFromEnvVar("IBRAND_CONF", &tempPtr);
-    if (rc==0)
+    if (rc == ERC_OK)
     {
         my_strlcpy(pIBRand->szConfigFilename, tempPtr, sizeof(pIBRand->szConfigFilename));
         free(tempPtr);
@@ -48,7 +48,7 @@ tIB_INSTANCEDATA *cfgInitConfig (void)
     }
 
     rc = cfgReadConfig(pIBRand->szConfigFilename, pIBRand);
-    if (rc != 0)
+    if (rc != ERC_OK)
     {
         app_tracef("FATAL: Configuration error. Aborting. rc=%d", rc);
         app_trace_closelog();
@@ -199,13 +199,14 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_INSTANCEDATA *pIBRan
     return true;
 }
 
-int cfgReadConfig(char *szConfigFilename, tIB_INSTANCEDATA *pIBRand)
+tERRORCODE cfgReadConfig(char *szConfigFilename, tIB_INSTANCEDATA *pIBRand)
 {
     char *szJsonConfig;
-    int rc;
+    tERRORCODE rc;
+    bool success;
 
     rc = my_readEntireConfigFileIntoMemory(szConfigFilename, &szJsonConfig);
-    if (rc)
+    if (rc != ERC_OK)
     {
         app_tracef("ERROR: Error %d reading JSON config from file: %s", rc, szConfigFilename);
         if (szJsonConfig) free(szJsonConfig);
@@ -213,18 +214,17 @@ int cfgReadConfig(char *szConfigFilename, tIB_INSTANCEDATA *pIBRand)
     }
     //app_tracef("INFO: Configuration file (JSON format) [%s] (%u bytes)", szConfigFilename, strlen(szJsonConfig));
 
-    rc = __ParseJsonConfig(szJsonConfig, pIBRand);
-    if (!rc)
+    success = __ParseJsonConfig(szJsonConfig, pIBRand);
+    if (!success)
     {
         app_tracef("ERROR: Error parsing JSON config");
         if (szJsonConfig) free(szJsonConfig);
-        return 20117;
+        return ERC_IBCFG_JSON_PARSE_FAILED;
     }
     if (szJsonConfig) free(szJsonConfig);
 
-    return 0;
+    return ERC_OK;
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //

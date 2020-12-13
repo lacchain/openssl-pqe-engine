@@ -17,6 +17,19 @@
 
 #include "../../ibrand_common/my_utils.h"
 
+#ifndef tERRORCODE
+#define tERRORCODE int
+#endif
+#ifndef ERC_OK
+#define ERC_OK 0
+#endif
+#ifndef ERC_UNSPECIFIED_ERROR
+#define ERC_UNSPECIFIED_ERROR 19999
+#endif
+#define ERC_IBCFG_FLOOR 18200
+#define ERC_IBCFG_JSON_PARSE_FAILED 18210
+
+
 #define DBGBIT_STATUS   0
 #define DBGBIT_CONFIG   1
 #define DBGBIT_PROGRESS 2
@@ -53,7 +66,7 @@ typedef struct tagIB_INSTANCEDATA
 } tIB_INSTANCEDATA;
 
 extern tIB_INSTANCEDATA *cfgInitConfig      (void);
-extern int               cfgReadConfig      (char *szConfigFilename, tIB_INSTANCEDATA *pIBRand);
+extern tERRORCODE        cfgReadConfig      (char *szConfigFilename, tIB_INSTANCEDATA *pIBRand);
 extern char *            cfgGetValue        (char *szEnvVariableWithFilename, char *szKey);
 extern void              cfgGetDatafilename (char *pIBDatafilename, size_t cbIBDatafilename, tIB_INSTANCEDATA *pIBRand);
 extern void              cfgPrintConfig     (tIB_INSTANCEDATA *pIBRand);

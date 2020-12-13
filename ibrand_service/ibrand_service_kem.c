@@ -134,7 +134,7 @@ bool KemAlgorithmIsValid(const char *algorithmName, bool *pIsSupported, bool *pI
     return *pIsSupported && *pIsEnabled;
 }
 
-int KemDecapsulateSharedSecret(int cqcKemAlgorithmId,
+tERRORCODE KemDecapsulateSharedSecret(int cqcKemAlgorithmId,
                                tLSTRING *pSharedSecret,
                                const tLSTRING *pEncapsulatedSharedSecret,
                                const tLSTRING *pKemSecretKey)
@@ -143,14 +143,14 @@ int KemDecapsulateSharedSecret(int cqcKemAlgorithmId,
     if (!szKemAlgorithm)
     {
         app_tracef("ERROR: Unknown KEM algorithm ID: %d", cqcKemAlgorithmId);
-        return 9989;
+        return ERC_IBKEM_PARAMERR_UNKNOWN_ALGO_ID;
     }
     bool isSupported = false;
     bool isEnabled = false;
     if (!KemAlgorithmIsValid(szKemAlgorithm, &isSupported, &isEnabled))
     {
         app_tracef("ERROR: Mechanism not supported and/or not enabled: %s (supported=%d, enabled=%d)", szKemAlgorithm, isSupported, isEnabled);
-        return 9991;
+        return ERC_IBKEM_PARAMERR_ALGO_NOT_SUPPORTED_OR_NOT_ENABLED;
     }
 
     OQS_KEM *pOQSInstance;
@@ -158,7 +158,7 @@ int KemDecapsulateSharedSecret(int cqcKemAlgorithmId,
     if (pOQSInstance == NULL)
     {
         app_tracef("ERROR: Failed to instantiate KEM Algorithm: %s", szKemAlgorithm);
-        return 9992;
+        return ERC_IBKEM_ALGO_INSTANTIATE_FAILED;
     }
     // pSharedSecret->pData points to a pre-allocated buffer of CRYPTO_MAXSHAREDSECRETBYTES
     // and pSharedSecret->cbData is currently set to the size of that malloc.
@@ -166,7 +166,7 @@ int KemDecapsulateSharedSecret(int cqcKemAlgorithmId,
     {
         app_tracef("ERROR: SharedSecret buffer (%u) too small for maximum length of decapsulated shared secret (%u)", pSharedSecret->cbData, pOQSInstance->length_shared_secret);
         OQS_KEM_free(pOQSInstance);
-        return 9993;
+        return ERC_IBKEM_SHSEC_BUFFER_TOO_SMALL;
     }
     pSharedSecret->cbData = pOQSInstance->length_shared_secret; // We are losing the original size of the malloc, but it shouldn't matter at all.
 
@@ -175,13 +175,13 @@ int KemDecapsulateSharedSecret(int cqcKemAlgorithmId,
     //{
     //    app_tracef("ERROR: Size of EncapsulatedSharedSecret (%u) is not as expected (%u)", pEncapsulatedSharedSecret->cbData, pOQSInstance->length_shared_secret);
     //    OQS_KEM_free(pOQSInstance);
-    //    return 9994;
+    //    return ERC_IBKEM_SHSEC_SIZE_ERROR;
     //}
     if (pKemSecretKey->cbData != pOQSInstance->length_secret_key)
     {
         app_tracef("ERROR: Size of KemSecretKey (%u) is not as expected (%u)", pKemSecretKey->cbData, pOQSInstance->length_secret_key);
         OQS_KEM_free(pOQSInstance);
-        return 9995;
+        return ERC_IBKEM_KEMKEY_SIZE_ERROR;
     }
 
     // Do the KEM decapsulation
@@ -194,9 +194,9 @@ int KemDecapsulateSharedSecret(int cqcKemAlgorithmId,
     {
         app_tracef("ERROR: OQS KEM failed with oqsStatus=%u", oqsStatus);
         OQS_KEM_free(pOQSInstance);
-        return 9996;
+        return ERC_IBKEM_KEM_DECAP_FAILED;
     }
 
     OQS_KEM_free(pOQSInstance);
-    return 0;
+    return ERC_OK;
 }

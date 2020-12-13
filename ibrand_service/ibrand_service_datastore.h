@@ -16,6 +16,18 @@
 #include "ibrand_service.h"
 #include "ibrand_service_utils.h"
 
+#ifndef tERRORCODE
+#define tERRORCODE int
+#endif
+#ifndef ERC_OK
+#define ERC_OK 0
+#endif
+#ifndef ERC_UNSPECIFIED_ERROR
+#define ERC_UNSPECIFIED_ERROR 19999
+#endif
+#define ERC_IBSDS_FLOOR 19000
+#define ERC_IBSDS_PLACEHOLDER         19010
+
 extern bool dataStore_Initialise(tIB_INSTANCEDATA *pIBRand);
 extern long dataStore_GetCurrentWaterLevel(tIB_INSTANCEDATA *pIBRand);
 extern long dataStore_GetHighWaterMark(tIB_INSTANCEDATA *pIBRand);

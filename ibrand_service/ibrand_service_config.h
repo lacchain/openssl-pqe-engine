@@ -15,6 +15,26 @@
 #include "../ibrand_common/my_utilslib.h"
 #include "ibrand_service_utils.h"
 
+#ifndef tERRORCODE
+#define tERRORCODE int
+#endif
+#ifndef ERC_OK
+#define ERC_OK 0
+#endif
+#ifndef ERC_UNSPECIFIED_ERROR
+#define ERC_UNSPECIFIED_ERROR 19999
+#endif
+#define ERC_IBSCF_FLOOR 18800
+#define ERC_IBSCF_PARAMERR_USERNAME_NOT_SPECIFIED  18810
+#define ERC_IBSCF_PARAMERR_USERPSWD_NOT_SPECIFIED  18820
+#define ERC_IBSCF_PARAMERR_BASEURL_NOT_SPECIFIED   18830
+#define ERC_IBSCF_JSON_PARSE_ERROR                 18840
+#define ERC_IBSCF_NOMEM_FOR_JSON                   18850
+#define ERC_IBSCF_NOMEM_FOR_OOB                    18860
+#define ERC_IBSCF_OOB_JSON_PARSE_ERROR             18870
+#define ERC_IBSCF_HEX_DECODE_FAILURE_OF_KEMKEY     18880
+
+
 #define DBGBIT_STATUS   0
 #define DBGBIT_CONFIG   1
 #define DBGBIT_PROGRESS 2
@@ -65,9 +85,9 @@ typedef struct tagIB_CONFIGDATA
     //char          theirSigningPublicKeyFilename[_MAX_PATH];
 } tIB_CONFIGDATA;
 
-extern int ValidateSettings(tIB_CONFIGDATA *pIBConfig);
-extern int ReadConfig(char *szConfigFilename, tIB_CONFIGDATA *pIBConfig, size_t secretKeyBytes, size_t publicKeyBytes);
+extern tERRORCODE ValidateSettings(tIB_CONFIGDATA *pIBConfig);
+extern tERRORCODE ReadConfig(char *szConfigFilename, tIB_CONFIGDATA *pIBConfig, size_t secretKeyBytes, size_t publicKeyBytes);
 extern void PrintConfig(tIB_CONFIGDATA *pIBConfig);
-extern int GetBinaryDataFromOOBFile(char *szSrcFilename, tLSTRING *pDestBinaryData);
+extern tERRORCODE GetBinaryDataFromOOBFile(char *szSrcFilename, tLSTRING *pDestBinaryData);
 
 #endif // _INCLUDE_IBRAND_SERVICE_CONFIG_H_

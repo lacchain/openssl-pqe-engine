@@ -46,7 +46,7 @@ static bool readNumberFromFile(char *fileName, uint32_t *pValue)
 // Open /dev/random
 bool inmWriteEntropyStart(uint32_t bufLen, bool debug)
 {
-    bool rc;
+    bool success;
     pfd.events = POLLOUT;
 
     //pfd.fd = open("/dev/random", O_WRONLY);
@@ -64,8 +64,8 @@ bool inmWriteEntropyStart(uint32_t bufLen, bool debug)
         return false;
     }
 
-    rc = readNumberFromFile(FILL_PROC_FILENAME, &inmFillWatermark);
-    if (!rc)
+    success = readNumberFromFile(FILL_PROC_FILENAME, &inmFillWatermark);
+    if (!success)
     {
         app_tracef("[ibrand_lib] FATAL: readNumberFromFile failed");
         return false;

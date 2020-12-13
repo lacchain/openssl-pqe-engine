@@ -41,25 +41,25 @@ typedef struct tagIB_OOBDATA
 //-----------------------------------------------------------------------
 // ValidateSettings
 //-----------------------------------------------------------------------
-int ValidateSettings(tIB_CONFIGDATA *pIBConfig)
+tERRORCODE ValidateSettings(tIB_CONFIGDATA *pIBConfig)
 {
     if (strlen(pIBConfig->szUsername) == 0)
     {
         app_tracef("ERROR: Username is mandatory, but not supplied. Aborting.");
-        return 2250;
+        return ERC_IBSCF_PARAMERR_USERNAME_NOT_SPECIFIED;
     }
     if (strlen(pIBConfig->szPassword) == 0)
     {
         app_tracef("ERROR: Password is mandatory, but not supplied. Aborting.");
-        return 2251;
+        return ERC_IBSCF_PARAMERR_USERPSWD_NOT_SPECIFIED;
     }
     if (strlen(pIBConfig->szBaseUrl) == 0)
     {
         // Parameter error
         app_tracef("ERROR: URL is mandatory, but not supplied. Aborting.");
-        return 2252;
+        return ERC_IBSCF_PARAMERR_BASEURL_NOT_SPECIFIED;
     }
-    return 0;
+    return ERC_OK;
 }
 
 static int localDebugTracing = false;
@@ -349,13 +349,14 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
     return true;
 }
 
-int ReadConfig(char *szConfigFilename, tIB_CONFIGDATA *pIBConfig, size_t secretKeyBytes, size_t publicKeyBytes)
+tERRORCODE ReadConfig(char *szConfigFilename, tIB_CONFIGDATA *pIBConfig, size_t secretKeyBytes, size_t publicKeyBytes)
 {
     char *szJsonConfig;
-    int rc;
+    bool success;
+    tERRORCODE rc;
 
     rc = my_readEntireConfigFileIntoMemory(szConfigFilename, &szJsonConfig);
-    if (rc)
+    if (rc != ERC_OK)
     {
         app_tracef("ERROR: Error %d reading JSON config from file: %s", rc, szConfigFilename);
         if (szJsonConfig) free(szJsonConfig);
@@ -363,12 +364,12 @@ int ReadConfig(char *szConfigFilename, tIB_CONFIGDATA *pIBConfig, size_t secretK
     }
     //app_tracef("INFO: Configuration file (JSON format) [%s] (%u bytes)", szConfigFilename, strlen(szJsonConfig));
 
-    rc = __ParseJsonConfig(szJsonConfig, pIBConfig);
-    if (!rc)
+    success = __ParseJsonConfig(szJsonConfig, pIBConfig);
+    if (!success)
     {
         app_tracef("ERROR: Error parsing JSON config");
         if (szJsonConfig) free(szJsonConfig);
-        return 10117;
+        return ERC_IBSCF_JSON_PARSE_ERROR;
     }
     if (szJsonConfig) free(szJsonConfig);
 
@@ -376,13 +377,13 @@ int ReadConfig(char *szConfigFilename, tIB_CONFIGDATA *pIBConfig, size_t secretK
     pIBConfig->publicKeyBytes = publicKeyBytes;
 
     rc = ValidateSettings(pIBConfig);
-    if (rc != 0)
+    if (rc != ERC_OK)
     {
         app_tracef("ERROR: One or more settings are invalid");
         return rc;
     }
 
-    return 0;
+    return ERC_OK;
 }
 
 void PrintConfig(tIB_CONFIGDATA *pIBConfig)
@@ -406,6 +407,7 @@ void PrintConfig(tIB_CONFIGDATA *pIBConfig)
     //app_tracef("ourKemSecretKey       =[%s]" , hiddenKemSecretKey             );
     //app_tracef("theirSigningPublicKey =[%s]" , pIBRand->theirSigningPublicKey );
     app_tracef("useSecureRng          =[%u]" , pIBConfig->useSecureRng          );
+    app_tracef("preferredKemAlgorithm =[%u]" , pIBConfig->preferredKemAlgorithm );
     app_tracef("szBaseUrl             =[%s]" , pIBConfig->szBaseUrl             ); // char          szBaseUrl                [_MAX_URL]  // "https://ironbridgeapi.com/api"; // http://192.168.9.128:6502/v1/ironbridge/api
     app_tracef("bytesPerRequest       =[%d]" , pIBConfig->bytesPerRequest       ); // int           bytesPerRequest                      // 16
     app_tracef("retrievalRetryDelay   =[%d]" , pIBConfig->retrievalRetryDelay   ); // int           retrievalRetryDelay                  //
@@ -490,13 +492,13 @@ static bool __ParseJsonOOBData(const char *szJsonString, tIB_OOBDATA *pOobData)
     return true;
 }
 
-int GetBinaryDataFromOOBFile(char *szSrcFilename, tLSTRING *pDestBinaryData)
+tERRORCODE GetBinaryDataFromOOBFile(char *szSrcFilename, tLSTRING *pDestBinaryData)
 {
-    int rc;
+    tERRORCODE rc;
     tLSTRING jsonData;
 
     rc = ReadContentsOfFile(szSrcFilename, &jsonData, NO_EXPECTATION_OF_FILESIZE );
-    if (rc != 0)
+    if (rc != ERC_OK)
     {
         app_tracef("ERROR: Failed to read contents of OOB file \"%s\"", szSrcFilename);
         return rc;
@@ -506,7 +508,7 @@ int GetBinaryDataFromOOBFile(char *szSrcFilename, tLSTRING *pDestBinaryData)
     if (!szJsonString)
     {
         app_tracef("ERROR: Failed to allocate %u bytes for szJsonString", jsonData.cbData+1);
-        return 2083;
+        return ERC_IBSCF_NOMEM_FOR_JSON;
     }
     memset(szJsonString, 0, jsonData.cbData+1);
     my_strlcpy(szJsonString, jsonData.pData, jsonData.cbData);
@@ -529,7 +531,7 @@ int GetBinaryDataFromOOBFile(char *szSrcFilename, tLSTRING *pDestBinaryData)
     if (!pOobData)
     {
         app_tracef("ERROR: Failed to allocate %u bytes for OOB Data", sizeof(tIB_OOBDATA));
-        return 2083;
+        return ERC_IBSCF_NOMEM_FOR_OOB;
     }
     bool success = __ParseJsonOOBData(szJsonString, pOobData);
     if (!success)
@@ -537,7 +539,7 @@ int GetBinaryDataFromOOBFile(char *szSrcFilename, tLSTRING *pDestBinaryData)
         app_tracef("ERROR: Failed to parse OOB json string");
         free(pOobData);
         pOobData = NULL;
-        return 2084;
+        return ERC_IBSCF_OOB_JSON_PARSE_ERROR;
     }
 
     success = DecodeHexString(&(pOobData->hexData), pDestBinaryData);
@@ -546,10 +548,10 @@ int GetBinaryDataFromOOBFile(char *szSrcFilename, tLSTRING *pDestBinaryData)
         app_tracef("ERROR: Failed to decode KEM secret key hex string");
         free(pOobData);
         pOobData = NULL;
-        return 2085;
+        return ERC_IBSCF_HEX_DECODE_FAILURE_OF_KEMKEY;
     }
 
     free(pOobData);
     pOobData = NULL;
-    return 0;
+    return ERC_OK;
 }

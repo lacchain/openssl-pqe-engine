@@ -97,6 +97,8 @@ typedef DWORD *         PDWORD;
 #define MAKEDWORD(lw, hw)        ((DWORD)(((WORD)(lw)) | (((DWORD)((WORD)(hw))) << 16)))
 #define MAKEDWORDB(b3,b2,b1,b0)  ((DWORD)((MAKEWORD(b0, b1)) | (((DWORD)(MAKEWORD(b2, b3))) << 16)))
 
+#define UINT_MAX_DIGITS 20 // 0x7FFF FFFF FFFF FFFF = 9,223,372,036,854,775,807 ==> 19 digits for signed, 20 for unsigned.
+
 typedef struct tagLSTRING
 {
     size_t cbData;

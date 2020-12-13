@@ -25,25 +25,18 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include <curl/curl.h>
 #include <openssl/aes.h>
 
 #include "ibrand_service_kem.h"
-
 #include "../ibrand_common/my_utilslib.h"
-
-#include "ibrand_service.h"
 #include "ibrand_service_utils.h"
 #include "ibrand_service_config.h"
 #include "ibrand_service_datastore.h"
-
-#include "../ibrand_common/my_utilslib.h"
 #include "ibrand_service_aes.h"
+#include "ibrand_service_comms.h"
 
+#include "ibrand_service.h"
 
-#if LIBCURL_VERSION_NUM < 0x070c03
-#error "ERROR - Requires libcurl of 7.12.3 or greater"
-#endif
 
 typedef enum tagSERVICE_STATE
 {
@@ -60,14 +53,6 @@ typedef enum tagSERVICE_STATE
     STATE_DESTROYEXISTINGSHAREDSECRET,
     STATE_SHUTDOWN
 } tSERVICESTATE;
-
-//#define HTTP_RESP_KEMKEYPAIREXPIRED    (426) // Upgrade Required
-//#define HTTP_RESP_SHAREDSECRETEXPIRED  (424) // Failed Dependency (WebDAV)
-//#define HTTP_RESP_PRECONDITIONFAILED   (412) // PreconditionFailed 412
-#define HTTP_RESP_TOKENEXPIREDORINVALID  (498) // TokenExpiredOrInvalid 498
-#define HTTP_RESP_KEMKEYPAIREXPIRED      (499) // TokenExpiredOrInvalid 498
-#define HTTP_RESP_SHAREDSECRETEXPIRED    (498) // TokenExpiredOrInvalid 498
-
 
 //#define KAT_KNOWN_ANSWER_TESTING
 
@@ -256,11 +241,11 @@ size_t ReceiveDataHandler_rng(char *buffer, size_t size, size_t nmemb, void *use
     size_t prevLen = pIBRand->ResultantData.cbData;
 
     // Alloc (or Realloc) a new buffer for the data, and free previous buffer, if there was one
-    bool rc = copyToNewBuffer (&(pIBRand->ResultantData),
+    bool success = copyToNewBuffer (&(pIBRand->ResultantData),
                                &inboundData,
                                //(pIBRand->encryptedKemSecretKey_RcvdSegments > 1) ); // If this is the 2nd or subsequent segment, then append
                                (pIBRand->ResultantData.cbData > 0) ); // If the buffer already holds some data, then append
-    if (!rc)
+    if (!success)
     {
         app_tracef("ERROR: ReceiveDataHandler_rng() malloc failure");
         return 0; // Zero bytes processed
@@ -313,10 +298,10 @@ size_t ReceiveDataHandler_RequestNewKeyPair(char *buffer, size_t size, size_t nm
     size_t prevLen = pIBRand->encryptedKemSecretKey.cbData;
 
     // Alloc (or Realloc) a new buffer for the data, and free previous buffer, if there was one
-    bool rc = copyToNewBuffer (&(pIBRand->encryptedKemSecretKey),
+    bool success = copyToNewBuffer (&(pIBRand->encryptedKemSecretKey),
                                &inboundData,
                                (pIBRand->encryptedKemSecretKey_RcvdSegments > 1) ); // If this is the 2nd or subsequent segment, then append
-    if (!rc)
+    if (!success)
     {
         app_tracef("ERROR: Failed to allocate storage for inbound encrypted data");
         return 0; // Zero bytes processed
@@ -372,10 +357,10 @@ size_t ReceiveDataHandler_SharedSecret(char *buffer, size_t size, size_t nmemb, 
     size_t prevLen = pIBRand->encapsulatedSharedSecret.cbData;
 
     // Alloc (or Realloc) a new buffer for the data, and free previous buffer, if there was one
-    bool rc = copyToNewBuffer (&(pIBRand->encapsulatedSharedSecret),
+    bool success = copyToNewBuffer (&(pIBRand->encapsulatedSharedSecret),
                                &inboundData,
                                (pIBRand->encapsulatedSharedSecret_RcvdSegments > 1) ); // If this is the 2nd or subsequent segment, then append
-    if (!rc)
+    if (!success)
     {
         app_tracef("ERROR: Failed to allocate storage for inbound KEM data");
         return 0; // Zero bytes processed
@@ -405,9 +390,9 @@ size_t ReceiveDataHandler_SharedSecret(char *buffer, size_t size, size_t nmemb, 
 //-----------------------------------------------------------------------
 // DecryptAndStoreKemSecretKey
 //-----------------------------------------------------------------------
-static int DecryptAndStoreKemSecretKey(tIB_INSTANCEDATA *pIBRand)
+static tERRORCODE DecryptAndStoreKemSecretKey(tIB_INSTANCEDATA *pIBRand)
 {
-    int errcode;
+    tERRORCODE errcode;
 
     // If there is already a KEM secret key stored, then clear and free it.
     DestroyAndFreeExistingItem(&pIBRand->ourKemSecretKey);
@@ -415,7 +400,7 @@ static int DecryptAndStoreKemSecretKey(tIB_INSTANCEDATA *pIBRand)
     errcode = AESDecryptPackage(pIBRand,
                                 &pIBRand->encryptedKemSecretKey, // Source
                                 &pIBRand->ourKemSecretKey,       // Destination
-                                0,                               // expectedSize not specified (CRYPTO_CIPHERTEXTBYTES) (TODO)
+                                0,                              // expectedSize not specified (TODO)
                                 true);                           // hasHeader
     if (errcode)
     {
@@ -440,7 +425,7 @@ static int DecryptAndStoreKemSecretKey(tIB_INSTANCEDATA *pIBRand)
     app_tracef("INFO: KEM key stored successfully (%lu bytes)", pIBRand->ourKemSecretKey.cbData);
 
     // Job done
-    return 0;
+    return ERC_OK;
 }
 
 //-----------------------------------------------------------------------
@@ -456,13 +441,13 @@ static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
     {
         // This should never happen!
         app_tracef("ERROR: KEM secret key error (size=%d)", pIBRand->ourKemSecretKey.cbData);
-        return 2201;
+        return ERC_IBSVC_PARAMERR_KEM_SECRETKEY_NOT_SPECIFIED;
     }
     // Check that we have the encapsulated key
     if (!pIBRand->encapsulatedSharedSecret.pData || pIBRand->encapsulatedSharedSecret.cbData == 0)
     {
         app_tracef("ERROR: Encapsulated SharedSecret not found");
-        return 2203;
+        return ERC_IBSVC_PARAMERR_SHARED_SECRET_NOT_SPECIFIED;
     }
 
     unsigned char *p = (unsigned char *)pIBRand->encapsulatedSharedSecret.pData;
@@ -485,30 +470,29 @@ static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
        {
            app_trace_hexall("DEBUG: Base64 encapsulatedSharedSecret: ", p, n);
        }
-       return 2204;
+       return ERC_IBSVC_BASE64_DECODE_FAILURE_OF_SHAREDSECRET;
     }
-
 
     // Allocate a new buffer large enough for the maximum shared secret length
     pIBRand->symmetricSharedSecret.pData = (char *)malloc(CRYPTO_MAXSHAREDSECRETBYTES);
     if (pIBRand->symmetricSharedSecret.pData == NULL)
     {
         app_tracef("ERROR: Failed to allocate storage for new SharedSecret");
-        return 2206;
+        return ERC_IBSVC_NOMEM_FOR_SHARED_SECRET;
     }
     // Initialise with something recognisable, so that we can ensure that it has worked
     memset(pIBRand->symmetricSharedSecret.pData, 0xAA, CRYPTO_MAXSHAREDSECRETBYTES);
     pIBRand->symmetricSharedSecret.cbData = CRYPTO_MAXSHAREDSECRETBYTES; // NB This is the maxlength, not actual length.
 
     // Do the KEM decapsulation
-    int rc = KemDecapsulateSharedSecret(pIBRand->cfg.preferredKemAlgorithm, // e.g. 222 = "FrodoKEM-640-AES"
-                                        &pIBRand->symmetricSharedSecret,
-                                        &rawEncapsulatedSharedSecret,
-                                        &pIBRand->ourKemSecretKey);
-    if (rc != 0)
+    tERRORCODE rc = KemDecapsulateSharedSecret(pIBRand->cfg.preferredKemAlgorithm, // e.g. 222 = "FrodoKEM-640-AES"
+                                               &pIBRand->symmetricSharedSecret,
+                                               &rawEncapsulatedSharedSecret,
+                                               &pIBRand->ourKemSecretKey);
+    if (rc != ERC_OK)
     {
         app_tracef("ERROR: Failed to decapsulate new SharedSecret");
-        return 2207;
+        return rc;
     }
     // We will set the size once we know it has completed
     pIBRand->symmetricSharedSecret.cbData = CRYPTO_MAXSHAREDSECRETBYTES; // TODO - This is the maxlength, not actual length
@@ -521,567 +505,144 @@ static int DecapsulateAndStoreSharedSecret(tIB_INSTANCEDATA *pIBRand)
     app_tracef("INFO: SharedSecret stored successfully (%lu bytes)", pIBRand->symmetricSharedSecret.cbData);
 
     // Job done
-    return 0;
+    return ERC_OK;
 }
 
-
-static bool SetPreferredRngEngine(tIB_INSTANCEDATA *pIBRand)
-{
-    // Force use of non-IronBridge OpenSSL RNG engine
-    // Anything except ourselves (ibrand).
-    CURLcode ret;
-    const char *szPreferredRngEngine = NULL; // options: NULL, "rdrand", "dynamic", "md_rand"
-
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
-    {
-        app_tracef("INFO: Set preferred OpenSSL RNG engine: %s", szPreferredRngEngine?szPreferredRngEngine:"NULL");
-    }
-
-    // https://wiki.openssl.org/index.php/Random_Numbers#Generators says...
-    // By default, OpenSSL uses the md_rand generator. md_rand uses the MD5 hash as the pseudorandom function.
-    // The source code is located in crypto/rand/md_rand.c.
-
-    ret = curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE, szPreferredRngEngine);
-    if (ret != CURLE_OK)
-    {
-        // e.g. CURLE_SSL_ENGINE_INITFAILED (66) : Initiating the SSL Engine failed.
-        //      CURLE_SSL_ENGINE_NOTFOUND   (53) : The specified crypto engine wasn't found.
-        app_tracef("ERROR: CURLOPT_SSLENGINE (%s) failed with ret=%d", szPreferredRngEngine?szPreferredRngEngine:"NULL",ret);
-        return false;
-    }
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CURL))
-    {
-        app_tracef("INFO: CURLOPT_SSLENGINE_DEFAULT");
-    }
-    ret = curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLENGINE_DEFAULT, 1L);
-    if (ret != CURLE_OK)
-    {
-        // e.g. CURLE_SSL_ENGINE_SETFAILED  (54) : Failed setting the selected SSL crypto engine as default!
-        app_tracef("ERROR: CURLOPT_SSLENGINE_DEFAULT (%s) failed with ret=%d", szPreferredRngEngine?szPreferredRngEngine:"NULL",ret);
-        return false;
-    }
-    return true;
-}
 
 //-----------------------------------------------------------------------
 // authenticateUser
 //-----------------------------------------------------------------------
-int authenticateUser(tIB_INSTANCEDATA *pIBRand)
+tERRORCODE authenticateUser(tIB_INSTANCEDATA *pIBRand)
 {
-    if (!pIBRand)
-    {
-        app_tracef("ERROR: authenticateUser: Parameter error - instance data is null");
-        return 2210;
-    }
+    char * pUrl;
+    const char *szEndpoint;
+    pUrl = pIBRand->cfg.szAuthUrl;
+    tERRORCODE rc;
 
-    if (strlen(pIBRand->cfg.szAuthUrl) == 0)
+    szEndpoint = "login";
+    if (strlen(pUrl) == 0)
     {
         app_tracef("ERROR: authenticateUser: Parameter error - AuthUrl is empty");
-        return 2211;
+        return ERC_IBSVC_PARAMETER_ERROR_AUTH_URL_NOT_SPECIFIED;
     }
 
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
     {
-        app_tracef("INFO: Authenticating User: (\"%s\", \"%s\")", pIBRand->cfg.szAuthUrl, pIBRand->cfg.szUsername);
-        //app_tracef("INFO: authenticateUser: (\"%s\", \"%s\", \"%s\")", pIBRand->cfg.szAuthUrl, pIBRand->cfg.szUsername, pIBRand->cfg.szPassword);
+        app_tracef("INFO: Authenticating User: (\"%s\", \"%s\")", pUrl, pIBRand->cfg.szUsername);
+        //app_tracef("INFO: authenticateUser: (\"%s\", \"%s\", \"%s\")", pUrl, pIBRand->cfg.szUsername, pIBRand->cfg.szPassword);
     }
 
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pIBRand->cfg.szAuthUrl);
-    if (!SetPreferredRngEngine(pIBRand))
-    {
-        app_tracef("ERROR: Failed to set preferred openssl RNG engine for SSL connection");
-        return 2212;
-    }
-
-    // Pass our list of custom made headers
-    struct curl_slist *headers = NULL;
-    headers = curl_slist_append ( headers, "Content-Type: application/json" );
-    headers = curl_slist_append ( headers, "Authorization: Bearer" );
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPHEADER, headers);
-
-    char bodyData[1024] = "";
-    sprintf(bodyData, "{\"Username\":\"%s\",\"Password\":\"%s\"}", pIBRand->cfg.szUsername, pIBRand->cfg.szPassword );
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_POSTFIELDS, bodyData);
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEFUNCTION, ReceiveDataHandler_login);
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEDATA, pIBRand);
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_FAILONERROR, true);
-
-    if (strcmp(pIBRand->cfg.szAuthType, "CLIENT_CERT") == 0)
-    {
-        // Client Certificate
-        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
-            app_tracef("INFO: Using client certificate \"%s\" of type \"%s\"", pIBRand->cfg.szAuthSSLCertFile, pIBRand->cfg.szAuthSSLCertType);
-        if (!my_fileExists(pIBRand->cfg.szAuthSSLCertFile))
-        {
-            app_tracef("WARNING: Client Certificate file not found: \"%s\"", pIBRand->cfg.szAuthSSLCertFile);
-            //return 55581;
-        }
-        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLCERT    , pIBRand->cfg.szAuthSSLCertFile); // Load the certificate
-        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLCERTTYPE, pIBRand->cfg.szAuthSSLCertType); // Load the certificate type
-
-        // SSL Key
-        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
-            app_tracef("INFO: Using Client SSL key \"%s\"", pIBRand->cfg.szAuthSSLKeyFile);
-        if (!my_fileExists(pIBRand->cfg.szAuthSSLKeyFile))
-        {
-            app_tracef("WARNING: Client SSL key file not found: \"%s\"", pIBRand->cfg.szAuthSSLKeyFile);
-            //return 55582;
-        }
-        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLKEY     , pIBRand->cfg.szAuthSSLKeyFile ); // Load the key
-    }
-
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
-    {
-        app_tracef("INFO: Connecting to \"%s\" with \"%s\"", pIBRand->cfg.szAuthUrl, bodyData);
-    }
-
-    // Do it
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
-    {
-        app_tracef("INFO: Sending \"%s\"", pIBRand->cfg.szAuthUrl );
-    }
-    CURLcode      curlResultCodeA;
-    curlResultCodeA = curl_easy_perform(pIBRand->hCurl);
-    if (curlResultCodeA != CURLE_OK)
-    {
-      app_tracef("ERROR: authenticateUser failed: rc=%d \"%s\"", curlResultCodeA, curl_easy_strerror(curlResultCodeA));
-      return 2212;
-    }
-
-    long resultCode = 0;
-    CURLcode curlResultCodeB;
-    curlResultCodeB = curl_easy_getinfo(pIBRand->hCurl, CURLINFO_HTTP_CONNECTCODE, &resultCode);
-    if (!curlResultCodeB && resultCode)
-    {
-        app_tracef("ERROR: authenticateUser: ResultCode=%03ld \"%s\"", resultCode, curl_easy_strerror(curlResultCodeB));
-        return 2220;
-    }
-
-    long response_code = 0;
-    CURLcode  curlResultCodeC;
-    curlResultCodeC = curl_easy_getinfo(pIBRand->hCurl, CURLINFO_RESPONSE_CODE, &response_code);
-    if (!curlResultCodeC && (response_code != 200))
-    {
-        app_tracef("ERROR: authenticateUser: HTTP Responcse Code=%ld", response_code);
-        return 2221;
-    }
-
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
-    {
-        if (strcmp(pIBRand->cfg.szAuthType, "SIMPLE") == 0)
-            app_tracef("INFO: authenticateUser() authToken = [%s]"            , pIBRand->authToken.pData);
-    }
-
-    curl_slist_free_all(headers); // Free custom header list
-    app_tracef("INFO: Authentication successful: (\"%s\", \"%s\")", pIBRand->cfg.szAuthUrl, pIBRand->cfg.szUsername);
-    return 0;
+    rc = callToRemote(pIBRand,
+                      pUrl,
+                      szEndpoint,
+                      true,
+                      ReceiveDataHandler_login,
+                      NULL,
+                      NULL,
+                      NULL);
+    return rc;
 }
 
-//-----------------------------------------------------------------------
-// getRandomBytes
-//-----------------------------------------------------------------------
-int getRandomBytes(tIB_INSTANCEDATA *pIBRand)
-{
-    CURLcode curlResultCode;
-    char * pUrl;
-    const char * szEndpoint;
-    char *pAuthHeader = NULL;
-    #define MAXUINT_DIGITS 20 // 0x7FFF FFFF FFFF FFFF = 9,223,372,036,854,775,807 ==> 19 digits for signed, 20 for unsigned.
-
-    szEndpoint = (pIBRand->cfg.useSecureRng) ? "srng":"rng";
-
-    pUrl = (char *)malloc(strlen(pIBRand->cfg.szBaseUrl)+strlen(szEndpoint)+2+MAXUINT_DIGITS); // i.e. strlen("/rng/NNNNNNN")
-    if (!pUrl)
-    {
-        app_tracef("ERROR: Out of memory allocating for URL");
-        return 22230;
-    }
-    sprintf(pUrl,"%s/%s/%u", pIBRand->cfg.szBaseUrl, szEndpoint, pIBRand->cfg.bytesPerRequest);
-    if (!SetPreferredRngEngine(pIBRand))
-    {
-        app_tracef("ERROR: Failed to set preferred openssl RNG engine for SSL connection");
-        return 22233;
-    }
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPGET, TRUE );
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pUrl);
-
-    // Pass our list of custom made headers
-    struct curl_slist *headers = NULL;
-    headers = curl_slist_append ( headers, "Content-Type: application/json" );
-    headers = curl_slist_append ( headers, "Accept: application/json, text/plain, */*" );
-    if (strcmp(pIBRand->cfg.szAuthType, "SIMPLE") == 0)
-    {
-        // e.g.
-        //   "name": "accept",
-        //   "value": "application/json, text/plain, */*"
-        //   "name": "authorization",
-        //   "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6InVzZXIxIiwibmJmIjoxNTczODM5ODU0LCJleHAiOjE1NzM5MjYyNTQsImlhdCI6MTU3MzgzOTg1NCwiaXNzIjoiaHR0cHM6Ly9pcm9uYnJpZGdlYXBpLmNvbSIsImF1ZCI6IkFueSJ9.sTD67YPrCdj1RWOqa8R3Pc3j7DA88mF8x0oD2ZMbmQ0"
-        //   "name": "content-type",
-        //   "value": "application/json"
-
-        pAuthHeader = (char *)malloc(strlen(pIBRand->pRealToken)+30u); // i.e. + strlen("Authorization: Bearer ")
-        if (!pAuthHeader)
-        {
-            app_tracef("ERROR: Out of memory allocating for AuthHeader");
-            return 2231;
-        }
-        sprintf(pAuthHeader, "authorization: Bearer %s", pIBRand->pRealToken);
-        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
-        {
-            app_tracef("INFO: %s AuthHeader = \"%s\"", szEndpoint, pAuthHeader);
-        }
-        headers = curl_slist_append ( headers, pAuthHeader );
-    }
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPHEADER, headers);
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEFUNCTION, ReceiveDataHandler_rng);
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEDATA, pIBRand);
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_FAILONERROR, true);
-
-    // Prepare the pIBRand for the new block of data
-    pIBRand->encryptedRng_RcvdSegments = 0;
-
-    if (strcmp(pIBRand->cfg.szAuthType, "CLIENT_CERT") == 0)
-    {
-        // Client Certificate
-        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
-            app_tracef("INFO: Using client certificate \"%s\" of type \"%s\"", pIBRand->cfg.szAuthSSLCertFile, pIBRand->cfg.szAuthSSLCertType);
-        if (!my_fileExists(pIBRand->cfg.szAuthSSLCertFile))
-        {
-            app_tracef("WARNING: Client Certificate file not found: \"%s\"", pIBRand->cfg.szAuthSSLCertFile);
-            //return 55581;
-        }
-        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLCERT    , pIBRand->cfg.szAuthSSLCertFile); // Load the certificate
-        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLCERTTYPE, pIBRand->cfg.szAuthSSLCertType); // Load the certificate type
-
-        // SSL Key
-        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
-            app_tracef("INFO: Using Client SSL key \"%s\"", pIBRand->cfg.szAuthSSLKeyFile);
-        if (!my_fileExists(pIBRand->cfg.szAuthSSLKeyFile))
-        {
-            app_tracef("WARNING: Client SSL key file not found: \"%s\"", pIBRand->cfg.szAuthSSLKeyFile);
-            //return 55582;
-        }
-        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLKEY     , pIBRand->cfg.szAuthSSLKeyFile ); // Load the key
-    }
-
-    // Do it
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
-    {
-        app_tracef("INFO: %s Sending \"%s\"", szEndpoint, pUrl );
-    }
-    curlResultCode = curl_easy_perform(pIBRand->hCurl);
-    long httpResponseCode = 0;
-    curl_easy_getinfo (pIBRand->hCurl, CURLINFO_RESPONSE_CODE, &httpResponseCode);
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
-    {
-        app_tracef("INFO: %s response code = %ld", szEndpoint, httpResponseCode);
-    }
-    if (curlResultCode != CURLE_OK)
-    {
-        if (httpResponseCode == HTTP_RESP_SHAREDSECRETEXPIRED)
-        {
-            curl_slist_free_all(headers); // Free custom header list
-            if (pAuthHeader) free(pAuthHeader);
-            free(pUrl);
-            return ERC_OopsSharedSecretExpired;
-        }
-        if (httpResponseCode == HTTP_RESP_KEMKEYPAIREXPIRED)
-        {
-            curl_slist_free_all(headers); // Free custom header list
-            if (pAuthHeader) free(pAuthHeader);
-            free(pUrl);
-            return ERC_OopsKemKeyPairExpired;
-        }
-        app_tracef("ERROR: %s perform failed: curl:%ld [%s] http:%ld [%s]", szEndpoint, curlResultCode, curl_easy_strerror(curlResultCode), httpResponseCode, HttpResponseCodeDescription(httpResponseCode));
-        if (pIBRand->ResultantData.pData && pIBRand->ResultantData.cbData)
-        {
-            app_tracef("ERROR: %s response: [%s]", szEndpoint, pIBRand->ResultantData);
-        }
-        curl_slist_free_all(headers); // Free custom header list
-        if (pAuthHeader) free(pAuthHeader);
-        free(pUrl);
-        return 2232;
-    }
-
-    //if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
-    //{
-    //    app_tracef("INFO: %s ResultantData = [%*.*s]", szEndpoint, pIBRand->ResultantData.cbData, pIBRand->ResultantData.cbData, pIBRand->ResultantData.pData);
-    //}
-
-    curl_slist_free_all(headers); // Free custom header list
-    if (pAuthHeader) free(pAuthHeader);
-    free(pUrl);
-    return 0;
-}
 
 //-----------------------------------------------------------------------
 // getNewKemKeyPair
 //-----------------------------------------------------------------------
-int getNewKemKeyPair(tIB_INSTANCEDATA *pIBRand)
+tERRORCODE getNewKemKeyPair(tIB_INSTANCEDATA *pIBRand)
 {
-    CURLcode curlResultCode;
     char * pUrl;
-    const char *szEndpoint = "reqkeypair";
-    char *pAuthHeader = NULL;
+    const char *szEndpoint;
+    size_t urlMaxLen;
+    tERRORCODE rc;
 
-    pUrl = (char *)malloc(strlen(pIBRand->cfg.szBaseUrl)+1+strlen(szEndpoint)+1);
+    szEndpoint = "reqkeypair";
+    urlMaxLen = strlen(pIBRand->cfg.szBaseUrl)+1+strlen(szEndpoint)+1;
+
+    pUrl = (char *)malloc(urlMaxLen);
     if (!pUrl)
     {
         app_tracef("ERROR: Out of memory allocating for URL");
-        return 2240;
+        return ERC_IBSVC_NOMEM_FOR_URL;
     }
     sprintf(pUrl,"%s/%s", pIBRand->cfg.szBaseUrl, szEndpoint);
-    if (!SetPreferredRngEngine(pIBRand))
-    {
-        app_tracef("ERROR: Failed to set preferred openssl RNG engine for SSL connection");
-        return 22401;
-    }
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPGET, TRUE );
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pUrl);
 
-    // Pass our list of custom made headers
-    struct curl_slist *headers = NULL;
-    headers = curl_slist_append ( headers, "Content-Type: application/json" );
-    headers = curl_slist_append ( headers, "Accept: application/json, text/plain, */*" );
-    if (strcmp(pIBRand->cfg.szAuthType, "SIMPLE") == 0)
-    {
-        // e.g.
-        //   "name": "accept",
-        //   "value": "application/json, text/plain, */*"
-        //   "name": "authorization",
-        //   "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6InVzZXIxIiwibmJmIjoxNTczODM5ODU0LCJleHAiOjE1NzM5MjYyNTQsImlhdCI6MTU3MzgzOTg1NCwiaXNzIjoiaHR0cHM6Ly9pcm9uYnJpZGdlYXBpLmNvbSIsImF1ZCI6IkFueSJ9.sTD67YPrCdj1RWOqa8R3Pc3j7DA88mF8x0oD2ZMbmQ0"
-        //   "name": "content-type",
-        //   "value": "application/json"
-        pAuthHeader = (char *)malloc(strlen(pIBRand->pRealToken)+30u); // i.e. + strlen("Authorization: Bearer ")
-        if (!pAuthHeader)
-        {
-            app_tracef("ERROR: Out of memory allocating for AuthHeader");
-            free(pUrl);
-            return 2241;
-        }
-        sprintf(pAuthHeader, "authorization: Bearer %s", pIBRand->pRealToken);
-        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
-        {
-            app_tracef("INFO: reqkeypair AuthHeader = \"%s\"", pAuthHeader);
-        }
-        headers = curl_slist_append ( headers, pAuthHeader );
-    }
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPHEADER, headers);
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEFUNCTION, ReceiveDataHandler_RequestNewKeyPair);
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEDATA, pIBRand);
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_FAILONERROR, true);
-
-    // Prepare the pIBRand for the new shared secret
-    pIBRand->encryptedKemSecretKey_RcvdSegments = 0;
-
-    if (strcmp(pIBRand->cfg.szAuthType, "CLIENT_CERT") == 0)
-    {
-        // Client Certificate
-        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
-            app_tracef("INFO: Using client certificate \"%s\" of type \"%s\"", pIBRand->cfg.szAuthSSLCertFile, pIBRand->cfg.szAuthSSLCertType);
-        if (!my_fileExists(pIBRand->cfg.szAuthSSLCertFile))
-        {
-            app_tracef("WARNING: Client Certificate file not found: \"%s\"", pIBRand->cfg.szAuthSSLCertFile);
-            //return 55581;
-        }
-        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLCERT    , pIBRand->cfg.szAuthSSLCertFile); // Load the certificate
-        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLCERTTYPE, pIBRand->cfg.szAuthSSLCertType); // Load the certificate type
-
-        // SSL Key
-        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
-            app_tracef("INFO: Using Client SSL key \"%s\"", pIBRand->cfg.szAuthSSLKeyFile);
-        if (!my_fileExists(pIBRand->cfg.szAuthSSLKeyFile))
-        {
-            app_tracef("WARNING: Client SSL key file not found: \"%s\"", pIBRand->cfg.szAuthSSLKeyFile);
-            //return 55582;
-        }
-        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLKEY     , pIBRand->cfg.szAuthSSLKeyFile ); // Load the key
-    }
-
-    // Do it
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
-    {
-        app_tracef("INFO: reqkeypair Sending \"%s\"", pUrl );
-    }
-    curlResultCode = curl_easy_perform(pIBRand->hCurl);
-    long httpResponseCode = 0;
-    curl_easy_getinfo (pIBRand->hCurl, CURLINFO_RESPONSE_CODE, &httpResponseCode);
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
-    {
-        app_tracef("INFO: reqkeypair %ld", httpResponseCode);
-    }
-    if (curlResultCode != CURLE_OK)
-    {
-        if (httpResponseCode == HTTP_RESP_SHAREDSECRETEXPIRED)
-        {
-            curl_slist_free_all(headers); // Free custom header list
-            if (pAuthHeader) free(pAuthHeader);
-            free(pUrl);
-            return ERC_OopsSharedSecretExpired;
-        }
-        if (httpResponseCode == HTTP_RESP_KEMKEYPAIREXPIRED)
-        {
-            curl_slist_free_all(headers); // Free custom header list
-            if (pAuthHeader) free(pAuthHeader);
-            free(pUrl);
-            return ERC_OopsKemKeyPairExpired;
-        }
-
-        app_tracef("ERROR: %s perform failed: curl:%ld [%s] http:%ld [%s]", "reqkeypair", curlResultCode, curl_easy_strerror(curlResultCode), httpResponseCode, HttpResponseCodeDescription(httpResponseCode));
-        if (pIBRand->encryptedKemSecretKey.pData && pIBRand->encryptedKemSecretKey.cbData)
-        {
-            app_tracef("ERROR: %s response: [%s]", szEndpoint, pIBRand->encryptedKemSecretKey);
-        }
-        curl_slist_free_all(headers); // Free custom header list
-        if (pAuthHeader) free(pAuthHeader);
-        free(pUrl);
-        return 2242;
-    }
-
-    //if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
-    //{
-    //    app_tracef("INFO: reqkeypair ResultantData = [%*.*s]", pIBRand->ResultantData.cbData, pIBRand->ResultantData.cbData, pIBRand->ResultantData.pData);
-    //}
-
-    curl_slist_free_all(headers); // Free custom header list
-    if (pAuthHeader) free(pAuthHeader);
+    rc = callToRemote(pIBRand,
+                      pUrl,
+                      szEndpoint,
+                      false,
+                      ReceiveDataHandler_RequestNewKeyPair,
+                      &pIBRand->encryptedKemSecretKey_RcvdSegments,
+                      &pIBRand->encryptedKemSecretKey,
+                      "encryptedKemSecretKey");
     free(pUrl);
-    return 0;
+    return rc;
 }
 
 
 //-----------------------------------------------------------------------
 // getSecureRNGSharedSecret
 //-----------------------------------------------------------------------
-int getSecureRNGSharedSecret(tIB_INSTANCEDATA *pIBRand)
+tERRORCODE getSecureRNGSharedSecret(tIB_INSTANCEDATA *pIBRand)
 {
-    CURLcode curlResultCode;
     char * pUrl;
-    const char *szEndpoint = "sharedsecret";
-    char *pAuthHeader = NULL;
+    const char *szEndpoint;
+    size_t urlMaxLen;
+    tERRORCODE rc;
 
-    pUrl = (char *)malloc(strlen(pIBRand->cfg.szBaseUrl)+1+strlen(szEndpoint)+1);
+    szEndpoint = "sharedsecret";
+    urlMaxLen = strlen(pIBRand->cfg.szBaseUrl)+1+strlen(szEndpoint)+1;
+
+    pUrl = (char *)malloc(urlMaxLen);
     if (!pUrl)
     {
         app_tracef("ERROR: Out of memory allocating for URL");
-        return 2240;
+        return ERC_IBSVC_NOMEM_FOR_URL;
     }
     sprintf(pUrl,"%s/%s", pIBRand->cfg.szBaseUrl, szEndpoint);
-    if (!SetPreferredRngEngine(pIBRand))
-    {
-        app_tracef("ERROR: Failed to set preferred openssl RNG engine for SSL connection");
-        return 22402;
-    }
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPGET, TRUE );
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_URL, pUrl);
 
-    // Pass our list of custom made headers
-    struct curl_slist *headers = NULL;
-    headers = curl_slist_append ( headers, "Content-Type: application/json" );
-    headers = curl_slist_append ( headers, "Accept: application/json, text/plain, */*" );
-    if (strcmp(pIBRand->cfg.szAuthType, "SIMPLE") == 0)
-    {
-        // e.g.
-        //   "name": "accept",
-        //   "value": "application/json, text/plain, */*"
-        //   "name": "authorization",
-        //   "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6InVzZXIxIiwibmJmIjoxNTczODM5ODU0LCJleHAiOjE1NzM5MjYyNTQsImlhdCI6MTU3MzgzOTg1NCwiaXNzIjoiaHR0cHM6Ly9pcm9uYnJpZGdlYXBpLmNvbSIsImF1ZCI6IkFueSJ9.sTD67YPrCdj1RWOqa8R3Pc3j7DA88mF8x0oD2ZMbmQ0"
-        //   "name": "content-type",
-        //   "value": "application/json"
-        pAuthHeader = (char *)malloc(strlen(pIBRand->pRealToken)+30u); // i.e. + strlen("Authorization: Bearer ")
-        if (!pAuthHeader)
-        {
-            app_tracef("ERROR: Out of memory allocating for AuthHeader");
-            free(pUrl);
-            return 2241;
-        }
-        sprintf(pAuthHeader, "authorization: Bearer %s", pIBRand->pRealToken);
-        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
-        {
-            app_tracef("INFO: sharedsecret AuthHeader = \"%s\"", pAuthHeader);
-        }
-        headers = curl_slist_append ( headers, pAuthHeader );
-    }
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_HTTPHEADER, headers);
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEFUNCTION, ReceiveDataHandler_SharedSecret);
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_WRITEDATA, pIBRand);
-    curl_easy_setopt(pIBRand->hCurl, CURLOPT_FAILONERROR, true);
-
-    // Prepare the pIBRand for the new shared secret
-    pIBRand->encapsulatedSharedSecret_RcvdSegments = 0;
-
-    if (strcmp(pIBRand->cfg.szAuthType, "CLIENT_CERT") == 0)
-    {
-        // Client Certificate
-        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
-            app_tracef("INFO: Using client certificate \"%s\" of type \"%s\"", pIBRand->cfg.szAuthSSLCertFile, pIBRand->cfg.szAuthSSLCertType);
-        if (!my_fileExists(pIBRand->cfg.szAuthSSLCertFile))
-        {
-            app_tracef("WARNING: Client Certificate file not found: \"%s\"", pIBRand->cfg.szAuthSSLCertFile);
-            //return 55581;
-        }
-        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLCERT    , pIBRand->cfg.szAuthSSLCertFile); // Load the certificate
-        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLCERTTYPE, pIBRand->cfg.szAuthSSLCertType); // Load the certificate type
-
-        // SSL Key
-        if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
-            app_tracef("INFO: Using Client SSL key \"%s\"", pIBRand->cfg.szAuthSSLKeyFile);
-        if (!my_fileExists(pIBRand->cfg.szAuthSSLKeyFile))
-        {
-            app_tracef("WARNING: Client SSL key file not found: \"%s\"", pIBRand->cfg.szAuthSSLKeyFile);
-            //return 55582;
-        }
-        curl_easy_setopt(pIBRand->hCurl, CURLOPT_SSLKEY     , pIBRand->cfg.szAuthSSLKeyFile ); // Load the key
-    }
-
-    // Do it
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
-    {
-        app_tracef("INFO: sharedsecret Sending \"%s\"", pUrl );
-    }
-    curlResultCode = curl_easy_perform(pIBRand->hCurl);
-    long httpResponseCode = 0;
-    curl_easy_getinfo (pIBRand->hCurl, CURLINFO_RESPONSE_CODE, &httpResponseCode);
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
-    {
-        app_tracef("INFO: sharedsecret response code = %ld", httpResponseCode);
-    }
-    if (curlResultCode != CURLE_OK)
-    {
-        if (httpResponseCode == HTTP_RESP_SHAREDSECRETEXPIRED)
-        {
-            curl_slist_free_all(headers); // Free custom header list
-            if (pAuthHeader) free(pAuthHeader);
-            free(pUrl);
-            return ERC_OopsSharedSecretExpired;
-        }
-        if (httpResponseCode == HTTP_RESP_KEMKEYPAIREXPIRED)
-        {
-            curl_slist_free_all(headers); // Free custom header list
-            if (pAuthHeader) free(pAuthHeader);
-            free(pUrl);
-            return ERC_OopsKemKeyPairExpired;
-        }
-        app_tracef("ERROR: %s perform failed: curl:%ld [%s] http:%ld [%s]", "sharedsecret", curlResultCode, curl_easy_strerror(curlResultCode), httpResponseCode, HttpResponseCodeDescription(httpResponseCode));
-        if (pIBRand->encapsulatedSharedSecret.pData && pIBRand->encapsulatedSharedSecret.cbData)
-        {
-            app_tracef("ERROR: %s response: [%s]", szEndpoint, pIBRand->encapsulatedSharedSecret);
-        }
-        curl_slist_free_all(headers); // Free custom header list
-        if (pAuthHeader) free(pAuthHeader);
-        free(pUrl);
-        return 2252;
-    }
-
-    //if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_DATA))
-    //{
-    //    app_tracef("INFO: sharedsecret ResultantData = [%*.*s]", pIBRand->ResultantData.cbData, pIBRand->ResultantData.cbData, pIBRand->ResultantData.pData);
-    //}
-
-    curl_slist_free_all(headers); // Free custom header list
-    if (pAuthHeader) free(pAuthHeader);
+    rc = callToRemote(pIBRand,
+                      pUrl,
+                      szEndpoint,
+                      false,
+                      ReceiveDataHandler_SharedSecret,
+                      &pIBRand->encapsulatedSharedSecret_RcvdSegments,
+                      &pIBRand->encapsulatedSharedSecret,
+                      "encapsulatedSharedSecret");
     free(pUrl);
-    return 0;
+    return rc;
+}
+
+
+//-----------------------------------------------------------------------
+// getRandomBytes
+//-----------------------------------------------------------------------
+tERRORCODE getRandomBytes(tIB_INSTANCEDATA *pIBRand)
+{
+    char * pUrl;
+    const char *szEndpoint;
+    size_t urlMaxLen;
+    tERRORCODE rc;
+
+    szEndpoint = (pIBRand->cfg.useSecureRng) ? "srng":"rng";
+    urlMaxLen = strlen(pIBRand->cfg.szBaseUrl)+strlen(szEndpoint)+2+UINT_MAX_DIGITS + 1;  // i.e. strlen("/rng/NNNNNNN")
+
+    pUrl = (char *)malloc(urlMaxLen);
+    if (!pUrl)
+    {
+        app_tracef("ERROR: Out of memory allocating for URL");
+        return ERC_IBSVC_NOMEM_FOR_URL;
+    }
+    sprintf(pUrl,"%s/%s/%u", pIBRand->cfg.szBaseUrl, szEndpoint, pIBRand->cfg.bytesPerRequest);
+
+    rc = callToRemote(pIBRand,
+                      pUrl,
+                      szEndpoint,
+                      false,
+                      ReceiveDataHandler_rng,
+                      &pIBRand->encryptedRng_RcvdSegments,
+                      &pIBRand->ResultantData,
+                      "ResultantData");
+    free(pUrl);
+    return rc;
 }
 
 
@@ -1178,7 +739,7 @@ static bool prepareRNGBytes(tIB_INSTANCEDATA *pIBRand)
 //-----------------------------------------------------------------------
 static bool prepareSRNGBytes(tIB_INSTANCEDATA *pIBRand)
 {
-    int errcode;
+    tERRORCODE errcode;
     tLSTRING decryptedData = {0, NULL};
 
     errcode = AESDecryptPackage(pIBRand,
@@ -1259,49 +820,11 @@ static bool storeRandomBytes(tIB_INSTANCEDATA *pIBRand, tLSTRING *pResultantData
 }
 
 //-----------------------------------------------------------------------
-// InitialiseCurl
-//-----------------------------------------------------------------------
-int InitialiseCurl(tIB_INSTANCEDATA *pIBRand)
-{
-    //////////////////////////////
-    // Initialise libcurl
-    //////////////////////////////
-    // In windows, this will init the winsock stuff
-    curl_global_init(CURL_GLOBAL_ALL);
-
-    pIBRand->hCurl = curl_easy_init();
-    if (!pIBRand->hCurl)
-    {
-      app_tracef("ERROR: Library initialisation failed");
-      return 2260;
-    }
-
-    if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CURL))
-    {
-        //curl_easy_setopt(pIBRand->hCurl, CURLOPT_TIMEOUT, xxx);
-        //curl_easy_setopt(pIBRand->hCurl, CURLOPT_FAILONERROR, true);
-
-
-        // CURLOPT_STDERR must be set to something specific.
-        // Setting curl_setopt($c, CURLOPT_STDERR, fopen('/curl.txt', 'w+')); fixed my issue.
-        // As it turns out curl_setopt($c, CURLOPT_VERBOSE, 1); is not printing the output to STDERR for some reason which I have not uncovered. I did not find the output in any of my PHP, Apache, nor Event Viewer logs.
-        // After setting curl_setopt($c, CURLOPT_STDERR, fopen('/curl.txt', 'w+'));, I was able to see the output in the curl.txt file.
-        // I am not sure if this is specific to Windows environments.
-        //curl_easy_setopt(pIBRand->hCurl, CURLOPT_STDERR, fopen('/curl.txt', 'w+'));
-
-        curl_easy_setopt(pIBRand->hCurl, CURLOPT_VERBOSE, 1L);
-    }
-
-    pIBRand->fCurlInitialised = TRUE;
-    return 0;
-}
-
-//-----------------------------------------------------------------------
 // DoSimpleAuthentication
 //-----------------------------------------------------------------------
-int DoSimpleAuthentication(tIB_INSTANCEDATA *pIBRand)
+tERRORCODE DoSimpleAuthentication(tIB_INSTANCEDATA *pIBRand)
 {
-    int rc;
+    tERRORCODE rc;
 
     //////////////////////////////
     // Authenticate the user
@@ -1309,10 +832,10 @@ int DoSimpleAuthentication(tIB_INSTANCEDATA *pIBRand)
     pIBRand->authToken.pData = NULL;
     pIBRand->authToken.cbData = 0;
     rc = authenticateUser ( pIBRand );
-    if (rc != 0)
+    if (rc != ERC_OK)
     {
       app_tracef("ERROR: authenticateUser failed rc=%d", rc);
-      return rc; // 2200..2299
+      return rc;
     }
 
     // TokenData is something of the form (without the EOLs)...
@@ -1329,7 +852,7 @@ int DoSimpleAuthentication(tIB_INSTANCEDATA *pIBRand)
         if (!pIBRand->pRealToken)
         {
           app_tracef("ERROR: Cannot find token in TokenData pData=[%s]", pIBRand->authToken.pData);
-          return 2270;
+          return ERC_IBSVC_REAL_TOKEN_NOT_FOUND;
         }
     }
 
@@ -1342,15 +865,15 @@ int DoSimpleAuthentication(tIB_INSTANCEDATA *pIBRand)
     //app_tracef("[ibrand-service] DEBUG: pRealToken=[%s]", pIBRand->pRealToken);
 
     pIBRand->fAuthenticated = TRUE;
-    return 0;
+    return ERC_OK;
 }
 
 //-----------------------------------------------------------------------
 // DoAuthentication
 //-----------------------------------------------------------------------
-int DoAuthentication(tIB_INSTANCEDATA *pIBRand)
+tERRORCODE DoAuthentication(tIB_INSTANCEDATA *pIBRand)
 {
-    int rc;
+    tERRORCODE rc;
 
     if (strcmp(pIBRand->cfg.szAuthType, "NONE") == 0)
     {
@@ -1360,7 +883,7 @@ int DoAuthentication(tIB_INSTANCEDATA *pIBRand)
     if (strcmp(pIBRand->cfg.szAuthType, "SIMPLE") == 0)
     {
         rc = DoSimpleAuthentication(pIBRand);
-        if (rc != 0)
+        if (rc != ERC_OK)
         {
             app_tracef("ERROR: Simple authentication failed rc=%d", rc);
             return rc;
@@ -1372,7 +895,7 @@ int DoAuthentication(tIB_INSTANCEDATA *pIBRand)
     }
     else
     {
-        rc = 999; // Unsupported AuthType
+        rc = ERC_IBSVC_AUTHTYPE_NOT_SUPPORTED_OR_INVALID; // Unsupported AuthType
         app_tracef("ERROR: Unsupported AuthType rc=%d", rc);
     }
 
@@ -1403,8 +926,7 @@ void ironbridge_api_finalise(tIB_INSTANCEDATA *pIBRand)
     DestroyAndFreeExistingItem(&pIBRand->ourKemSecretKey);
     //DestroyAndFreeExistingItem(&pIBRand->theirSigningPublicKey);
 
-    curl_easy_cleanup(pIBRand->hCurl);
-    curl_global_cleanup();
+    CommsFinalise(pIBRand);
 
     if (pIBRand)
     {
@@ -1414,23 +936,23 @@ void ironbridge_api_finalise(tIB_INSTANCEDATA *pIBRand)
     }
 }
 
-static int ImportKemSecretKeyFromClientSetupOOBFile(tIB_INSTANCEDATA *pIBRand)
+static tERRORCODE ImportKemSecretKeyFromClientSetupOOBFile(tIB_INSTANCEDATA *pIBRand)
 {
-    int rc;
+    tERRORCODE rc;
     tLSTRING binaryData = {0U, NULL};
 
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CONFIG))
         app_tracef("INFO: Importing KEM secret key from OOB file: \"%s\"", pIBRand->cfg.clientSetupOOBFilename);
 
     rc = GetBinaryDataFromOOBFile(pIBRand->cfg.clientSetupOOBFilename, &binaryData);
-    if (rc != 0)
+    if (rc != ERC_OK)
     {
         app_tracef("ERROR: Failed to get binary data from OOB file \"%s\"", pIBRand->cfg.ourKemSecretKeyFilename);
         return rc;
     }
 
     rc = WriteToFile(pIBRand->cfg.ourKemSecretKeyFilename, &binaryData, true);
-    if (rc != 0)
+    if (rc != ERC_OK)
     {
         app_tracef("ERROR: Failed to write KEM secret key to file \"%s\"", pIBRand->cfg.ourKemSecretKeyFilename);
         DestroyAndFreeExistingItem(&binaryData);
@@ -1438,15 +960,15 @@ static int ImportKemSecretKeyFromClientSetupOOBFile(tIB_INSTANCEDATA *pIBRand)
     }
 
     DestroyAndFreeExistingItem(&binaryData);
-    return 0;
+    return ERC_OK;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Config Top Level Functions
 ////////////////////////////////////////////////////////////////////////////////
-int ReadOurKemPrivateKey(tIB_INSTANCEDATA *pIBRand, size_t secretKeyBytes)
+tERRORCODE ReadOurKemPrivateKey(tIB_INSTANCEDATA *pIBRand, size_t secretKeyBytes)
 {
-    int rc;
+    tERRORCODE rc;
 
     if (my_fileExists(pIBRand->cfg.ourKemSecretKeyFilename))
     {
@@ -1461,7 +983,7 @@ int ReadOurKemPrivateKey(tIB_INSTANCEDATA *pIBRand, size_t secretKeyBytes)
         app_tracef("INFO: Initialising client from OOB data.", pIBRand->cfg.ourKemSecretKeyFilename );
         // Import secret key from clientsetup OOB file
         rc = ImportKemSecretKeyFromClientSetupOOBFile(pIBRand);
-        if (rc != 0)
+        if (rc != ERC_OK)
         {
             app_tracef("ERROR: Failed to import KEM secret key from OOB file");
             return rc;
@@ -1473,28 +995,28 @@ int ReadOurKemPrivateKey(tIB_INSTANCEDATA *pIBRand, size_t secretKeyBytes)
         app_tracef("INFO: Reading our KEM secret key from \"%s\"", pIBRand->cfg.ourKemSecretKeyFilename );
 
     rc = ReadContentsOfFile(pIBRand->cfg.ourKemSecretKeyFilename, &pIBRand->ourKemSecretKey, secretKeyBytes);
-    if (rc != 0)
+    if (rc != ERC_OK)
     {
         app_tracef("ERROR: Failed to read KEM secret key from file \"%s\"", pIBRand->cfg.ourKemSecretKeyFilename );
         return rc;
     }
 
-    return 0;
+    return ERC_OK;
 }
 
 
-// int ReadTheirSigningPublicKey(tIB_INSTANCEDATA *pIBRand, size_t publicKeyBytes)
+// tERRORCODE ReadTheirSigningPublicKey(tIB_INSTANCEDATA *pIBRand, size_t publicKeyBytes)
 // {
-//     int rc;
+//     tERRORCODE rc;
 //     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CONFIG))
 //         app_tracef("INFO: Reading their Signing public key from \"%s\"", pIBRand->cfg.ourKemSecretKeyFilename );
 //     rc = ReadContentsOfFile(pIBRand->cfg.theirSigningPublicKeyFilename, &pIBRand->theirSigningPublicKey, publicKeyBytes);
-//     if (rc != 0)
+//     if (rc != ERC_OK)
 //     {
 //         app_tracef("ERROR: Failed to read their signing public key from \"%s\"", pIBRand->cfg.ourKemSecretKeyFilename );
 //         return rc;
 //     }
-//     return 0;
+//     return ERC_OK;
 // }
 
 int main(int argc, char * argv[])
@@ -1502,7 +1024,7 @@ int main(int argc, char * argv[])
     // Our process ID and Session ID
     pid_t processId = {0};
     pid_t sessionId = {0};
-    int rc;
+    tERRORCODE rc;
     tIB_INSTANCEDATA *pIBRand;
 
     UNUSED_PARAM(argc);
@@ -1535,7 +1057,7 @@ int main(int argc, char * argv[])
 
     char *tempPtr = NULL;
     rc = my_getFilenameFromEnvVar("IBRAND_CONF", &tempPtr);
-    if ((rc != 0) || (tempPtr == NULL) || strlen(tempPtr)==0)
+    if ((rc != ERC_OK) || (tempPtr == NULL) || strlen(tempPtr)==0)
     {
         fprintf(stderr, "FATAL: Config environment variable \"IBRAND_CONF\" not found or invalid.\n");
         free(pIBRand);
@@ -1551,10 +1073,8 @@ int main(int argc, char * argv[])
     app_tracef("===ibrand_service==================================================================================================");
 
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_PROGRESS)) app_tracef("PROGRESS: ReadConfig \"%s\"", pIBRand->szConfigFilename);
-
-    //rc = ReadConfig(pIBRand->szConfigFilename, &(pIBRand->cfg), CRYPTO_SECRETKEYBYTES, CRYPTO_PUBLICKEYBYTES);
     rc = ReadConfig(pIBRand->szConfigFilename, &(pIBRand->cfg), 0, 0);
-    if (rc != 0)
+    if (rc != ERC_OK)
     {
         app_tracef("FATAL: Configuration error while processing \"%s\". Aborting. rc=%d", pIBRand->szConfigFilename, rc);
         app_trace_closelog();
@@ -1704,10 +1224,8 @@ int main(int argc, char * argv[])
 
                 pIBRand->ourKemSecretKey.pData        = NULL;
                 pIBRand->ourKemSecretKey.cbData       = 0;
-
-                //rc = ReadOurKemPrivateKey(pIBRand, CRYPTO_SECRETKEYBYTES);
                 rc = ReadOurKemPrivateKey(pIBRand, 0);
-                if (rc != 0)
+                if (rc != ERC_OK)
                 {
                     app_tracef("FATAL: Configuration error. Aborting. rc=%d", rc);
                     app_trace_closelog();
@@ -1718,7 +1236,7 @@ int main(int argc, char * argv[])
                 // pIBRand->theirSigningPublicKey.pData  = NULL;
                 // pIBRand->theirSigningPublicKey.cbData = 0;
                 // rc = ReadTheirSigningPublicKey(pIBRand, CRYPTO_PUBLICKEYBYTES);
-                // if (rc != 0)
+                // if (rc != ERC_OK)
                 // {
                 //     app_tracef("FATAL: Configuration error. Aborting. rc=%d", rc);
                 //     app_trace_closelog();
@@ -1739,10 +1257,10 @@ int main(int argc, char * argv[])
                     currentState = STATE_AUTHENTICATE;
                     continue;
                 }
-                rc = InitialiseCurl(pIBRand);
-                if (rc != 0)
+                rc = CommsInitialise(pIBRand);
+                if (rc != ERC_OK)
                 {
-                    app_tracef("ERROR: InitialiseCurl failed with rc=%d. Will retry initialisation in %d seconds", rc, pIBRand->cfg.authRetryDelay);
+                    app_tracef("ERROR: CommsInitialise failed with rc=%d. Will retry initialisation in %d seconds", rc, pIBRand->cfg.authRetryDelay);
                     sleep(pIBRand->cfg.authRetryDelay);
                     currentState = STATE_INITIALISECURL;
                     continue;
@@ -1764,7 +1282,7 @@ int main(int argc, char * argv[])
                     continue;
                 }
                 rc = DoAuthentication(pIBRand);
-                if (rc != 0)
+                if (rc != ERC_OK)
                 {
                     numberOfAuthFailures++;
                     numberOfConsecutiveAuthFailures++;
@@ -1786,17 +1304,17 @@ int main(int argc, char * argv[])
                 printProgressToSyslog = true;
                 // Request a new KEM secret key
                 rc = getNewKemKeyPair(pIBRand);
-                if (rc == ERC_OopsSharedSecretExpired)
+                if (rc == ERC_IBCOM_SHAREDSECRET_EXPIRED)
                 {
                     currentState = STATE_DESTROYEXISTINGSHAREDSECRET;
                     continue;
                 }
-                else if (rc == ERC_OopsKemKeyPairExpired)
+                else if (rc == ERC_IBCOM_KEMKEYPAIR_EXPIRED)
                 {
                     currentState = STATE_GETNEWKEMKEYPAIR;
                     continue;
                 }
-                if (rc != 0)
+                if (rc != ERC_OK)
                 {
                     numberOfAuthFailures++;
                     numberOfConsecutiveAuthFailures++;
@@ -1819,8 +1337,8 @@ int main(int argc, char * argv[])
                 }
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
                     app_tracef("INFO: Decrypting KEM secret key");
-                int rc = DecryptAndStoreKemSecretKey(pIBRand);
-                if (rc != 0)
+                tERRORCODE rc = DecryptAndStoreKemSecretKey(pIBRand);
+                if (rc != ERC_OK)
                 {
                     numberOfAuthFailures++;
                     numberOfConsecutiveAuthFailures++;
@@ -1842,17 +1360,17 @@ int main(int argc, char * argv[])
                 printProgressToSyslog = true;
                 // Get SharedSecret
                 rc = getSecureRNGSharedSecret(pIBRand);
-                if (rc == ERC_OopsSharedSecretExpired)
+                if (rc == ERC_IBCOM_SHAREDSECRET_EXPIRED)
                 {
                     currentState = STATE_DESTROYEXISTINGSHAREDSECRET;
                     continue;
                 }
-                else if (rc == ERC_OopsKemKeyPairExpired)
+                else if (rc == ERC_IBCOM_KEMKEYPAIR_EXPIRED)
                 {
                     currentState = STATE_GETNEWKEMKEYPAIR;
                     continue;
                 }
-                else if (rc != 0)
+                else if (rc != ERC_OK)
                 {
                     numberOfAuthFailures++;
                     numberOfConsecutiveAuthFailures++;
@@ -1878,7 +1396,7 @@ int main(int argc, char * argv[])
                 if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_AUTH))
                     app_tracef("INFO: Decapsulating SharedSecret");
                 rc = DecapsulateAndStoreSharedSecret(pIBRand);
-                if (rc != 0)
+                if (rc != ERC_OK)
                 {
                     numberOfAuthFailures++;
                     numberOfConsecutiveAuthFailures++;
@@ -1959,17 +1477,17 @@ int main(int argc, char * argv[])
                 // Get the RNG material
                 //////////////////////////////
                 rc = getRandomBytes(pIBRand);
-                if (rc == ERC_OopsSharedSecretExpired)
+                if (rc == ERC_IBCOM_SHAREDSECRET_EXPIRED)
                 {
                     currentState = STATE_DESTROYEXISTINGSHAREDSECRET;
                     continue;
                 }
-                else if (rc == ERC_OopsKemKeyPairExpired)
+                else if (rc == ERC_IBCOM_KEMKEYPAIR_EXPIRED)
                 {
                     currentState = STATE_GETNEWKEMKEYPAIR;
                     continue;
                 }
-                else if (rc != 0)
+                else if (rc != ERC_OK)
                 {
                     numberOfRetreivalFailures++;
                     numberOfConsecutiveRetreivalFailures++;
