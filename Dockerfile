@@ -134,7 +134,9 @@ openssl engine\n\
 #tail -f /var/log/syslog\n'\
 sleep 15\n\
 openssl rand 24\n\
-curl -v http://$SERVER_HOST:8080/shutdown\n'\
+ret=$?\n\
+curl -v http://$SERVER_HOST:8080/shutdown\n\
+exit $ret\n'\
 >> /run.sh
 RUN chmod +x /run.sh
 
