@@ -63,6 +63,7 @@ RUN dpkg -i ./openssl-pqe-engine_0.1.0_amd64.deb
 RUN sed -i '/imklog/s/^/#/' /etc/rsyslog.conf
 RUN mkdir -p /var/lib/ibrand/
 RUN mkdir /certs/
+RUN mkdir /oob/
 RUN echo '#!/bin/sh\n\
 set -x\n\
 service rsyslog start\n\
@@ -77,7 +78,14 @@ ret=$?\n\
 if [ $ret -ne 0 ] ; then\n\
   exit 1\n\
 fi\n\
-curl --http1.1 --silent --fail --show-error --cert /certs/client.crt --key /certs/client.key --header "Content-Type: application/json" --data-raw "{\"clientCertName\":\"monarca.iadb.org\", \"clientCertSerialNumber\":\"$certSerial\", \"countryCode\":\"GB\", \"channels\":[{\"type\":\"sms\", \"value\":\"10000000001\\"}, {\"type\":\"email\", \"value\":\"diegol@iadb.org\"}], \"kemAlgorithm\":\"222\"}" https://$SERVER_HOST/api/clientsetupdata -o /ironbridge_clientsetup_OOB.json\n\
+curl --http1.1 --silent --fail --show-error --cert /certs/client.crt --key /certs/client.key --header "Content-Type: application/json" --data-raw "{\"clientCertName\":\"monarca.iadb.org\", \"clientCertSerialNumber\":\"$certSerial\", \"countryCode\":\"GB\", \"channels\":[{\"type\":\"email\", \"value\":\"diegol@iadb.org\"}, {\"type\":\"email\", \"value\":\"diegol1@iadb.org\"}, {\"type\":\"email\", \"value\":\"diegol2@iadb.org\"}], \"kemAlgorithm\":\"222\"}" https://$SERVER_HOST/api/clientsetupdata -o /oob/ironbridge_clientsetup_OOB_1.json\n\
+slices=$(curl -s http://$SMTP_HOST:1080/messages | jq length)\n\
+sleep 1\n\
+i=1\n\
+while [ "$i" -le "$slices" ]; do\n\
+  curl -s http://$SMTP_HOST:1080/messages/$i.plain -o /oob/ironbridge_clientsetup_OOB_$(($i + 1)).json\n\
+  i=$(($i + 1))\n\
+done\n\
 ret=$?\n\
 if [ $ret -ne 0 ] ; then\n\
   exit 1\n\
