@@ -1,5 +1,14 @@
 version: "3.8"
 services:
+  mail-server:
+    build:
+      context: .
+      target: mailcatcher
+    expose:
+      - 1080
+      - 1025
+      - 8080
+
   pqe-rpc-server:
     image: pqe-rpc-server-test:latest
     expose:
@@ -7,14 +16,24 @@ services:
       - 8080
     environment:
      - SERVICE_NAME=pqe-rpc-server
+     - SMTP_HOST=mail-server
+     - SMTP_PORT=1025
+     - SMTP_SSL=false
+     - SMTP_USER=
+     - SMTP_PASS=
     volumes:
       - shared-volume:/ca-certs/
+    command: ["wait-for-it", "mail-server:1025", "--", "/run.sh"]
+    depends_on:
+     - mail-server
 
   openssl-pqe-engine:
     build:
       context: .
+      target: runner
     environment:
      - SERVER_HOST=pqe-rpc-server
+     - SMTP_HOST=mail-server
     volumes:
       - shared-volume:/ca-certs/
     command: ["wait-for-it", "pqe-rpc-server:443", "--", "./run.sh"]

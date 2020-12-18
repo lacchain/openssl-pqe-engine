@@ -63,6 +63,7 @@ RUN dpkg -i ./openssl-pqe-engine_0.1.0_amd64.deb
 RUN sed -i '/imklog/s/^/#/' /etc/rsyslog.conf
 RUN mkdir -p /var/lib/ibrand/
 RUN mkdir /certs/
+RUN mkdir /oob/
 RUN echo '#!/bin/sh\n\
 set -x\n\
 service rsyslog start\n\
@@ -77,7 +78,14 @@ ret=$?\n\
 if [ $ret -ne 0 ] ; then\n\
   exit 1\n\
 fi\n\
-curl --http1.1 --silent --fail --show-error --cert /certs/client.crt --key /certs/client.key --header "Content-Type: application/json" --data-raw "{\"clientCertName\":\"monarca.iadb.org\", \"clientCertSerialNumber\":\"$certSerial\", \"countryCode\":\"GB\", \"channels\":[{\"type\":\"sms\", \"value\":\"10000000001\\"}, {\"type\":\"email\", \"value\":\"diegol@iadb.org\"}], \"kemAlgorithm\":\"222\"}" https://$SERVER_HOST/api/clientsetupdata -o /ironbridge_clientsetup_OOB.json\n\
+curl --http1.1 --silent --fail --show-error --cert /certs/client.crt --key /certs/client.key --header "Content-Type: application/json" --data-raw "{\"clientCertName\":\"monarca.iadb.org\", \"clientCertSerialNumber\":\"$certSerial\", \"countryCode\":\"GB\", \"channels\":[{\"type\":\"email\", \"value\":\"diegol@iadb.org\"}, {\"type\":\"email\", \"value\":\"diegol1@iadb.org\"}, {\"type\":\"email\", \"value\":\"diegol2@iadb.org\"}], \"kemAlgorithm\":\"222\"}" https://$SERVER_HOST/api/clientsetupdata -o /oob/ironbridge_clientsetup_OOB_1.json\n\
+slices=$(curl -s http://$SMTP_HOST:1080/messages | jq length)\n\
+sleep 1\n\
+i=1\n\
+while [ "$i" -le "$slices" ]; do\n\
+  curl -s http://$SMTP_HOST:1080/messages/$i.plain -o /oob/ironbridge_clientsetup_OOB_$(($i + 1)).json\n\
+  i=$(($i + 1))\n\
+done\n\
 ret=$?\n\
 if [ $ret -ne 0 ] ; then\n\
   exit 1\n\
@@ -104,7 +112,9 @@ JSON:{\n\
   {\n\
     "USESECURERNG":"1",\n\
     "PREFERRED_KEM_ALGORITHM":"222",\n\
-    "CLIENTSETUPOOBFILENAME":"/ironbridge_clientsetup_OOB.json",\n\
+    "CLIENTSETUP_OOB_PATH":"/oob/",\n\
+    "CLIENTSETUP_OOB1_FILENAME":"ironbridge_clientsetup_OOB_1.json",\n\
+    "CLIENTSETUP_OOBN_FILENAME":"ironbridge_clientsetup_OOB_%d.json",\n\
     "OURKEMSECRETKEYFILENAME":"/ibrand_sk.bin"\n\
   },\n\
   "CommsSettings":\n\
@@ -138,8 +148,26 @@ sleep 15\n\
 openssl rand 24\n\
 ret=$?\n\
 curl -v http://$SERVER_HOST:8080/shutdown\n\
+curl -v http://$SMTP_HOST:8080/shutdown\n\
 exit $ret\n'\
 >> /run.sh
 RUN chmod +x /run.sh
 
+CMD ["/run.sh"]
+
+FROM sj26/mailcatcher as mailcatcher
+
+RUN wget https://github.com/msoap/shell2http/releases/download/1.13/shell2http_1.13_amd64.deb
+RUN echo "4f41498fd58b9ddb856aef7ef59c267a3cf681a7d576eb9a73a376f5e88e92b2 shell2http_1.13_amd64.deb" | sha256sum --check --status
+RUN dpkg -i shell2http_1.13_amd64.deb
+
+RUN echo '#!/bin/sh\n\
+set -x\n\
+shell2http /shutdown "kill \$(ps aux | grep '\''[/]usr/local/bin/ruby '\'' | awk '\''{print \$2}'\'')" &>/dev/null\n\
+mailcatcher --foreground --ip 0.0.0.0\n'\
+>> /run.sh
+
+RUN chmod +x /run.sh
+
+ENTRYPOINT []
 CMD ["/run.sh"]

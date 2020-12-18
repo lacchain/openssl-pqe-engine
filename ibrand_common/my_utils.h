@@ -130,4 +130,5 @@ extern long   my_getFilesize(const char *szFilename);
 extern bool   my_fileExists(const char *szFilename);
 extern int    my_roundUp(int num, int multipleOf);
 extern bool   my_isSuperUser(void);
+extern bool   my_LStringJoin(tLSTRING *pDest, tLSTRING *pDataToAppend);
 #endif // _INCLUDE_MY_UTILS_H_
