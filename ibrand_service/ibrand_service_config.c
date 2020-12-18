@@ -187,13 +187,29 @@ static bool __ParseJsonConfig(const char *szJsonConfig, tIB_CONFIGDATA *pIBConfi
                     {
                         pIBConfig->preferredKemAlgorithm = atoi(childJson->pairs[jj].value->stringValue);
                     }
-                    else if (strcmp(childJson->pairs[jj].key,"CLIENTSETUPOOBFILENAME")==0)
+                    else if (strcmp(childJson->pairs[jj].key,"CLIENTSETUP_OOB_PATH")==0)
                     {
-                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->clientSetupOOBFilename)-1))
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->clientSetupOOBPath)-1))
                         {
                             return false;
                         }
-                        my_strlcpy(pIBConfig->clientSetupOOBFilename, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->clientSetupOOBFilename));
+                        my_strlcpy(pIBConfig->clientSetupOOBPath, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->clientSetupOOBPath));
+                    }
+                    else if (strcmp(childJson->pairs[jj].key,"CLIENTSETUP_OOB1_FILENAME")==0)
+                    {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->clientSetupOOB1Filename)-1))
+                        {
+                            return false;
+                        }
+                        my_strlcpy(pIBConfig->clientSetupOOB1Filename, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->clientSetupOOB1Filename));
+                    }
+                    else if (strcmp(childJson->pairs[jj].key,"CLIENTSETUP_OOBN_FILENAME")==0)
+                    {
+                        if (__StringLengthExceeded(&childJson->pairs[jj], sizeof(pIBConfig->clientSetupOOBNFilename)-1))
+                        {
+                            return false;
+                        }
+                        my_strlcpy(pIBConfig->clientSetupOOBNFilename, childJson->pairs[jj].value->stringValue, sizeof(pIBConfig->clientSetupOOBNFilename));
                     }
                     else if (strcmp(childJson->pairs[jj].key,"OURKEMSECRETKEYFILENAME")==0)
                     {

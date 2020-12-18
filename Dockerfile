@@ -104,7 +104,9 @@ JSON:{\n\
   {\n\
     "USESECURERNG":"1",\n\
     "PREFERRED_KEM_ALGORITHM":"222",\n\
-    "CLIENTSETUPOOBFILENAME":"/ironbridge_clientsetup_OOB.json",\n\
+    "CLIENTSETUP_OOB_PATH":"/oob/",\n\
+    "CLIENTSETUP_OOB1_FILENAME":"ironbridge_clientsetup_OOB_1.json",\n\
+    "CLIENTSETUP_OOBN_FILENAME":"ironbridge_clientsetup_OOB_%d.json",\n\
     "OURKEMSECRETKEYFILENAME":"/ibrand_sk.bin"\n\
   },\n\
   "CommsSettings":\n\
