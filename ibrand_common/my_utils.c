@@ -321,4 +321,58 @@ bool my_isSuperUser(void)
     return (geteuid() == 0);
 }
 
+bool my_LStringJoin(tLSTRING *pDest, tLSTRING *pDataToAppend)
+{
+    tLSTRING joinedData;
+
+    if (!pDest)
+    {
+        my_errno = EINVAL;
+        return false;
+    }
+    if (!pDataToAppend)
+    {
+        // Nothing to do
+        return true;
+    }
+    if (pDataToAppend->pData == NULL || pDataToAppend->cbData == 0)
+    {
+        // Nothing to do
+        return true;
+    }
+
+    joinedData.cbData = pDest->cbData + pDataToAppend->cbData;
+    joinedData.pData = malloc(joinedData.cbData);
+    if (joinedData.pData == NULL)
+    {
+        my_errno = ENOMEM;
+        return false;
+    }
+    // Copy in the original data
+    if (pDest->cbData)
+    {
+        memcpy(joinedData.pData, pDest->pData, pDest->cbData);
+    }
+    // Append the additional data
+    memcpy(joinedData.pData + pDest->cbData, pDataToAppend->pData, pDataToAppend->cbData);
+
+    // Clean and Free up the original data
+    memset(pDest->pData, 0, pDest->cbData);
+    free(pDest->pData);
+    pDest->pData = NULL;
+    pDest->cbData = 0;
+
+    // Clean and Free up the appended data
+    memset(pDataToAppend->pData, 0, pDataToAppend->cbData);
+    free(pDataToAppend->pData);
+    pDataToAppend->pData = NULL;
+    pDataToAppend->cbData = 0;
+
+    // Return the joined data
+    pDest->pData = joinedData.pData;
+    pDest->cbData = joinedData.cbData;
+
+    return true;
+}
+
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------------
