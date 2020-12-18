@@ -508,10 +508,15 @@ static bool __ParseJsonOOBData(const char *szJsonString, tIB_OOBDATA *pOobData)
     return true;
 }
 
-tERRORCODE GetBinaryDataFromOOBFile(char *szSrcFilename, tLSTRING *pDestBinaryData)
+static tERRORCODE GetBinaryDataFromOOBFile(char *szSrcFilename, tLSTRING *pDestBinaryData, int *pNumberOfSegments)
 {
     tERRORCODE rc;
     tLSTRING jsonData;
+
+    if (pNumberOfSegments)
+    {
+        *pNumberOfSegments = 0;
+    }
 
     rc = ReadContentsOfFile(szSrcFilename, &jsonData, NO_EXPECTATION_OF_FILESIZE );
     if (rc != ERC_OK)
@@ -561,13 +566,60 @@ tERRORCODE GetBinaryDataFromOOBFile(char *szSrcFilename, tLSTRING *pDestBinaryDa
     success = DecodeHexString(&(pOobData->hexData), pDestBinaryData);
     if (!success)
     {
-        app_tracef("ERROR: Failed to decode KEM secret key hex string");
+        app_tracef("ERROR: Failed to OOB hex string");
         free(pOobData);
         pOobData = NULL;
         return ERC_IBSCF_HEX_DECODE_FAILURE_OF_KEMKEY;
     }
+    if (pOobData->segmentNumber == 1 && pNumberOfSegments)
+    {
+        *pNumberOfSegments = pOobData->requiredSegments;
+    }
 
     free(pOobData);
     pOobData = NULL;
+    return ERC_OK;
+}
+
+tERRORCODE GetBinaryDataFromOOBFiles(char *szOOBPath,
+                                     char *szOOB1Filename,
+                                     char *szOOBNFilename,
+                                     tLSTRING *pDestBinaryData)
+{
+    tERRORCODE rc;
+    int requiredSegments = 0;
+    char szSrcFilename[_MAX_PATH];
+
+    strcpy(szSrcFilename, szOOBPath);
+    strcat(szSrcFilename, szOOB1Filename);
+    rc = GetBinaryDataFromOOBFile(szSrcFilename, pDestBinaryData, &requiredSegments);
+    if (rc != ERC_OK)
+    {
+        app_tracef("ERROR: Failed to read contents of OOB segment 1 - \"%s\"", szSrcFilename);
+        return rc;
+    }
+    if (requiredSegments > 1)
+    {
+        char segmentFilename[_MAX_PATH];
+        tLSTRING segmentBinaryData = {0, NULL};
+        for (int seg = 2; seg <= requiredSegments; seg++)
+        {
+            snprintf(segmentFilename, sizeof(segmentFilename)-1, szOOBNFilename, seg); // szOOBNFilename assumed to contain a single %d, or similar
+            strcpy(szSrcFilename, szOOBPath);
+            strcat(szSrcFilename, segmentFilename);
+            rc = GetBinaryDataFromOOBFile(szSrcFilename, &segmentBinaryData, NULL);
+            if (rc != ERC_OK)
+            {
+                app_tracef("ERROR: Failed to read contents of OOB segment %d - \"%s\"", seg, szSrcFilename);
+                return rc;
+            }
+            bool success = my_LStringJoin(pDestBinaryData, &segmentBinaryData);
+            if (!success)
+            {
+                app_tracef("ERROR: Failed to append OOB segment %d (errno = %u)", seg, my_errno);
+                return ERC_IBSCF_OOB_JOIN_FAILURE;
+            }
+        }
+    }
     return ERC_OK;
 }

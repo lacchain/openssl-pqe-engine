@@ -942,9 +942,12 @@ static tERRORCODE ImportKemSecretKeyFromClientSetupOOBFile(tIB_INSTANCEDATA *pIB
     tLSTRING binaryData = {0U, NULL};
 
     if (TEST_BIT(pIBRand->cfg.fVerbose,DBGBIT_CONFIG))
-        app_tracef("INFO: Importing KEM secret key from OOB file: \"%s\"", pIBRand->cfg.clientSetupOOBFilename);
+        app_tracef("INFO: Importing KEM secret key from OOB file: \"%s\"", pIBRand->cfg.clientSetupOOB1Filename);
 
-    rc = GetBinaryDataFromOOBFile(pIBRand->cfg.clientSetupOOBFilename, &binaryData);
+    rc = GetBinaryDataFromOOBFiles(pIBRand->cfg.clientSetupOOBPath,
+                                   pIBRand->cfg.clientSetupOOB1Filename,
+                                   pIBRand->cfg.clientSetupOOBNFilename,
+                                   &binaryData);
     if (rc != ERC_OK)
     {
         app_tracef("ERROR: Failed to get binary data from OOB file \"%s\"", pIBRand->cfg.ourKemSecretKeyFilename);

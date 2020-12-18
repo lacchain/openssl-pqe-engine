@@ -33,6 +33,8 @@
 #define ERC_IBSCF_NOMEM_FOR_OOB                    18860
 #define ERC_IBSCF_OOB_JSON_PARSE_ERROR             18870
 #define ERC_IBSCF_HEX_DECODE_FAILURE_OF_KEMKEY     18880
+#define ERC_IBSCF_OOB_JOIN_FAILURE                 18890
+
 
 
 #define DBGBIT_STATUS   0
@@ -90,6 +92,10 @@ typedef struct tagIB_CONFIGDATA
 extern tERRORCODE ValidateSettings(tIB_CONFIGDATA *pIBConfig);
 extern tERRORCODE ReadConfig(char *szConfigFilename, tIB_CONFIGDATA *pIBConfig, size_t secretKeyBytes, size_t publicKeyBytes);
 extern void PrintConfig(tIB_CONFIGDATA *pIBConfig);
-extern tERRORCODE GetBinaryDataFromOOBFile(char *szSrcFilename, tLSTRING *pDestBinaryData);
+extern tERRORCODE GetBinaryDataFromOOBFiles(char *szOOBPath,
+                                            char *szOOB1Filename,
+                                            char *szOOBNFilename,
+                                            tLSTRING *pDestBinaryData);
+
 
 #endif // _INCLUDE_IBRAND_SERVICE_CONFIG_H_
