@@ -1,10 +1,11 @@
-add_library(stdrand_engine SHARED stdrand_engine.c)
+include_directories(../ibrand_common)
 
-target_link_libraries(stdrand_engine ibrand_common)
+add_library(ibinit_engine SHARED ibinit_engine.c)
 
 set_target_properties(
-  stdrand_engine
+  ibinit_engine
   PROPERTIES
     SOVERSION 1.0
     PREFIX ""
 )
+target_link_libraries(ibinit_engine PUBLIC ibrand_common)

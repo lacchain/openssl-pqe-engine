@@ -33,7 +33,7 @@ static long int g_InstanceTotalBytesRequested = 0;
 ///////////////////////////
 
 
-static int stdrand_EngineStateInit(tENGINESTATE *pEngineState)
+static int ibinit_EngineStateInit(tENGINESTATE *pEngineState)
 {
     app_trace_set_destination(false, false, true); // (toConsole, toLogFile; toSyslog)
     app_trace_openlog(NULL, LOG_PID, LOG_USER );
@@ -45,7 +45,7 @@ static int stdrand_EngineStateInit(tENGINESTATE *pEngineState)
     return pEngineState->status;
 }
 
-static int stdrand_GetRngMaterial(unsigned char *buf, int requestedBytes)
+static int ibinit_GetRngMaterial(unsigned char *buf, int requestedBytes)
 {
     unsigned long bytesStillRequired = requestedBytes;
     unsigned char *w_ptr = buf;
@@ -76,11 +76,11 @@ static int stdrand_GetRngMaterial(unsigned char *buf, int requestedBytes)
     g_InstanceTotalBytesRequested += requestedBytes;
     if (localDebugTracing_Debug)
     {
-        app_tracef("DEBUG: (STDRAND_ENGINE) GetRngMaterial (requested:%d, supplied:%ld, InstanceTotal=%ld) Done\n", requestedBytes, requestedBytes-bytesStillRequired, g_InstanceTotalBytesRequested);
+        app_tracef("DEBUG: (IBINIT_ENGINE) GetRngMaterial (requested:%d, supplied:%ld, InstanceTotal=%ld) Done\n", requestedBytes, requestedBytes-bytesStillRequired, g_InstanceTotalBytesRequested);
     }
     //if (printTotalsToStdOut)
     //{
-    //   fprintf(stderr, "*** INFO: (STDRAND_ENGINE) GetRngMaterial (requested:%d, supplied:%ld, InstanceTotal=%ld) Done\n", requestedBytes, requestedBytes-bytesStillRequired, g_InstanceTotalBytesRequested);
+    //   fprintf(stderr, "*** INFO: (IBINIT_ENGINE) GetRngMaterial (requested:%d, supplied:%ld, InstanceTotal=%ld) Done\n", requestedBytes, requestedBytes-bytesStillRequired, g_InstanceTotalBytesRequested);
     //}
     return engine_state.status;
 }
@@ -93,9 +93,9 @@ static int cb_GetRngMaterial(unsigned char *buf, int num)
     depth++;
     if (localDebugTracing_Info)
     {
-        app_tracef("INFO: (STDRAND_ENGINE) cb_GetRngMaterial(%d)", num);
+        app_tracef("INFO: (IBINIT_ENGINE) cb_GetRngMaterial(%d)", num);
     }
-    rc = stdrand_GetRngMaterial(buf, num);
+    rc = ibinit_GetRngMaterial(buf, num);
     depth--;
     return rc;
 }
@@ -104,9 +104,9 @@ static int cb_GetPseudoRandMaterial(unsigned char *buf, int num)
 {
     if (localDebugTracing_Info)
     {
-        app_tracef("INFO: (STDRAND_ENGINE) cb_GetPseudoRandMaterial(%d)", num);
+        app_tracef("INFO: (IBINIT_ENGINE) cb_GetPseudoRandMaterial(%d)", num);
     }
-    return stdrand_GetRngMaterial(buf, num);
+    return ibinit_GetRngMaterial(buf, num);
 }
 
 static int cb_Status(void)
@@ -118,18 +118,18 @@ static void cb_Cleanup(void)
 {
     if (localDebugTracing_Info)
     {
-        app_tracef("INFO: (STDRAND_ENGINE) cb_Cleanup() (InstanceTotal=%ld)", g_InstanceTotalBytesRequested);
+        app_tracef("INFO: (IBINIT_ENGINE) cb_Cleanup() (InstanceTotal=%ld)", g_InstanceTotalBytesRequested);
     }
     if (printTotalsToStdOut)
     {
-        fprintf(stderr, "*** INFO: (STDRAND_ENGINE) cb_Cleanup() (InstanceTotal=%ld)\n", g_InstanceTotalBytesRequested);
+        fprintf(stderr, "*** INFO: (IBINIT_ENGINE) cb_Cleanup() (InstanceTotal=%ld)\n", g_InstanceTotalBytesRequested);
     }
 }
 
-int stdrand_bind(ENGINE *pEngine, const char *pID)
+int ibinit_bind(ENGINE *pEngine, const char *pID)
 {
-    static const char ENGINE_ID[]   = "stdrand";
-    static const char ENGINE_NAME[] = "CQC stdrand RNG engine";
+    static const char ENGINE_ID[]   = "ibinit";
+    static const char ENGINE_NAME[] = "CQC IronBridge IBInit Initialisation engine";
 
     static RAND_METHOD engineCallbackFunctions = {NULL,                      // int (*seed) (const void *buf, int num);
                                                   &cb_GetRngMaterial,        // int (*bytes) (unsigned char *buf, int num);
@@ -141,30 +141,30 @@ int stdrand_bind(ENGINE *pEngine, const char *pID)
 
     if (localDebugTracing_Debug)
     {
-        app_tracef("DEBUG: (STDRAND_ENGINE) stdrand_bind()");
+        app_tracef("DEBUG: (IBINIT_ENGINE) ibinit_bind()");
     }
 
     if (ENGINE_set_id  (pEngine, ENGINE_ID               ) != ENGINE_STATUS_OK ||
         ENGINE_set_name(pEngine, ENGINE_NAME             ) != ENGINE_STATUS_OK ||
         ENGINE_set_RAND(pEngine, &engineCallbackFunctions) != ENGINE_STATUS_OK)
     {
-      app_tracef("ERROR: (STDRAND_ENGINE) stdrand_bind: Binding failed");
+      app_tracef("ERROR: (IBINIT_ENGINE) ibinit_bind: Binding failed");
       return ENGINE_STATUS_NG;
     }
 
-    if (stdrand_EngineStateInit(&engine_state) != ENGINE_STATUS_OK)
+    if (ibinit_EngineStateInit(&engine_state) != ENGINE_STATUS_OK)
     {
-      app_tracef("ERROR: (STDRAND_ENGINE) stdrand_EngineStateInit failed");
+      app_tracef("ERROR: (IBINIT_ENGINE) ibinit_EngineStateInit failed");
       return ENGINE_STATUS_NG;
     }
 
     g_InstanceTotalBytesRequested = 0;
     if (localDebugTracing_Debug)
     {
-        app_tracef("DEBUG: (STDRAND_ENGINE) stdrand_bind() OK");
+        app_tracef("DEBUG: (IBINIT_ENGINE) ibinit_bind() OK");
     }
     return ENGINE_STATUS_OK;
 }
 
-IMPLEMENT_DYNAMIC_BIND_FN(stdrand_bind)
+IMPLEMENT_DYNAMIC_BIND_FN(ibinit_bind)
 IMPLEMENT_DYNAMIC_CHECK_FN()

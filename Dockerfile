@@ -35,8 +35,8 @@ COPY ibrand_common                 ./ibrand_common/
 COPY ibrand_lib/CMakeLists.txt     ./ibrand_lib/
 COPY ibrand_lib/software           ./ibrand_lib/software/
 COPY ibrand_service                ./ibrand_service/
-COPY ibrand_openssl                ./ibrand_openssl/
-COPY stdrand_engine                ./stdrand_engine/
+COPY ibrand_engine                 ./ibrand_engine/
+COPY ibinit_engine                 ./ibinit_engine/
 
 RUN debuild -b -uc -us -nc
 
