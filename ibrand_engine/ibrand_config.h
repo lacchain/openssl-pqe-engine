@@ -9,13 +9,13 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 
-#ifndef _INCLUDE_LIBIBRAND_CONFIG_H_
-#define _INCLUDE_LIBIBRAND_CONFIG_H_
+#ifndef _INCLUDE_IBRAND_CONFIG_H_
+#define _INCLUDE_IBRAND_CONFIG_H_
 
 #include <stdlib.h>
 #include <stdint.h>
 
-#include "../../ibrand_common/my_utils.h"
+#include "../ibrand_common/my_utils.h"
 
 #ifndef tERRORCODE
 #define tERRORCODE int
@@ -71,4 +71,4 @@ extern char *            cfgGetValue        (char *szEnvVariableWithFilename, ch
 extern void              cfgGetDatafilename (char *pIBDatafilename, size_t cbIBDatafilename, tIB_INSTANCEDATA *pIBRand);
 extern void              cfgPrintConfig     (tIB_INSTANCEDATA *pIBRand);
 
-#endif // _INCLUDE_LIBIBRAND_CONFIG_H_
+#endif // _INCLUDE_IBRAND_CONFIG_H_

@@ -1,6 +1,6 @@
 
-#ifndef _INCLUDE_LIBIBRAND_H_
-#define _INCLUDE_LIBIBRAND_H_
+#ifndef _INCLUDE_IBRAND_MAIN_H_
+#define _INCLUDE_IBRAND_MAIN_H_
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -12,7 +12,7 @@
 #endif
 #include <time.h>
 
-#include "libibrand_config.h"
+#include "ibrand_config.h"
 
 #define BUFLEN 512u
 
@@ -39,4 +39,4 @@ extern uint32_t IBRand_readData (struct ibrand_context *context, uint8_t *result
 
 #endif
 
-#endif // _INCLUDE_LIBIBRAND_H_
+#endif // _INCLUDE_IBRAND_MAIN_H_
