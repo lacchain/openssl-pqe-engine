@@ -7,14 +7,14 @@
 // 23/06/2020: Changes added to support IronBridge RNG API
 //
 
-#include <libibrand.h>
-#include <openssl/engine.h>
-#include <openssl/evp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <openssl/engine.h>
+#include <openssl/evp.h>
 
+#include <libibrand.h>
 #include "../ibrand_common/my_utilslib.h"
 
 //#define USE_RINGBUFFER // Can cause problems with genrsa >= 2048
@@ -26,11 +26,27 @@
 static const int ENGINE_STATUS_OK = 1;
 static const int ENGINE_STATUS_NG = 0;
 
-static const int localDebugTracing = true;
+static const int localDebugTracing_Debug = false;
+static const int localDebugTracing_Info = false;
+static const int printTotalsToStdOut = false;
 
-///////////////////
-// Configuration
-///////////////////
+typedef struct tagENGINESTATE
+{
+  struct ibrand_context trng_context;
+#ifdef USE_RINGBUFFER
+  RingBuffer ring_buffer;
+#endif
+  int status;
+} tENGINESTATE;
+
+#ifdef USE_RINGBUFFER
+static tENGINESTATE engine_state = {{NULL, {0}, 0, 0},{{0},NULL,NULL},ENGINE_STATUS_NG};
+#else
+static tENGINESTATE engine_state = {{NULL, {0}, 0, 0},ENGINE_STATUS_NG};
+#endif
+
+static long int g_InstanceTotalBytesRequested = 0;
+
 
 ////////////////////////////////
 // Ring buffer implementation
@@ -122,15 +138,6 @@ static size_t RingBufferWrite(RingBuffer *buffer, size_t num_bytes, const uint8_
 // Engine implementation
 ///////////////////////////
 
-typedef struct tagENGINESTATE
-{
-  struct ibrand_context trng_context;
-#ifdef USE_RINGBUFFER
-  RingBuffer ring_buffer;
-#endif
-  int status;
-} tENGINESTATE;
-
 static int IBRandEngineStateInit(tENGINESTATE *pEngineState)
 {
   app_trace_set_destination(false, false, true); // (toConsole, toLogFile; toSyslog)
@@ -149,27 +156,22 @@ static int IBRandEngineStateInit(tENGINESTATE *pEngineState)
   return pEngineState->status;
 }
 
-#ifdef USE_RINGBUFFER
-static tENGINESTATE engine_state = {{NULL, {0}, 0, 0},{{0},NULL,NULL},ENGINE_STATUS_NG};
-#else
-static tENGINESTATE engine_state = {{NULL, {0}, 0, 0},ENGINE_STATUS_NG};
-#endif
-
-
-static int GetRngMaterial(unsigned char *buf, int num)
+static int GetRngMaterial(unsigned char *buf, int requestedBytes)
 {
-  unsigned long bytesStillRequired = num;
-
-  UNUSED_VAR(localDebugTracing);
-
+  unsigned long bytesStillRequired = requestedBytes;
   unsigned char *w_ptr = buf;
+
+  UNUSED_VAR(localDebugTracing_Debug);
+  UNUSED_VAR(localDebugTracing_Info);
+  UNUSED_VAR(printTotalsToStdOut);
+
   while ((bytesStillRequired > 0) && (engine_state.status == ENGINE_STATUS_OK))
   {
 #ifdef USE_RINGBUFFER
     size_t bytes_read = RingBufferRead(&engine_state.ring_buffer, bytesStillRequired, w_ptr);
     w_ptr += bytes_read;
     bytesStillRequired -= bytes_read;
-    //if (localDebugTracing) app_tracef("DEBUG: RingBufferRead Supplied=%lu. ShortFall=%u", bytes_read, bytesStillRequired);
+    //if (localDebugTracing_Debug) app_tracef("DEBUG: RingBufferRead Supplied=%lu. ShortFall=%u", bytes_read, bytesStillRequired);
 
     // Has the request been satisfied, or do we still have a requirement?
     if (bytesStillRequired > 0)
@@ -182,7 +184,7 @@ static int GetRngMaterial(unsigned char *buf, int num)
       // (If this proves effective, it may make the RingBuffer redundant).
       unsigned long shMemRequestBytes = MIN(bytesStillRequired, (int)RING_BUFFER_REPLENISH_SIZE); // was RING_BUFFER_REPLENISH_SIZE
 
-      //if (localDebugTracing) app_tracef("DEBUG: Replenish RingBuffer from shmem(%d)", shMemRequestBytes);
+      //if (localDebugTracing_Debug) app_tracef("DEBUG: Replenish RingBuffer from shmem(%d)", shMemRequestBytes);
       size_t rand_bytes = IBRand_readData(&engine_state.trng_context, rand_buffer, shMemRequestBytes);
       if (engine_state.trng_context.errorCode)
       {
@@ -198,7 +200,7 @@ static int GetRngMaterial(unsigned char *buf, int num)
         engine_state.status = ENGINE_STATUS_NG;
         break;
       }
-      //if (localDebugTracing) app_tracef("DEBUG: RingBuffer replenished with %lu bytes. Try again...", (unsigned long)bytes_written);
+      //if (localDebugTracing_Debug) app_tracef("DEBUG: RingBuffer replenished with %lu bytes. Try again...", (unsigned long)bytes_written);
     }
 #else // USE_RINGBUFFER
       unsigned long shMemRequestBytes = bytesStillRequired;
@@ -214,8 +216,16 @@ static int GetRngMaterial(unsigned char *buf, int num)
       bytesStillRequired -= rand_bytes;
 #endif // USE_RINGBUFFER
   }
-  //if (localDebugTracing) app_tracef("DEBUG: Inbound openssl rand (requested:%d, supplied:%d) Done", requestBytes, requestBytes-bytesStillRequired);
 
+  g_InstanceTotalBytesRequested += requestedBytes;
+    if (localDebugTracing_Debug)
+  {
+        app_tracef("DEBUG: (IBRAND_ENGINE) GetRngMaterial (requested:%d, supplied:%ld, InstanceTotal=%ld) Done\n", requestedBytes, requestedBytes-bytesStillRequired, g_InstanceTotalBytesRequested);
+  }
+  //if (printTotalsToStdOut)
+  //{
+    //   fprintf(stderr, "*** INFO: (IBRAND_ENGINE) GetRngMaterial (requested:%d, supplied:%ld, InstanceTotal=%ld) Done\n", requestedBytes, requestedBytes-bytesStillRequired, g_InstanceTotalBytesRequested);
+  //}
   return engine_state.status;
 }
 
@@ -225,7 +235,10 @@ static int cb_GetRngMaterial(unsigned char *buf, int num)
   int rc;
 
   depth++;
-  if (localDebugTracing) app_tracef("INFO: cb_GetRngMaterial(%d) (depth=%d)", num, depth);
+  if (localDebugTracing_Info)
+  {
+    app_tracef("INFO: (IBRAND_ENGINE) cb_GetRngMaterial(%d)", num);
+  }
   rc = GetRngMaterial(buf, num);
   depth--;
   return rc;
@@ -233,10 +246,12 @@ static int cb_GetRngMaterial(unsigned char *buf, int num)
 
 static int cb_GetPseudoRandMaterial(unsigned char *buf, int num)
 {
-  if (localDebugTracing) app_tracef("INFO: cb_GetPseudoRandMaterial(%d)", num);
+  if (localDebugTracing_Info)
+  {
+    app_tracef("INFO: (IBRAND_ENGINE) cb_GetPseudoRandMaterial(%d)", num);
+  }
   return GetRngMaterial(buf, num);
 }
-
 
 static int cb_Status(void)
 {
@@ -245,7 +260,14 @@ static int cb_Status(void)
 
 static void cb_Cleanup(void)
 {
-  if (localDebugTracing) app_tracef("INFO: cb_Cleanup() [waterlevel=%d]", engine_state.trng_context.recentWaterLevel);
+    if (localDebugTracing_Info)
+    {
+        app_tracef("INFO: (IBRAND_ENGINE) cb_Cleanup() [waterlevel=%d] (InstanceTotal=%ld)", engine_state.trng_context.recentWaterLevel, g_InstanceTotalBytesRequested);
+    }
+    if (printTotalsToStdOut)
+    {
+        fprintf(stderr, "*** INFO: (IBRAND_ENGINE) cb_Cleanup() [waterlevel=%d] (InstanceTotal=%ld)\n", engine_state.trng_context.recentWaterLevel, g_InstanceTotalBytesRequested);
+    }
 }
 
 int ibrand_bind(ENGINE *pEngine, const char *pID)
@@ -261,24 +283,31 @@ int ibrand_bind(ENGINE *pEngine, const char *pID)
                                                 &cb_Status};               // int (*status) (void);
   (void)pID; // Unused variable
 
-  if (localDebugTracing) app_tracef("INFO: ibrand_bind()");
+    if (localDebugTracing_Debug)
+    {
+        app_tracef("INFO: (IBRAND_ENGINE) ibrand_bind()");
+    }
 
   if (ENGINE_set_id  (pEngine, ENGINE_ID               ) != ENGINE_STATUS_OK ||
       ENGINE_set_name(pEngine, ENGINE_NAME             ) != ENGINE_STATUS_OK ||
       ENGINE_set_RAND(pEngine, &engineCallbackFunctions) != ENGINE_STATUS_OK)
   {
-    app_tracef("ERROR: ibrand_bind: Binding failed");
+    app_tracef("ERROR: (IBRAND_ENGINE) ibrand_bind: Binding failed");
     return ENGINE_STATUS_NG;
   }
 
   if (IBRandEngineStateInit(&engine_state) != ENGINE_STATUS_OK)
   {
-    app_tracef("ERROR: IBRandEngineStateInit failed");
+    app_tracef("ERROR: (IBRAND_ENGINE) IBRandEngineStateInit failed");
     return ENGINE_STATUS_NG;
   }
 
-  if (localDebugTracing) app_tracef("INFO: ibrand_bind() OK");
-  return ENGINE_STATUS_OK;
+    g_InstanceTotalBytesRequested = 0;
+    if (localDebugTracing_Debug)
+    {
+        app_tracef("INFO: (IBRAND_ENGINE) ibrand_bind() OK");
+    }
+    return ENGINE_STATUS_OK;
 }
 
 IMPLEMENT_DYNAMIC_BIND_FN(ibrand_bind)

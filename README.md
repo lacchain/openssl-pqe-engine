@@ -1,6 +1,16 @@
 
 # CQC IronBridge OpenSSL Engine
 
+# Description
+
+This repo contains the implementation of an OpenSSL engine for Linux to replace the default RNG functionality with that with randomness from CQC IronBridge.
+
+The system was developed on Ubunto 20.04 LTS, and has also been tested on Ubunto 18.04 LTS and within a Docker container on Debian.
+
+It is implemented as a series of static and dynamic libraries shared objects and requires network connectivity to an IronBridge server exposing the IronBridge API.
+
+
+<!--
 ## Quick Start
 To get up and running quickly, please see the following:
 

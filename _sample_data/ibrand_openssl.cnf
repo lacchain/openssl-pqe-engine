@@ -11,10 +11,9 @@ stdrand = stdrand_engine_section
 
 [ibrand_section]
 engine_id = ibrand_openssl
-default_algorithms = ALL
+default_algorithms = RAND
 init = 0
 
 [stdrand_engine_section]
 engine_id = stdrand_engine
-default_algorithms = ALL
 init = 0

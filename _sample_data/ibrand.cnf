@@ -22,7 +22,7 @@ JSON:{
     "CLIENTSETUP_OOB_PATH":"~/oob/",
     "CLIENTSETUP_OOB1_FILENAME":"ironbridge_clientsetup_OOB_1.json",
     "CLIENTSETUP_OOBN_FILENAME":"ironbridge_clientsetup_OOB_%d.json",
-    "OURKEMSECRETKEYFILENAME":"/usr/local/ssl/ibrand_sk.bin",
+    "OURKEMSECRETKEYFILENAME":"/usr/local/ssl/ibrand_sk.bin"
   },
   "CommsSettings":
   {

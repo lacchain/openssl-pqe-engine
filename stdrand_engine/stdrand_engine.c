@@ -1,26 +1,32 @@
 
 // JGilmore (07/12/2020 12:26)
 
-#include <openssl/engine.h>
-#include <openssl/evp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
 #include <time.h> // To seed the rand() function
+#include <openssl/engine.h>
+#include <openssl/evp.h>
 
 #include "../ibrand_common/my_utilslib.h"
 
 static const int ENGINE_STATUS_OK = 1;
 static const int ENGINE_STATUS_NG = 0;
 
-static const int localDebugTracing = true;
+static const int localDebugTracing_Debug = false;
+static const int localDebugTracing_Info = false;
+static const int printTotalsToStdOut = false;
 
 typedef struct tagENGINESTATE
 {
     int status;
 } tENGINESTATE;
+
 static tENGINESTATE engine_state = {ENGINE_STATUS_NG};
+
+static long int g_InstanceTotalBytesRequested = 0;
+
 
 ///////////////////////////
 // Engine implementation
@@ -45,7 +51,9 @@ static int stdrand_GetRngMaterial(unsigned char *buf, int requestedBytes)
     unsigned char *w_ptr = buf;
     unsigned int r;
 
-    UNUSED_VAR(localDebugTracing);
+    UNUSED_VAR(localDebugTracing_Debug);
+    UNUSED_VAR(localDebugTracing_Info);
+    UNUSED_VAR(printTotalsToStdOut);
 
     while ((bytesStillRequired > 0) && (engine_state.status == ENGINE_STATUS_OK))
     {
@@ -65,19 +73,39 @@ static int stdrand_GetRngMaterial(unsigned char *buf, int requestedBytes)
             bytesStillRequired -= 1;
         }
     }
-    if (localDebugTracing) app_tracef("DEBUG: stdrand rand (requested:%d, supplied:%d) Done", requestedBytes, requestedBytes-bytesStillRequired);
+    g_InstanceTotalBytesRequested += requestedBytes;
+    if (localDebugTracing_Debug)
+    {
+        app_tracef("DEBUG: (STDRAND_ENGINE) GetRngMaterial (requested:%d, supplied:%ld, InstanceTotal=%ld) Done\n", requestedBytes, requestedBytes-bytesStillRequired, g_InstanceTotalBytesRequested);
+    }
+    //if (printTotalsToStdOut)
+    //{
+    //   fprintf(stderr, "*** INFO: (STDRAND_ENGINE) GetRngMaterial (requested:%d, supplied:%ld, InstanceTotal=%ld) Done\n", requestedBytes, requestedBytes-bytesStillRequired, g_InstanceTotalBytesRequested);
+    //}
     return engine_state.status;
 }
 
 static int cb_GetRngMaterial(unsigned char *buf, int num)
 {
-    if (localDebugTracing) app_tracef("INFO: cb_GetRngMaterial(%d)", num);
-    return stdrand_GetRngMaterial(buf, num);
+    static int depth = 0;
+    int rc;
+
+    depth++;
+    if (localDebugTracing_Info)
+    {
+        app_tracef("INFO: (STDRAND_ENGINE) cb_GetRngMaterial(%d)", num);
+    }
+    rc = stdrand_GetRngMaterial(buf, num);
+    depth--;
+    return rc;
 }
 
 static int cb_GetPseudoRandMaterial(unsigned char *buf, int num)
 {
-    if (localDebugTracing) app_tracef("INFO: cb_GetPseudoRandMaterial(%d)", num);
+    if (localDebugTracing_Info)
+    {
+        app_tracef("INFO: (STDRAND_ENGINE) cb_GetPseudoRandMaterial(%d)", num);
+    }
     return stdrand_GetRngMaterial(buf, num);
 }
 
@@ -88,7 +116,14 @@ static int cb_Status(void)
 
 static void cb_Cleanup(void)
 {
-    if (localDebugTracing) app_tracef("INFO: cb_Cleanup()");
+    if (localDebugTracing_Info)
+    {
+        app_tracef("INFO: (STDRAND_ENGINE) cb_Cleanup() (InstanceTotal=%ld)", g_InstanceTotalBytesRequested);
+    }
+    if (printTotalsToStdOut)
+    {
+        fprintf(stderr, "*** INFO: (STDRAND_ENGINE) cb_Cleanup() (InstanceTotal=%ld)\n", g_InstanceTotalBytesRequested);
+    }
 }
 
 int stdrand_bind(ENGINE *pEngine, const char *pID)
@@ -104,23 +139,30 @@ int stdrand_bind(ENGINE *pEngine, const char *pID)
                                                   &cb_Status};               // int (*status) (void);
     (void)pID; // Unused variable
 
-    if (localDebugTracing) app_tracef("INFO: stdrand_bind()");
+    if (localDebugTracing_Debug)
+    {
+        app_tracef("DEBUG: (STDRAND_ENGINE) stdrand_bind()");
+    }
 
     if (ENGINE_set_id  (pEngine, ENGINE_ID               ) != ENGINE_STATUS_OK ||
         ENGINE_set_name(pEngine, ENGINE_NAME             ) != ENGINE_STATUS_OK ||
         ENGINE_set_RAND(pEngine, &engineCallbackFunctions) != ENGINE_STATUS_OK)
     {
-      app_tracef("ERROR: stdrand_bind: Binding failed");
+      app_tracef("ERROR: (STDRAND_ENGINE) stdrand_bind: Binding failed");
       return ENGINE_STATUS_NG;
     }
 
     if (stdrand_EngineStateInit(&engine_state) != ENGINE_STATUS_OK)
     {
-      app_tracef("ERROR: stdrand_EngineStateInit failed");
+      app_tracef("ERROR: (STDRAND_ENGINE) stdrand_EngineStateInit failed");
       return ENGINE_STATUS_NG;
     }
 
-    if (localDebugTracing) app_tracef("INFO: stdrand_bind() OK");
+    g_InstanceTotalBytesRequested = 0;
+    if (localDebugTracing_Debug)
+    {
+        app_tracef("DEBUG: (STDRAND_ENGINE) stdrand_bind() OK");
+    }
     return ENGINE_STATUS_OK;
 }
 
