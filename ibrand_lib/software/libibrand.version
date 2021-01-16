@@ -1,4 +1,0 @@
-libibrand {
-  global: IBRand_init; IBRand_deinit; IBRand_readData; # explicitly list symbols to be exported
-  local: *;         # hide everything else
-};
