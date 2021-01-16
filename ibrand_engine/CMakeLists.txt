@@ -1,6 +1,6 @@
 include_directories(../ibrand_common ../ibrand_service)
 
-add_library(ibrand_engine SHARED ibrand_engine.c ibrand_main.c writeentropy.c ibrand_get_new_entropy.c ibrand_config.c)
+add_library(ibrand_engine SHARED ibrand_engine.c ibrand_main.c ibrand_get_new_entropy.c ibrand_config.c)
 
 set_target_properties(
   ibrand_engine
