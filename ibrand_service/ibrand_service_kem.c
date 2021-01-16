@@ -1,6 +1,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 // IronBridge RNG Provider Service
 // Copyright 2020 Cambridge Quantum Computing Ltd. All Rights Reserved.
+// Original: JGilmore (2020/06/23 15:26:31)
 //
 // Licensed under the Apache License 2.0 (the "License").  You may not use
 // this file except in compliance with the License.  You can obtain a copy

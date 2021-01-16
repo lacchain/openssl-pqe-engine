@@ -16,7 +16,6 @@ pkg_get_variable(OPENSSL_PREFIX      libcrypto prefix)
 string(REPLACE "${OPENSSL_PREFIX}/" "" OPENSSL_ENGINES_DESTINATION "${OPENSSL_ENGINES_DIR}")
 
 install ( TARGETS ibrand_common        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}        )
-install ( TARGETS ibrand_lib           LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}        )
 install ( TARGETS ibrand_service_shmem LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}        )
 install ( TARGETS ibrand_service       RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}        )
 install ( TARGETS ibrand_engine        LIBRARY DESTINATION ${OPENSSL_ENGINES_DESTINATION} )

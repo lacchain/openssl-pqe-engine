@@ -32,8 +32,7 @@ RUN rm -rf /var/lib/apt/lists/*
 
 COPY CMakeLists.txt                ./
 COPY ibrand_common                 ./ibrand_common/
-COPY ibrand_lib/CMakeLists.txt     ./ibrand_lib/
-COPY ibrand_lib/software           ./ibrand_lib/software/
+COPY ibrand_lib                    ./ibrand_lib/
 COPY ibrand_service                ./ibrand_service/
 COPY ibrand_engine                 ./ibrand_engine/
 COPY ibinit_engine                 ./ibinit_engine/
@@ -56,7 +55,7 @@ RUN apt-get update && apt-get install --no-install-recommends -yV \
     liboqs \
  && rm -rf /var/lib/apt/lists/*
 
-COPY ./_sample_data/ibrand_openssl.cnf /usr/lib/ssl/
+COPY ./_sample_data/ibrand_openssl.cnf $HOME/.ibrand
 COPY --from=builder /openssl-pqe-engine_0.1.0_amd64.deb .
 
 RUN dpkg -i ./openssl-pqe-engine_0.1.0_amd64.deb
@@ -139,7 +138,7 @@ JSON:{\n\
   }\n\
 }\n\
 _EOF_\n\
-export OPENSSL_CONF=/usr/lib/ssl/ibrand_openssl.cnf\n\
+export OPENSSL_CONF=$HOME/.ibrand/ibrand_openssl.cnf\n\
 export IBRAND_CONF=/ibrand.cnf\n\
 ibrand_service\n\
 openssl engine\n\

@@ -7,26 +7,26 @@ JSON:{
   "AuthSettings":
   {
     "AUTHTYPE":"CLIENT_CERT",
-    "AUTHURL":"https://ironbridgeapi.com/api/login",
+    "AUTHURL":"https://dev.ironbridgeapi.com/api/login",
     "AUTHUSER":"notused1",
     "AUTHPSWD":"notused2",
     "AUTHSSLCERTTYPE":"PEM",
-    "AUTHSSLCERTFILE":"/etc/ssl/certs/client.ironbridgeapi.com.crt.pem",
-    "AUTHSSLKEYFILE":"/etc/ssl/private/client.ironbridgeapi.com.key.pem",
+    "AUTHSSLCERTFILE":"$HOME/.ibrand/client.ironbridgeapi.com.crt.pem",
+    "AUTHSSLKEYFILE":"$HOME/.ibrand/client.ironbridgeapi.com.key.pem",
     "AUTHRETRYDELAY":"5"
   },
   "SecuritySettings":
   {
     "USESECURERNG":"1",
     "PREFERRED_KEM_ALGORITHM":"222",
-    "CLIENTSETUP_OOB_PATH":"~/oob/",
+    "CLIENTSETUP_OOB_PATH":"$HOME/.ibrand/",
     "CLIENTSETUP_OOB1_FILENAME":"ironbridge_clientsetup_OOB_1.json",
     "CLIENTSETUP_OOBN_FILENAME":"ironbridge_clientsetup_OOB_%d.json",
-    "OURKEMSECRETKEYFILENAME":"/usr/local/ssl/ibrand_sk.bin"
+    "OURKEMSECRETKEYFILENAME":"$HOME/.ibrand/ibrand_sk.bin"
   },
   "CommsSettings":
   {
-    "BASEURL":"https://ironbridgeapi.com/api",
+    "BASEURL":"https://dev.ironbridgeapi.com/api",
     "BYTESPERREQUEST":"4096",
     "RETRIEVALRETRYDELAY":"3"
   },
@@ -34,7 +34,7 @@ JSON:{
   {
     "STORAGETYPE":"SHMEM",
     "FILE_DATAFORMAT":"RAW",
-    "FILE_FILENAME":"/var/lib/ibrand/ibrand_data.bin",
+    "FILE_FILENAME":"$HOME/.ibrand/ibrand_data.bin",
     "FILE_LOCKFILEPATH":"/tmp",
     "FILE_HIGHWATERMARK":"30000",
     "FILE_LOWWATERMARK":"20000",

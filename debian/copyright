@@ -19,20 +19,19 @@ Files:     CMakeLists.txt
            ibrand_lib/README.md
            ibrand_lib/healthcheck.c
            ibrand_lib/healthcheck.h
-           ibrand_lib/libibrand.c
-           ibrand_lib/libibrand.h
-           ibrand_lib/libibrand.version
-           ibrand_lib/libibrand_private.h
+           ibrand_lib/ibrand_main.c
+           ibrand_lib/ibrand_main.h
+           ibrand_lib/ibrand.version
+           ibrand_lib/ibrand_private.h
            ibrand_lib/writeentropy.c
-           ibrand_openssl/.gitignore
-           ibrand_openssl/CMakeLists.txt
-           ibrand_openssl/Makefile.linux
-           ibrand_openssl/README.md
-           ibrand_openssl/e_ibrand.d
-           ibrand_openssl/ibrand_openssl.cnf
-           ibrand_openssl/infnoise-openssl-master.txt
-           ibrand_openssl/infnoise-openssl-master.zip
-           ibrand_openssl/makefile
+           ibrand_engine/.gitignore
+           ibrand_engine/CMakeLists.txt
+           ibrand_engine/Makefile.linux
+           ibrand_engine/README.md
+           ibrand_engine/ibrand_openssl.cnf
+           ibrand_engine/infnoise-openssl-master.txt
+           ibrand_engine/infnoise-openssl-master.zip
+           ibrand_engine/makefile
            ibrand_service/.gitignore
            ibrand_service/CMakeLists.txt
            ibrand_service/ibrand_service_aes.c
@@ -101,7 +100,7 @@ License:   __UNKNOWN__
  Based on the service template provided by Devin Watson:
  http://www.netzmafia.de/skripten/unix/linux-daemon-howto.html
 
-Files:     ibrand_openssl/e_ibrand.c
+Files:     ibrand_engine/ibrand_engine.c
 Copyright: 2018 Thomás Inskip. https://github.com/tinskip/infnoise-openssl-engine
 License:   __UNKNOWN__
  Implementation of OpenSSL RAND engine which uses the infnoise TRNG to
