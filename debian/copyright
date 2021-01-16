@@ -11,27 +11,13 @@ Files:     CMakeLists.txt
            ibrand_common/my_json.c
            ibrand_common/my_json.h
            ibrand_common/my_utilslib.version
-           ibrand_lib/.gitignore
-           ibrand_lib/CMakeLists.txt
-           ibrand_lib/Keccak/KeccakF-1600-interface.h
-           ibrand_lib/Keccak/KeccakF-1600-reference.c
-           ibrand_lib/Makefile.linux
-           ibrand_lib/README.md
-           ibrand_lib/healthcheck.c
-           ibrand_lib/healthcheck.h
-           ibrand_lib/ibrand_main.c
-           ibrand_lib/ibrand_main.h
-           ibrand_lib/ibrand.version
-           ibrand_lib/ibrand_private.h
-           ibrand_lib/writeentropy.c
+           ibrand_engine/ibrand_main.c
+           ibrand_engine/ibrand_main.h
+           ibrand_engine/ibrand.version
+           ibrand_engine/ibrand_private.h
            ibrand_engine/.gitignore
            ibrand_engine/CMakeLists.txt
            ibrand_engine/Makefile.linux
-           ibrand_engine/README.md
-           ibrand_engine/ibrand_openssl.cnf
-           ibrand_engine/infnoise-openssl-master.txt
-           ibrand_engine/infnoise-openssl-master.zip
-           ibrand_engine/makefile
            ibrand_service/.gitignore
            ibrand_service/CMakeLists.txt
            ibrand_service/ibrand_service_aes.c
@@ -64,29 +50,6 @@ License:   __UNKNOWN__
  this file except in compliance with the License.  You can obtain a copy
  in the file LICENSE in the source distribution or at
  https://www.openssl.org/source/license.html
-
-Files:     ibrand_lib/Keccak/brg_endian.h
-Copyright: 1998-2008 Brian Gladman, Worcester, UK.
-License:   __UNKNOWN__
- LICENSE TERMS
- .
- The redistribution and use of this software (with or without changes)
- is allowed without the payment of fees or royalties provided that:
- .
- 1. source code distributions include the above copyright notice, this
- list of conditions and the following disclaimer;
- .
- 2. binary distributions include the above copyright notice, this list
- of conditions and the following disclaimer in their documentation;
- .
- 3. the name of the copyright holder is not used to endorse products
- built using this software without specific written permission.
- .
- DISCLAIMER
- .
- This software is provided 'as is' with no explicit or implied warranties
- in respect of its properties, including, but not limited to, correctness
- and/or fitness for purpose.
 
 Files:     ibrand_service/ibrand_service.c
            ibrand_service/ibrand_service.h

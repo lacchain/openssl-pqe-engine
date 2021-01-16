@@ -32,7 +32,6 @@ RUN rm -rf /var/lib/apt/lists/*
 
 COPY CMakeLists.txt                ./
 COPY ibrand_common                 ./ibrand_common/
-COPY ibrand_lib                    ./ibrand_lib/
 COPY ibrand_service                ./ibrand_service/
 COPY ibrand_engine                 ./ibrand_engine/
 COPY ibinit_engine                 ./ibinit_engine/

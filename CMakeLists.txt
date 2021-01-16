@@ -6,7 +6,6 @@ find_package(PkgConfig REQUIRED)
 include(GNUInstallDirs)
 
 add_subdirectory(ibrand_common)
-add_subdirectory(ibrand_lib)
 add_subdirectory(ibrand_service)
 add_subdirectory(ibrand_engine)
 add_subdirectory(ibinit_engine)

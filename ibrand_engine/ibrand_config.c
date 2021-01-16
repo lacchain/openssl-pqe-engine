@@ -40,7 +40,7 @@ tIB_INSTANCEDATA *cfgInitConfig (void)
     pIBRand = malloc(sizeof(tIB_INSTANCEDATA));
     if (!pIBRand)
     {
-        app_tracef("[ibrand_lib] FATAL: Failed to allocate memory for local storage. Aborting.");
+        app_tracef("[ibrand_engine] FATAL: Failed to allocate memory for local storage. Aborting.");
         return NULL;
     }
     memset(pIBRand, 0, sizeof(tIB_INSTANCEDATA));
@@ -54,7 +54,7 @@ tIB_INSTANCEDATA *cfgInitConfig (void)
     }
     if (strlen(pIBRand->szConfigFilename) == 0)
     {
-        app_tracef("[ibrand_lib] FATAL: Configuration not specified, neither on commandline nor via an environment variable.");
+        app_tracef("[ibrand_engine] FATAL: Configuration not specified, neither on commandline nor via an environment variable.");
         free(pIBRand);
         return NULL;
     }
