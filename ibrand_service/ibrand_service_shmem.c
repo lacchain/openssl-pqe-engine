@@ -1,6 +1,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 // IronBridge RNG Provider Service
 // Copyright 2020 Cambridge Quantum Computing Ltd. All Rights Reserved.
+// Original: JGilmore (2020/06/23 15:26:31)
 //
 // Licensed under the Apache License 2.0 (the "License").  You may not use
 // this file except in compliance with the License.  You can obtain a copy
@@ -50,7 +51,7 @@ static const char *ACTIVITY_NAMES[4] = {"CREATE","WRITE","GETINFO","SHMEM_RETRIE
 #define SEMAPHORE_NAME_SIZE (16)
 
 // Local Vars
-static const unsigned int    __shMemAccessPermissions = 0666;                 // or 0644
+static const unsigned int    __shMemAccessPermissions = 0640;
 static char                  __shMemBackingFilename[_MAX_PATH] = {0};         // Typically "shmem_ibrand01" e.g. /dev/shm/shmem_ibrand01
 static unsigned long         __shMemSizeInBytes = 0;                          // Typically sizeof(tSHMEMHEADER) + DEFAULT_TANK_SIZE; // See SHMEM_STORAGESIZE, pIBConfig->shMemStorageSize, ShMem_SetStorageSize
 static char                  __shMemSemaphoreName[SEMAPHORE_NAME_SIZE] = {0}; // Typically "sem_ibrand01"

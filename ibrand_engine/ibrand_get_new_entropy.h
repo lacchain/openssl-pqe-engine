@@ -9,12 +9,12 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 
-#ifndef _INCLUDE_LIBIBRAND_GETNEWENTROPY_H_
-#define _INCLUDE_LIBIBRAND_GETNEWENTROPY_H_
+#ifndef _INCLUDE_IBRAND_GETNEWENTROPY_H_
+#define _INCLUDE_IBRAND_GETNEWENTROPY_H_
 
-#include "libibrand_config.h" // For tIB_INSTANCEDATA
-#include "libibrand.h" // For struct ibrand_context
+#include "ibrand_config.h" // For tIB_INSTANCEDATA
+#include "ibrand_main.h" // For struct ibrand_context
 
 extern bool GetNewEntropy(struct ibrand_context *context, tIB_INSTANCEDATA *pIBRand, uint8_t *inBuf, size_t inBufLen);
 
-#endif // _INCLUDE_LIBIBRAND_GETNEWENTROPY_H_
+#endif // _INCLUDE_IBRAND_GETNEWENTROPY_H_

@@ -1,5 +1,0 @@
-
-Original infnoise-openssl-master:
-   "infnoise-openssl-master.zip"
-from:
-   https://github.com/tinskip/infnoise-openssl
