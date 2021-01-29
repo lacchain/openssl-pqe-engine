@@ -418,7 +418,7 @@ tERRORCODE callToRemote(tIB_INSTANCEDATA *pIBRand,
             //   "name": "accept",
             //   "value": "application/json, text/plain, */*"
             //   "name": "authorization",
-            //   "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6InVzZXIxIiwibmJmIjoxNTczODM5ODU0LCJleHAiOjE1NzM5MjYyNTQsImlhdCI6MTU3MzgzOTg1NCwiaXNzIjoiaHR0cHM6Ly9pcm9uYnJpZGdlYXBpLmNvbSIsImF1ZCI6IkFueSJ9.sTD67YPrCdj1RWOqa8R3Pc3j7DA88mF8x0oD2ZMbmQ0"
+            //   "value": "Bearer <BearerToken>"
             //   "name": "content-type",
             //   "value": "application/json"
 
