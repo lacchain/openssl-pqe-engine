@@ -1,3 +1,15 @@
+///////////////////////////////////////////////////////////////////////////////
+// IronBridge RNG Provider Service
+// Copyright 2020 Cambridge Quantum Computing Ltd. All Rights Reserved.
+// Original: JGilmore (2020/06/23 15:26:31)
+//
+// Licensed under the Apache License 2.0 (the "License").  You may not use
+// this file except in compliance with the License.  You can obtain a copy
+// in the file LICENSE in the source distribution or at
+// https://www.openssl.org/source/license.html
+//
+///////////////////////////////////////////////////////////////////////////////
+
 
 // Required to include clock_gettime
 #define _POSIX_C_SOURCE 200809L
@@ -12,7 +24,7 @@
 #include <sys/types.h>
 #include <syslog.h>
 
-#include "libibrand_config.h"
+#include "ibrand_config.h"
 #include "ibrand_service_shmem.h"
 #include "my_utilslib.h"
 
@@ -28,7 +40,7 @@ tIB_INSTANCEDATA *cfgInitConfig (void)
     pIBRand = malloc(sizeof(tIB_INSTANCEDATA));
     if (!pIBRand)
     {
-        app_tracef("[ibrand_lib] FATAL: Failed to allocate memory for local storage. Aborting.");
+        app_tracef("[ibrand_engine] FATAL: Failed to allocate memory for local storage. Aborting.");
         return NULL;
     }
     memset(pIBRand, 0, sizeof(tIB_INSTANCEDATA));
@@ -42,7 +54,7 @@ tIB_INSTANCEDATA *cfgInitConfig (void)
     }
     if (strlen(pIBRand->szConfigFilename) == 0)
     {
-        app_tracef("[ibrand_lib] FATAL: Configuration not specified, neither on commandline nor via an environment variable.");
+        app_tracef("[ibrand_engine] FATAL: Configuration not specified, neither on commandline nor via an environment variable.");
         free(pIBRand);
         return NULL;
     }

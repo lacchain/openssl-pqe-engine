@@ -1,6 +1,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 // IronBridge RNG Provider Service
 // Copyright 2020 Cambridge Quantum Computing Ltd. All Rights Reserved.
+// Original: JGilmore (2020/06/23 15:26:31)
 //
 // Licensed under the Apache License 2.0 (the "License").  You may not use
 // this file except in compliance with the License.  You can obtain a copy
@@ -185,7 +186,7 @@ static tERRORCODE SetupRNGForSSLConnection(tIB_INSTANCEDATA *pIBRand, bool isBef
     {
         ACT_NO_ACTION_TAKEN = 0,
         ACT_USING_DEFAULT_RNG,
-        ACT_USING_STDRAND_RNG,
+        ACT_USING_IBINIT_RNG,
         ACT_USING_RDRAND_RNG,
 #ifdef DISABLE_IBRAND_BY_REMOVING_ENVVAR
         ACT_IBRAND_ENVVAR_REMOVED,
@@ -197,7 +198,7 @@ static tERRORCODE SetupRNGForSSLConnection(tIB_INSTANCEDATA *pIBRand, bool isBef
     {
         "ACT_NO_ACTION_TAKEN",
         "ACT_USING_DEFAULT_RNG",
-        "ACT_USING_STDRAND_RNG",
+        "ACT_USING_IBINIT_RNG",
         "ACT_USING_RDRAND_RNG",
 #ifdef DISABLE_IBRAND_BY_REMOVING_ENVVAR
         "ACT_IBRAND_ENVVAR_REMOVED",
@@ -223,11 +224,11 @@ static tERRORCODE SetupRNGForSSLConnection(tIB_INSTANCEDATA *pIBRand, bool isBef
             erc = ERC_OK;
             goto CLEANUP_AND_EXIT;
         }
-        if (IsOpensslRngEngineActive(pIBRand->hCurl, "stdrand") == true)
+        if (IsOpensslRngEngineActive(pIBRand->hCurl, "ibinit") == true)
         {
-            if (SetOpensslRngEngine(pIBRand, "stdrand"))
+            if (SetOpensslRngEngine(pIBRand, "ibinit"))
             {
-                *pActionTaken = ACT_USING_STDRAND_RNG;
+                *pActionTaken = ACT_USING_IBINIT_RNG;
                 erc = ERC_OK;
                 goto CLEANUP_AND_EXIT;
             }
@@ -417,7 +418,7 @@ tERRORCODE callToRemote(tIB_INSTANCEDATA *pIBRand,
             //   "name": "accept",
             //   "value": "application/json, text/plain, */*"
             //   "name": "authorization",
-            //   "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6InVzZXIxIiwibmJmIjoxNTczODM5ODU0LCJleHAiOjE1NzM5MjYyNTQsImlhdCI6MTU3MzgzOTg1NCwiaXNzIjoiaHR0cHM6Ly9pcm9uYnJpZGdlYXBpLmNvbSIsImF1ZCI6IkFueSJ9.sTD67YPrCdj1RWOqa8R3Pc3j7DA88mF8x0oD2ZMbmQ0"
+            //   "value": "Bearer <BearerToken>"
             //   "name": "content-type",
             //   "value": "application/json"
 
@@ -490,7 +491,7 @@ tERRORCODE callToRemote(tIB_INSTANCEDATA *pIBRand,
     //     return ERC_IBCOM_OPENSSL_PREFERRED_ENGINE_NOT_SET;
     // }
 
-    // if ibrand engine is active, then use stdrand or rdrand engine
+    // if ibrand engine is active, then use ibinit or rdrand engine
     // If neither are available, then remove environment variable in an and try that.
     int rngActionTaken = 0;
     SetupRNGForSSLConnection(pIBRand, true, &rngActionTaken);

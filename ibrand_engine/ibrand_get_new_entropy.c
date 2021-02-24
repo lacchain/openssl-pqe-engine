@@ -1,3 +1,14 @@
+///////////////////////////////////////////////////////////////////////////////
+// IronBridge RNG Provider Service
+// Copyright 2020 Cambridge Quantum Computing Ltd. All Rights Reserved.
+// Original: JGilmore (2020/06/23 15:26:31)
+//
+// Licensed under the Apache License 2.0 (the "License").  You may not use
+// this file except in compliance with the License.  You can obtain a copy
+// in the file LICENSE in the source distribution or at
+// https://www.openssl.org/source/license.html
+//
+///////////////////////////////////////////////////////////////////////////////
 
 #define _POSIX_C_SOURCE 200809L  // Required to include clock_gettime
 
@@ -11,13 +22,13 @@
 #include <sys/types.h>
 #include <syslog.h>
 
-#include "../../ibrand_common/my_utils.h"
-#include "../../ibrand_common/my_filelock.h"
-#include "../../ibrand_common/my_logging.h" // For app_tracef()
-#include "../../ibrand_service/ibrand_service_shmem.h" // For ShMem_GetCurrentWaterLevel() & ShMem_RetrieveFromDataStore()
+#include "../ibrand_common/my_utils.h"
+#include "../ibrand_common/my_filelock.h"
+#include "../ibrand_common/my_logging.h" // For app_tracef()
+#include "../ibrand_service/ibrand_service_shmem.h" // For ShMem_GetCurrentWaterLevel() & ShMem_RetrieveFromDataStore()
 
-#include "libibrand.h"
-#include "libibrand_get_new_entropy.h"
+#include "ibrand_main.h"
+#include "ibrand_get_new_entropy.h"
 
 static const int localDebugTracing = false;
 
