@@ -1,0 +1,209 @@
+////////////////////////////////////////////////////////////
+// IronBridge OpenSSL Engine Sequence Diagram
+// Copyright (c) 2020-2021 Cambridge Quantum Computing Ltd.
+// All rights reserved.
+// JGilmore (23/02/2021 17:53) 
+////////////////////////////////////////////////////////////
+// To View and/or Edit:
+//   * Go to https://sequencediagram.org/
+//   * Paste the entire contents of this text file into the
+//     left hand window.
+//   * Edit as required.
+//   * Copy the edited text back into this file, including
+//     these instructions.
+////////////////////////////////////////////////////////////
+
+// #DarkGrey
+// #Grey
+// #LightGrey
+// #Silver
+// #SlateGrey
+//
+// #AliceBlue
+// #LightBlue
+// #LightCyan
+// #LightSteelBlue
+//
+// #Gainsboro
+// #Linen
+// #MintCream
+// #Thistle
+// #WhiteSmoke
+// #Wheat
+
+
+title IronBridge OpenSSL Engine (IB-Rand)
+
+bottomparticipants
+
+actor User
+participant System
+participant OpenSSL
+participant IB-Rand Engine
+participant IB-Rand Service
+database Disk
+participant Entropy Tank
+participant IronBridge API
+participant Entropy Source
+
+///////////////////////////////////////
+// Startup
+///////////////////////////////////////
+group #LightSteelBlue IB-Rand Service Initialisation
+System->IB-Rand Service: Initialise
+activate IB-Rand Service #BBEEFF
+IB-Rand Service->Disk: Read Config
+activate Disk #BBEEFF
+IB-Rand Service<-Disk: Config
+deactivate Disk
+System<-IB-Rand Service: Ready (Daemon Started)
+deactivate IB-Rand Service
+end
+
+///////////////////////////////////////
+// IB-Rand Service
+///////////////////////////////////////
+// Check Water Level
+group #LightSteelBlue IB-Rand Service
+System->IB-Rand Service: Start Daemon (fork)
+activate IB-Rand Service #BBEEFF
+IB-Rand Service->Disk: Read KEMPrivateKey
+activate Disk #BBEEFF
+IB-Rand Service<-Disk: KEMPrivateKey
+deactivate Disk
+
+loop #Gainsboro Forever
+
+IB-Rand Service->Entropy Tank: Check WaterLevel
+activate Entropy Tank #BBEEFF
+IB-Rand Service<-Entropy Tank: WaterLevel
+deactivate Entropy Tank
+box over IB-Rand Service: If WaterLevel is above LowWaterMark\nthen jump to 'Sleep'
+loop #Thistle  until WaterLevel reaches HighWaterMark
+// Connection and authentication
+box over IB-Rand Service,IronBridge API: Exchange and Verify Certificates
+// Request new SharedSecret (SessionKey)
+IB-Rand Service->IronBridge API: Request new SharedSecret\n(aka SessionKey)
+activate IronBridge API #BBEEFF
+
+box over IB-Rand Service,IronBridge API #BfBeCb: (Conditionally) Renew KEMKeyPair <background:#yellow>(A-B)</background>
+
+IronBridge API->Entropy Source: Acquire Randomness
+activate Entropy Source #BBEEFF
+IronBridge API<-Entropy Source: Randomness
+deactivate Entropy Source
+box over IronBridge API: Encapsulate SharedSecret\nusing caller's KemPublicKey
+IB-Rand Service<-IronBridge API: Encapsulated SharedSecret
+deactivate IronBridge API
+box over IB-Rand Service: Decapsulate SharedSecret\nusing KEMPrivateKey
+// Request Randomness
+IB-Rand Service->IronBridge API: Request Randomness
+activate IronBridge API #BBEEFF
+
+box over IB-Rand Service,IronBridge API #BfBeCb: (Conditionally) Renew SharedSecret <background:#yellow>(C-D)</background>
+
+IronBridge API->Entropy Source: Acquire Randomness
+activate Entropy Source #BBEEFF
+IronBridge API<-Entropy Source: Randomness
+deactivate Entropy Source
+box over IronBridge API: Encrypt using SharedSecret
+IB-Rand Service<-IronBridge API: Encrypted Randomness
+deactivate IronBridge API
+box over IB-Rand Service: Decrypt Randomness\nusing SharedSecret
+// Store Randomness in Shared Memory "Tank"
+IB-Rand Service->Entropy Tank: Store Randomness
+activate Entropy Tank #BBEEFF
+IB-Rand Service<-Entropy Tank: Stored successfully
+deactivate Entropy Tank
+IB-Rand Service->Entropy Tank: Check WaterLevel
+activate Entropy Tank #BBEEFF
+IB-Rand Service<-Entropy Tank: WaterLevel
+deactivate Entropy Tank
+note over IB-Rand Service:Repeat until\nHighWaterMark reached
+end
+box over IB-Rand Service: Sleep
+box over IB-Rand Service: Repeat Forever
+deactivate IB-Rand Service
+end
+end 
+
+///////////////////////////////////////
+// IB-Rand Engine
+///////////////////////////////////////
+group #LightSteelBlue Open SSL Request for entropy
+User->OpenSSL:request for randomness\ne.g. rand, genrsa etc
+activate OpenSSL #BBEEFF
+OpenSSL->IB-Rand Engine: Start Engine
+activate IB-Rand Engine #BBEEFF
+OpenSSL<-IB-Rand Engine: Engine Started
+OpenSSL->IB-Rand Engine: Request for Randomness
+loop #Thistle Until request is fullfilled
+IB-Rand Engine->Entropy Tank: Retrieve Randomness
+activate Entropy Tank #BBEEFF
+IB-Rand Engine<-Entropy Tank: Randomness
+deactivate Entropy Tank
+end
+OpenSSL<-IB-Rand Engine: Randomness
+OpenSSL->IB-Rand Engine: Halt Engine
+OpenSSL<-IB-Rand Engine: Engine Halted
+deactivate IB-Rand Engine
+User<-OpenSSL:Randomness/Key(s) etc
+deactivate OpenSSL
+end
+
+// KEMKeyPair Renewal
+rbox over IronBridge API #Yellow: A
+activate IB-Rand Service #BBEEFF
+activate IronBridge API #BBEEFF
+group #2f2e7b KEMKeyPair Renewal (conditional) #white
+IB-Rand Service<-IronBridge API: KEMKeyPair Expired
+deactivate IronBridge API
+IB-Rand Service->IronBridge API: Request KEMPrivateKey
+activate IronBridge API #BBEEFF
+IronBridge API->Entropy Source: Acquire Randomness
+activate Entropy Source #BBEEFF
+IronBridge API<-Entropy Source: Randomness
+deactivate Entropy Source
+box over IronBridge API: Encrypt new KEMPublicKey\nwith existing SharedSecret
+IB-Rand Service<-IronBridge API: Encrypted KEMPublicKey
+deactivate IronBridge API
+box over IB-Rand Service: Decrypt KEMPublicKey\nusing existing SharedSecret
+IB-Rand Service->Disk: Store KEMPublicKey
+activate Disk #BBEEFF
+IB-Rand Service<-Disk: KEMPublicKey stored
+deactivate Disk
+IB-Rand Service->IronBridge API: Retry original request
+activate IronBridge API #BBEEFF
+end
+rbox over IronBridge API #Yellow: B
+deactivate IronBridge API
+deactivate IB-Rand Service
+// End of KEMKeyPair Renewal
+
+
+// SharedSecret Renewal
+rbox over IronBridge API #Yellow: C
+activate IB-Rand Service #BBEEFF
+activate IronBridge API #BBEEFF
+group #2f2e7b SharedSecret Expired (conditional) #white
+IB-Rand Service<-IronBridge API: SharedSecret Expired
+deactivate IronBridge API
+IB-Rand Service->IronBridge API: Request new SharedSecret
+activate IronBridge API #BBEEFF
+IronBridge API->Entropy Source: Acquire Randomness
+activate Entropy Source #BBEEFF
+IronBridge API<-Entropy Source: Randomness
+deactivate Entropy Source
+box over IronBridge API: Encapsulate new SharedSecret\nwith existing KEMPrivateKey
+IB-Rand Service<-IronBridge API: Encapsulated Shared Secret
+deactivate IronBridge API
+box over IB-Rand Service: Decapsulate SharedSecret\nusing existing KEMPublicKey
+IB-Rand Service->IronBridge API: Retry original request
+activate IronBridge API #BBEEFF
+end
+rbox over IronBridge API #Yellow: D
+deactivate IronBridge API
+deactivate IB-Rand Service
+// End of SharedSecret Renewal
+
+
